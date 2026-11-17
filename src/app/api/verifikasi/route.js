@@ -1,0 +1,44 @@
+import { createHash, randomInt } from 'node:crypto';
+import { svc, siapa, err, getRow, put, upd, del } from '@/lib/server';
+import { kirimEmail, kirimWA } from '@/lib/kirim';
+export const dynamic = 'force-dynamic';
+
+const hash = (k, uid) => createHash('sha256').update(`${k}:${uid}:${process.env.APPWRITE_API_KEY}`).digest('hex');
+const samar = (pg) => pg.kanal === 'WHATSAPP' ? pg.no_telepon.slice(0, 5) + '****' + pg.no_telepon.slice(-2) : pg.email.replace(/^(.).*(@.*)$/, '$1***$2');
+
+export async function POST(req) {
+  const u = await siapa(req);
+  if (!u) return err('Belum masuk.', 401);
+  const b = await req.json();
+  const { db, users } = svc();
+  const pg = await getRow(db, 'pengguna', u.$id).catch(() => null);
+  if (!pg) return err('Profil belum dibuat.', 404);
+  if (pg.kontak_terverifikasi) return Response.json({ ok: true, sudah: true });
+  const lama = await getRow(db, 'kode_verifikasi', u.$id).catch(() => null);
+
+  if (b.aksi === 'kirim') {
+    if (lama && Date.now() - new Date(lama.$updatedAt) < 60000) return err('Tunggu 1 menit sebelum meminta kode baru.', 429);
+    const kode = String(randomInt(100000, 1000000));
+    const wa = pg.kanal === 'WHATSAPP';
+    const data = { kode_hash: hash(kode, u.$id), kanal: pg.kanal, tujuan: wa ? pg.no_telepon : pg.email, kedaluwarsa: new Date(Date.now() + 10 * 60000).toISOString(), percobaan: 0 };
+    if (lama) await upd(db, 'kode_verifikasi', u.$id, data); else await put(db, 'kode_verifikasi', u.$id, data, []);
+    const teks = `Kode verifikasi: ${kode}\nBerlaku 10 menit. Jangan bagikan kode ini ke siapa pun.`;
+    const ok = wa ? await kirimWA(pg.no_telepon, `*LapaKWU*\n${teks}`) : await kirimEmail(pg.email, 'Kode verifikasi LapaKWU', teks);
+    if (!ok) return err(`Kode gagal dikirim lewat ${wa ? 'WhatsApp' : 'email'}. Coba lagi sebentar lagi atau hubungi admin.`, 502);
+    return Response.json({ ok: true, tujuan: samar(pg) });
+  }
+
+  if (b.aksi === 'cek') {
+    if (!lama) return err('Minta kode dulu.');
+    if (new Date(lama.kedaluwarsa) < new Date()) return err('Kode sudah kedaluwarsa. Minta kode baru.');
+    if (lama.percobaan >= 5) return err('Terlalu banyak percobaan salah. Minta kode baru.', 429);
+    if (hash(String(b.kode || '').trim(), u.$id) !== lama.kode_hash) { await upd(db, 'kode_verifikasi', u.$id, { percobaan: lama.percobaan + 1 }); return err('Kode salah.'); }
+    await del(db, 'kode_verifikasi', u.$id);
+    const pembeli = await getRow(db, 'pembeli', u.$id).catch(() => null);
+    // Pembeli langsung aktif. Mitra tetap menunggu persetujuan admin.
+    await upd(db, 'pengguna', u.$id, { kontak_terverifikasi: true, ...(pembeli ? { status_akun: 'AKTIF' } : {}) });
+    if (pg.kanal === 'EMAIL') await users.updateEmailVerification({ userId: u.$id, emailVerification: true }).catch(() => {});
+    return Response.json({ ok: true });
+  }
+  return err('Aksi tidak dikenal.');
+}
