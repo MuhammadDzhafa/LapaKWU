@@ -1,5 +1,5 @@
 import { kabari } from '@/lib/kirim';
-import { Client, Account, TablesDB, Users, Query, ID, Permission, Role } from 'node-appwrite';
+import { Client, Account, TablesDB, Storage, Users, Query, ID, Permission, Role } from 'node-appwrite';
 export { Query, ID, Permission, Role };
 
 // Patch kompatibilitas undici Node.js untuk node-appwrite
@@ -21,7 +21,7 @@ const P = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID;
 
 export const svc = () => {
   const c = new Client().setEndpoint(E).setProject(P).setKey(process.env.APPWRITE_API_KEY);
-  return { db: new TablesDB(c), users: new Users(c) };
+  return { db: new TablesDB(c), users: new Users(c), storage: new Storage(c) };
 };
 export const siapa = async (req) => {
   const j = req.headers.get('x-jwt');

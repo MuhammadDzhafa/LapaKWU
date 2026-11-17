@@ -5,6 +5,7 @@ import { list, api, storage, ID, Query, BUCKET, rp, img } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
 import Pesanan from '@/components/Pesanan';
 import Rekap from '@/components/Rekap';
+import Modal from '@/components/Modal';
 
 export default function Lapak() {
   const { akun, peran, pengguna, mitra, memuat, muat: muatSaya } = useSaya();
@@ -17,6 +18,10 @@ export default function Lapak() {
   const [st, setSt] = useState(null);
   const [off, setOff] = useState(null);
   const [edit, setEdit] = useState({});
+
+  // Modal State pengganti alert/confirm/prompt
+  const [modalInfo, setModalInfo] = useState(null);
+  const [busyModal, setBusyModal] = useState(false);
 
   // QRIS State
   const [fileQris, setFileQris] = useState(null);
@@ -69,12 +74,80 @@ export default function Lapak() {
     try { const r = await api('/api/stok', { aksi: 'koreksi', id, baru }); setMsg(`${r.dikembalikan} pcs ${nama} dikembalikan ke stok, rekap ikut dikoreksi.`); setEdit({}); await Promise.all([muat(), muatOff(), segarkanStat()]); }
     catch (e) { setMsg(e.message); }
   };
-  const stok = async (p) => { const v = prompt(`Stok baru untuk ${p.nama}`, p.stok); if (v === null || isNaN(+v) || +v < 0) return; await api('/api/produk', { aksi: 'ubah', id: p.$id, stok: +v }).catch((e) => setMsg(e.message)); muat(); };
-  const harga = async (p) => { const v = prompt(`Harga baru untuk ${p.nama}`, p.harga); if (v === null || isNaN(+v) || +v < 0) return; await api('/api/produk', { aksi: 'ubah', id: p.$id, harga: +v }).catch((e) => setMsg(e.message)); muat(); };
-  const hapusP = async (p) => {
-    if (!confirm(`Hapus ${p.nama}?`)) return;
-    try { if (p.id_gambar) await storage.deleteFile({ bucketId: BUCKET, fileId: p.id_gambar }).catch(() => {}); await api('/api/produk', { aksi: 'hapus', id: p.$id }); muat(); } catch (e) { setMsg(e.message); }
+  const stok = (p) => {
+    setModalInfo({
+      judul: `Ubah Stok ${p.nama}`,
+      pesan: `Masukkan jumlah stok fisik produk ${p.nama} yang tersedia saat ini:`,
+      tipe: 'input',
+      inputType: 'number',
+      inputLabel: 'Jumlah stok (pcs)',
+      inputDefault: p.stok,
+      tombolOk: 'Simpan Stok',
+      onOk: async (v) => {
+        if (v === null || isNaN(+v) || +v < 0) return;
+        setBusyModal(true);
+        try {
+          await api('/api/produk', { aksi: 'ubah', id: p.$id, stok: +v });
+          await muat();
+          setMsg(`Stok ${p.nama} berhasil diubah.`);
+          setModalInfo(null);
+        } catch (e) {
+          setMsg(e.message);
+          setModalInfo(null);
+        }
+        setBusyModal(false);
+      },
+    });
   };
+
+  const harga = (p) => {
+    setModalInfo({
+      judul: `Ubah Harga ${p.nama}`,
+      pesan: `Masukkan harga jual baru untuk produk ${p.nama}:`,
+      tipe: 'input',
+      inputType: 'number',
+      inputLabel: 'Harga baru (Rp)',
+      inputDefault: p.harga,
+      tombolOk: 'Simpan Harga',
+      onOk: async (v) => {
+        if (v === null || isNaN(+v) || +v < 0) return;
+        setBusyModal(true);
+        try {
+          await api('/api/produk', { aksi: 'ubah', id: p.$id, harga: +v });
+          await muat();
+          setMsg(`Harga ${p.nama} berhasil diubah.`);
+          setModalInfo(null);
+        } catch (e) {
+          setMsg(e.message);
+          setModalInfo(null);
+        }
+        setBusyModal(false);
+      },
+    });
+  };
+
+  const hapusP = (p) => {
+    setModalInfo({
+      judul: `Hapus Produk ${p.nama}?`,
+      pesan: `Apakah kamu yakin ingin menghapus produk "${p.nama}"? Produk yang dihapus tidak akan muncul lagi di katalog lapak.`,
+      warnaOk: 'red',
+      tombolOk: 'Hapus Produk',
+      onOk: async () => {
+        setBusyModal(true);
+        try {
+          await api('/api/produk', { aksi: 'hapus', id: p.$id });
+          await muat();
+          setMsg(`Produk ${p.nama} berhasil dihapus.`);
+          setModalInfo(null);
+        } catch (e) {
+          setMsg(e.message);
+          setModalInfo(null);
+        }
+        setBusyModal(false);
+      },
+    });
+  };
+
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   const handleFile = (e) => {
@@ -105,7 +178,6 @@ export default function Lapak() {
     setMsg('');
     try {
       const res = await storage.createFile({ bucketId: BUCKET, fileId: ID.unique(), file: fileQris });
-      if (mitra?.id_qris) await storage.deleteFile({ bucketId: BUCKET, fileId: mitra.id_qris }).catch(() => {});
       await api('/api/profil', { aksi: 'detail', id_qris: res.$id });
       setFileQris(null);
       setPreviewQris(null);
@@ -117,20 +189,46 @@ export default function Lapak() {
     setBusyQris(false);
   };
 
-  const hapusQris = async () => {
-    if (!confirm('Hapus barcode QRIS tokomu?')) return;
-    try {
-      if (mitra?.id_qris) await storage.deleteFile({ bucketId: BUCKET, fileId: mitra.id_qris }).catch(() => {});
-      await api('/api/profil', { aksi: 'detail', id_qris: '' });
-      if (muatSaya) await muatSaya();
-      setMsg('QRIS toko berhasil dihapus.');
-    } catch (err) {
-      setMsg(err.message);
-    }
+  const hapusQris = () => {
+    setModalInfo({
+      judul: 'Hapus Barcode QRIS Toko?',
+      pesan: 'Gambar barcode QRIS tokomu akan dihapus. Pembeli tidak dapat membayar via QRIS toko sampai kamu mengunggah barcode QRIS baru.',
+      warnaOk: 'red',
+      tombolOk: 'Hapus QRIS',
+      onOk: async () => {
+        setBusyModal(true);
+        try {
+          await api('/api/profil', { aksi: 'hapus_qris' });
+          if (muatSaya) await muatSaya();
+          setMsg('QRIS toko berhasil dihapus.');
+          setModalInfo(null);
+        } catch (err) {
+          setMsg(err.message);
+          setModalInfo(null);
+        }
+        setBusyModal(false);
+      },
+    });
   };
 
   return (
     <main className="wrap">
+      {modalInfo && (
+        <Modal
+          judul={modalInfo.judul}
+          pesan={modalInfo.pesan}
+          tipe={modalInfo.tipe}
+          inputType={modalInfo.inputType}
+          inputLabel={modalInfo.inputLabel}
+          inputDefault={modalInfo.inputDefault}
+          inputPlaceholder={modalInfo.inputPlaceholder}
+          tombolOk={modalInfo.tombolOk}
+          warnaOk={modalInfo.warnaOk}
+          busy={busyModal}
+          onOk={modalInfo.onOk}
+          onBatal={() => setModalInfo(null)}
+        />
+      )}
       <h2>Lapak {mitra?.nama_usaha}</h2>
       {st && <div className="stats"><div className="stat"><small>Pesanan baru</small><b>{st.baru}</b></div><div className="stat"><small>Penjualan bulan ini</small><b>{rp(st.jual)}</b></div></div>}
       {!mitra?.id_qris && (
@@ -146,7 +244,7 @@ export default function Lapak() {
           ['offline', 'Terjual offline'],
           ['pesanan', 'Pesanan masuk'],
           ['qris', 'QRIS Toko'],
-          ['rekap', 'Rekap dan komisi'],
+          ['rekap', 'Rekap Penjualan'],
         ].map(([k, t]) => (
           <button key={k} className={'chip' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>
             {t}

@@ -118,12 +118,11 @@ export async function POST(req) {
   }
   await upd(db, 'pesanan', id, data);
 
-  if (aksi === 'selesai') { // catat penjualan dan komisi (atomik, aman untuk pesanan bersamaan)
-    const komisi = Math.round((p.total_harga * Number(process.env.KOMISI_PERSEN || 5)) / 100);
+  if (aksi === 'selesai') { // catat rekap penjualan (atomik, aman untuk pesanan bersamaan)
     const rid = `${u.$id}_${new Date().toISOString().slice(0, 7)}`;
     await put(db, 'rekap_penjualan', rid, { id_mitra: u.$id, periode: rid.slice(-7), total_penjualan: 0, jumlah_transaksi: 0, total_komisi: 0, total_digital: 0, status_pencairan: 'BELUM' }, [Permission.read(Role.user(u.$id))]).catch((e) => { if (e.code !== 409) throw e; });
     const digital = by && by.metode !== 'BAYAR_DI_TEMPAT' ? p.total_harga : 0;
-    for (const [k, v] of [['total_penjualan', p.total_harga], ['jumlah_transaksi', 1], ['total_komisi', komisi], ['total_digital', digital]]) if (v) await inc(db, 'rekap_penjualan', rid, k, v);
+    for (const [k, v] of [['total_penjualan', p.total_harga], ['jumlah_transaksi', 1], ['total_digital', digital]]) if (v) await inc(db, 'rekap_penjualan', rid, k, v);
     if (by && by.status_pembayaran !== 'BERHASIL') await upd(db, 'pembayaran', by.$id, { status_pembayaran: 'BERHASIL', waktu_bayar: new Date().toISOString() });
   }
 

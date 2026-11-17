@@ -42,8 +42,23 @@ export async function POST(req) {
     return Response.json({ ok: true });
   }
 
-  const pg = await getRow(db, 'pengguna', u.$id).catch(() => null);
-  if (!pg && ['nama', 'email', 'telepon', 'detail'].includes(b.aksi)) return err('Profil tidak ditemukan.', 404);
+  let pg = await getRow(db, 'pengguna', u.$id).catch(() => null);
+  if (!pg) {
+    const mt0 = await getRow(db, 'mitra', u.$id).catch(() => null);
+    const pb0 = await getRow(db, 'pembeli', u.$id).catch(() => null);
+    if (mt0 || pb0) {
+      // Auto-heal profil pengguna jika terputus
+      pg = await put(db, 'pengguna', u.$id, {
+        nama: u.name || u.email.split('@')[0],
+        email: u.email,
+        no_telepon: '',
+        status_akun: 'AKTIF',
+        kanal: 'EMAIL',
+        kontak_terverifikasi: true,
+      }, baca(u.$id)).catch(() => null);
+    }
+  }
+  if (!pg && ['nama', 'email', 'telepon', 'detail', 'hapus_qris'].includes(b.aksi)) return err('Profil tidak ditemukan.', 404);
   // Verifikasi ulang kontak setelah email/nomor verifikasi diganti
   const perluVerif = async () => {
     const pb = await getRow(db, 'pembeli', u.$id).catch(() => null);
@@ -82,9 +97,26 @@ export async function POST(req) {
       if ('nama_usaha' in b) { if (!s(b.nama_usaha)) return err('Nama usaha tidak boleh kosong.'); d.nama_usaha = s(b.nama_usaha); }
       if ('alamat' in b) d.alamat_usaha = s(b.alamat);
       if ('rekening' in b) d.rekening = s(b.rekening, 100);
-      if ('id_qris' in b) d.id_qris = b.id_qris ? s(b.id_qris, 36) : null;
+      if ('id_qris' in b) {
+        if (!b.id_qris && mt.id_qris) {
+          const { storage } = svc();
+          await storage.deleteFile({ bucketId: 'gambar-produk', fileId: mt.id_qris }).catch(() => {});
+        }
+        d.id_qris = b.id_qris ? s(b.id_qris, 36) : null;
+      }
       await upd(db, 'mitra', u.$id, d);
     } else if (pb && 'alamat' in b) await upd(db, 'pembeli', u.$id, { alamat: s(b.alamat) });
+    return Response.json({ ok: true });
+  }
+
+  if (b.aksi === 'hapus_qris') {
+    const mt = await getRow(db, 'mitra', u.$id).catch(() => null);
+    if (!mt) return err('Data mitra tidak ditemukan.', 404);
+    if (mt.id_qris) {
+      const { storage } = svc();
+      await storage.deleteFile({ bucketId: 'gambar-produk', fileId: mt.id_qris }).catch(() => {});
+    }
+    await upd(db, 'mitra', u.$id, { id_qris: null });
     return Response.json({ ok: true });
   }
 
