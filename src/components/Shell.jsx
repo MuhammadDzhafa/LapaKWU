@@ -62,18 +62,46 @@ export default function Shell({ children }) {
   const awal = (nama.trim()[0] || '?').toUpperCase();
   const aktif = (h) => (h === '/' ? path === '/' : path.startsWith(h)) ? 'page' : undefined;
 
-  const NavLinks = ({ onClick }) => (
+  const NavMenu = ({ onClick }) => (
     <>
       <Link href="/" onClick={onClick} aria-current={aktif('/')}>Katalog</Link>
-      {s.peran === 'pembeli' && <><Link href="/keranjang" onClick={onClick} aria-current={aktif('/keranjang')}>Keranjang</Link><Link href="/pesanan" onClick={onClick} aria-current={aktif('/pesanan')}>Pesanan</Link></>}
+      {s.peran === 'pembeli' && (
+        <>
+          <Link href="/keranjang" onClick={onClick} aria-current={aktif('/keranjang')}>Keranjang</Link>
+          <Link href="/pesanan" onClick={onClick} aria-current={aktif('/pesanan')}>Pesanan</Link>
+        </>
+      )}
       {s.peran === 'mitra' && <Link href="/mitra" onClick={onClick} aria-current={aktif('/mitra')}>Lapak saya</Link>}
       {s.peran === 'admin' && <Link href="/admin" onClick={onClick} aria-current={aktif('/admin')}>Admin</Link>}
-      {s.akun
-        ? <Link href="/profil" className="me" onClick={onClick} aria-current={aktif('/profil')} aria-label={`Profil ${nama}`}>
-            <i>{awal}</i><span>{nama.split(' ')[0]}</span>
-          </Link>
-        : !s.memuat && <Link href="/masuk" className="btn sm" onClick={onClick}>Masuk</Link>}
     </>
+  );
+
+  const NavUserDesktop = () => (
+    s.akun ? (
+      <Link href="/profil" className="me" aria-current={aktif('/profil')} aria-label={`Profil ${nama}`}>
+        <i>{awal}</i><span>{nama.split(' ')[0]}</span>
+      </Link>
+    ) : !s.memuat ? (
+      <Link href="/masuk" className="btn sm">Masuk</Link>
+    ) : null
+  );
+
+  const NavUserMobile = ({ onClick }) => (
+    s.akun ? (
+      <Link href="/profil" className="nav-user-card" onClick={onClick} aria-current={aktif('/profil')}>
+        <i className="user-avatar" aria-hidden="true">{awal}</i>
+        <div className="user-info">
+          <b className="user-name">{nama}</b>
+          <span className="user-role">
+            {s.peran === 'mitra' ? 'Mitra Lapak' : s.peran === 'admin' ? 'Administrator' : 'Akun Pembeli'} • Profil →
+          </span>
+        </div>
+      </Link>
+    ) : !s.memuat ? (
+      <Link href="/masuk" className="btn sm" onClick={onClick} style={{ width: '100%', textAlign: 'center' }}>
+        Masuk / Daftar Akun
+      </Link>
+    ) : null
   );
 
   return (
@@ -84,7 +112,8 @@ export default function Shell({ children }) {
           <Link href="/" className="brand">Lapa<b>KWU</b></Link>
           {/* Nav desktop */}
           <nav aria-label="Menu utama" className="nav-desktop">
-            <NavLinks />
+            <NavMenu />
+            <NavUserDesktop />
           </nav>
           {/* Tombol hamburger mobile */}
           <button
@@ -106,8 +135,11 @@ export default function Shell({ children }) {
           <button className="nav-close" aria-label="Tutup menu" onClick={tutup}>✕</button>
         </div>
         <nav className="nav-sidebar-body">
-          <NavLinks onClick={tutup} />
+          <NavMenu onClick={tutup} />
         </nav>
+        <div className="nav-sidebar-foot">
+          <NavUserMobile onClick={tutup} />
+        </div>
       </aside>
       {perlu && (
         <div className="banner"><div className="wrap">
