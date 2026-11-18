@@ -1,20 +1,28 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { list, hapus, api, Query, rp } from '@/lib/aw';
+import { list, hapus, api, Query, rp, img } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
 import Rekap from '@/components/Rekap';
 import Modal from '@/components/Modal';
 
-const TABS = [['mitra', 'Verifikasi mitra'], ['pengguna', 'Pengguna dan peran'], ['produk', 'Produk'], ['rekap', 'Rekap Penjualan'], ['refund', 'Refund']];
+const TABS = [
+  ['mitra', 'Verifikasi mitra'],
+  ['qris', 'Verifikasi QRIS DANA'],
+  ['pengguna', 'Pengguna dan peran'],
+  ['produk', 'Produk'],
+  ['rekap', 'Rekap Penjualan'],
+  ['refund', 'Refund'],
+];
 
 export default function Admin() {
   const { akun, peran, memuat, toast } = useSaya();
   const [tab, setTab] = useState('mitra');
-  const [d, setD] = useState({ u: [], m: [], pr: [], ad: [], pb: [], rf: [] });
+  const [d, setD] = useState({ u: [], m: [], pr: [], ad: [], pb: [], rf: [], qris: [] });
   const [f, setF] = useState({ peran: 'pembeli' });
   const [modalInfo, setModalInfo] = useState(null);
   const [busyModal, setBusyModal] = useState(false);
+  const [modalGambar, setModalGambar] = useState(null);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   const muat = useCallback(async () => {
@@ -144,10 +152,106 @@ export default function Admin() {
       <h2>Panel admin</h2>
       <div className="stats">
         <div className="stat"><small>Mitra menunggu</small><b>{d.m.filter((x) => pg(x.$id)?.status_akun !== 'AKTIF').length}</b></div>
+        <div className="stat"><small>QRIS DANA menunggu</small><b>{(d.qris || []).length}</b></div>
         <div className="stat"><small>Total pengguna</small><b>{d.u.length}</b></div>
         <div className="stat"><small>Refund menunggu</small><b>{d.rf.length}</b></div>
       </div>
       <div className="tabs">{TABS.map(([k, t]) => <button key={k} className={'chip' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{t}</button>)}</div>
+
+      {tab === 'qris' && (
+        <div className="stack">
+          <div className="card pad" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: '1.4rem' }}>📲</span>
+              <div>
+                <b style={{ color: '#14532d' }}>Verifikasi Pembayaran QRIS DANA (PayHook & Manual)</b>
+                <p className="muted" style={{ margin: 0, fontSize: '0.88rem' }}>
+                  Jika PayHook aktif di ponsel Android, pembayaran yang nominalnya cocok akan otomatis terverifikasi lunas.
+                  Jika transfer belum otomatis terverifikasi (misal HP offline atau pembeli salah nominal), Admin bisa melakukan verifikasi manual di bawah ini.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>No. Pesanan</th>
+                  <th>Pembeli</th>
+                  <th>Lapak Tujuan</th>
+                  <th>Nominal</th>
+                  <th>Bukti Transfer</th>
+                  <th>Tindakan Admin</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(d.qris || []).map((x) => {
+                  const pembeliUser = pg(x.pesanan?.id_pembeli);
+                  const namaMitra = nama[x.pesanan?.id_mitra] || 'Mitra Toko';
+                  return (
+                    <tr key={x.$id}>
+                      <td><b>#{x.id_pesanan.slice(-6)}</b></td>
+                      <td>
+                        <b>{pembeliUser?.nama || 'Pembeli'}</b>
+                        <br />
+                        <small className="muted">{pembeliUser?.email}</small>
+                      </td>
+                      <td>{namaMitra}</td>
+                      <td><b style={{ color: '#047857' }}>{rp(x.jumlah)}</b></td>
+                      <td>
+                        {x.id_bukti ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <img
+                              src={img(x.id_bukti)}
+                              alt="Bukti Transfer"
+                              onClick={() => setModalGambar(img(x.id_bukti))}
+                              style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6, cursor: 'pointer', border: '1px solid #cbd5e1' }}
+                            />
+                            <button
+                              type="button"
+                              className="link"
+                              style={{ fontSize: '0.8rem' }}
+                              onClick={() => setModalGambar(img(x.id_bukti))}
+                            >
+                              Lihat Bukti
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="muted"><small>Tanpa file</small></span>
+                        )}
+                      </td>
+                      <td>
+                        <div className="row" style={{ gap: 6 }}>
+                          <button
+                            className="btn sm sun"
+                            onClick={() => act('verifikasi_qris', x.$id, {}, 'Pembayaran QRIS berhasil diverifikasi Lunas! Mitra dan pembeli telah dikabari.')}
+                          >
+                            ✓ Konfirmasi Lunas
+                          </button>
+                          <button
+                            className="btn sm red"
+                            onClick={() => act('tolak_qris', x.$id, { catatan: 'Bukti transfer tidak valid / dana tidak masuk ke DANA LapaKWU.' }, 'Pembayaran ditolak.')}
+                          >
+                            Tolak
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!(d.qris || []).length && (
+                  <tr>
+                    <td colSpan="6" className="muted" style={{ textAlign: 'center', padding: 24 }}>
+                      Tidak ada pembayaran QRIS yang sedang menunggu verifikasi.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {tab === 'mitra' && <div className="scroll"><table><thead><tr><th>Usaha</th><th>Alamat</th><th>Kontak</th><th>Status</th><th>Tindakan</th></tr></thead><tbody>
         {d.m.map((x) => { const u = pg(x.$id); return (
@@ -188,6 +292,70 @@ export default function Admin() {
         {d.rf.map((x) => <tr key={x.$id}><td>{x.id_pesanan.slice(-6)}</td><td>{x.metode.replaceAll('_', ' ')}</td><td>{rp(x.jumlah)}</td>
           <td><button className="btn sm sun" onClick={() => act('refund', x.$id, {}, 'Refund dicatat.')}>Tandai sudah dikembalikan</button></td></tr>)}
         {!d.rf.length && <tr><td colSpan="4" className="muted">Tidak ada refund yang menunggu.</td></tr>}</tbody></table></div>}
+
+      {/* MODAL PREVIEW BUKTI TRANSFER */}
+      {modalGambar && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setModalGambar(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#fff',
+              borderRadius: 12,
+              padding: 20,
+              maxWidth: 500,
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <b style={{ fontSize: '1.05rem', color: '#1e3a8a' }}>Preview Bukti Pembayaran QRIS</b>
+              <button
+                type="button"
+                onClick={() => setModalGambar(null)}
+                style={{ background: 'none', border: 'none', fontSize: '1.4rem', cursor: 'pointer', padding: 4 }}
+              >
+                ✕
+              </button>
+            </div>
+            <img
+              src={modalGambar}
+              alt="Bukti Transfer Penuh"
+              style={{
+                width: '100%',
+                maxHeight: '65vh',
+                objectFit: 'contain',
+                borderRadius: 8,
+                border: '1px solid #e2e8f0',
+                background: '#f8fafc',
+              }}
+            />
+            <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 10 }}>
+              <a href={modalGambar} target="_blank" rel="noopener noreferrer" className="btn sm">
+                Buka di Tab Baru ↗
+              </a>
+              <button type="button" className="btn sm out" onClick={() => setModalGambar(null)}>
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -11,6 +11,7 @@ export default function Detail() {
   const [p, setP] = useState(null);
   const [mt, setMt] = useState(null);
   const [n, setN] = useState(1);
+  const [inputVal, setInputVal] = useState('1');
 
   useEffect(() => {
     ambil('produk', id).then(async (x) => { setP(x); setMt(await ambil('mitra', x.id_mitra).catch(() => null)); }).catch(() => setP(false));
@@ -18,16 +19,53 @@ export default function Detail() {
     return () => clearInterval(t);
   }, [id]);
 
+  const updateQty = (val) => {
+    const maxStok = p?.stok || 1;
+    const clamped = Math.max(1, Math.min(maxStok, val));
+    setN(clamped);
+    setInputVal(String(clamped));
+  };
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setInputVal(val);
+    const parsed = parseInt(val, 10);
+    if (!isNaN(parsed) && parsed >= 1) {
+      const maxStok = p?.stok || 1;
+      setN(Math.min(maxStok, parsed));
+    }
+  };
+
+  const handleInputBlur = () => {
+    const parsed = parseInt(inputVal, 10);
+    if (isNaN(parsed) || parsed < 1) {
+      updateQty(1);
+    } else {
+      updateQty(parsed);
+    }
+  };
+
   const cek = () => {
-    if (!akun) { r.push('/masuk'); return false; }
     if (peran === 'mitra' || peran === 'admin') { toast('Pembelian hanya untuk akun pembeli.', true); return false; }
     return true;
   };
   const keranjang = async () => {
+    if (!akun) {
+      r.push('/masuk');
+      return;
+    }
     if (!cek()) return;
     try { const j = await tambahKeranjang(akun.$id, p, n); toast(`Keranjang: ${j} × ${p.nama}`); } catch (e) { toast(e.message, true); }
   };
-  const beli = () => { if (cek()) r.push(`/checkout?beli=${id}&jml=${n}`); };
+  const beli = () => {
+    if (!akun) {
+      sessionStorage.setItem('lapakwu_checkout_intent', JSON.stringify({ productId: id, quantity: n }));
+      r.push('/masuk');
+      return;
+    }
+    if (!cek()) return;
+    r.push(`/checkout?beli=${id}&jml=${n}`);
+  };
 
   if (p === null) return <main className="wrap"><div className="skel" style={{ maxWidth: 420 }} /></main>;
   if (p === false) return <main className="wrap"><p className="kosong">Produk tidak ditemukan atau sudah dihapus.</p></main>;
@@ -43,9 +81,18 @@ export default function Detail() {
         {p.stok > 0 ? (<>
           <div className="row">
             <label htmlFor="jml"><b>Jumlah</b></label>
-            <button className="btn out sm" aria-label="Kurangi" onClick={() => setN(Math.max(1, n - 1))}>−</button>
-            <input id="jml" type="number" min="1" max={p.stok} value={n} style={{ width: 80, textAlign: 'center' }} onChange={(e) => setN(Math.max(1, Math.min(p.stok, +e.target.value || 1)))} />
-            <button className="btn out sm" aria-label="Tambah" onClick={() => setN(Math.min(p.stok, n + 1))}>+</button>
+            <button type="button" className="btn out sm" aria-label="Kurangi" disabled={n <= 1} onClick={() => updateQty(n - 1)}>−</button>
+            <input
+              id="jml"
+              type="number"
+              min="1"
+              max={p.stok}
+              value={inputVal}
+              style={{ width: 80, textAlign: 'center' }}
+              onChange={handleInputChange}
+              onBlur={handleInputBlur}
+            />
+            <button type="button" className="btn out sm" aria-label="Tambah" disabled={n >= p.stok} onClick={() => updateQty(n + 1)}>+</button>
             <b style={{ marginLeft: 8 }}>{rp(p.harga * n)}</b>
           </div>
           <div className="row">

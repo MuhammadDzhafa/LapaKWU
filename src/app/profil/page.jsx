@@ -1,8 +1,17 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { account, api } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
+
+const EyeIcon = ({ show }) => (
+  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    {show
+      ? <><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></>
+      : <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>
+    }
+  </svg>
+);
 
 const tampilHp = (v) => (v ? '0' + String(v).replace(/^62/, '') : '');
 const NAMA_PERAN = { pembeli: 'Pembeli', mitra: 'Mitra', admin: 'Admin' };
@@ -62,6 +71,23 @@ export default function Profil() {
   const [buka, setBuka] = useState(null);
   const [f, setF] = useState({});
   const [yakin, setYakin] = useState(false);
+  const [showSL, setShowSL] = useState(false);
+  const [showSB, setShowSB] = useState(false);
+  const [isReset, setIsReset] = useState(false);
+  const [resetParams, setResetParams] = useState({ token: '', userId: '' });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      const isResetParam = sp.get('reset') === '1' || (sp.get('token') && sp.get('userId'));
+      if (isResetParam) {
+        setIsReset(true);
+        setResetParams({ token: sp.get('token') || '', userId: sp.get('userId') || '' });
+        setBuka('sandi');
+      }
+    }
+  }, []);
+
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
   const mulai = (isi) => () => setF((x) => ({ ...x, ...isi }));
 
@@ -191,9 +217,41 @@ export default function Profil() {
           <section className="pcard" style={{ '--i': 3 }} aria-labelledby="h-aman">
             <h3 id="h-aman">Keamanan</h3>
             <Baris id="sandi" ikon={I.lock} label="Kata sandi" nilai="••••••••" tombol="Ganti kata sandi" buka={buka} setBuka={(v) => { if (v === 'sandi') mulai({ sl: '', sb: '' })(); setBuka(v); }}
-              onSimpan={async () => { await account.updatePassword({ password: f.sb, oldPassword: f.sl }); toast('Kata sandi diganti.'); }}>
-              <div className="field"><label htmlFor="in-sl">Kata sandi lama</label><input id="in-sl" type="password" required autoComplete="current-password" value={f.sl ?? ''} onChange={set('sl')} /></div>
-              <div className="field"><label htmlFor="in-sb">Kata sandi baru (min. 8 karakter)</label><input id="in-sb" type="password" minLength={8} required autoComplete="new-password" value={f.sb ?? ''} onChange={set('sb')} /></div>
+              onSimpan={async () => {
+                if (isReset && resetParams.token) {
+                  const res = await fetch('/api/reset-sandi', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ token: resetParams.token, userId: resetParams.userId || akun?.$id, sandi: f.sb }),
+                  });
+                  const d = await res.json().catch(() => ({}));
+                  if (!res.ok) throw new Error(d.error || 'Gagal mengatur kata sandi baru.');
+                  toast('Kata sandi berhasil diperbarui.');
+                } else {
+                  await account.updatePassword({ password: f.sb, oldPassword: f.sl });
+                  toast('Kata sandi diganti.');
+                }
+              }}>
+              {!isReset && (
+                <div className="field" style={{ position: 'relative' }}>
+                  <label htmlFor="in-sl">Kata sandi lama</label>
+                  <input id="in-sl" type={showSL ? 'text' : 'password'} required autoComplete="current-password" style={{ paddingRight: 44 }} value={f.sl ?? ''} onChange={set('sl')} />
+                  <button type="button" onClick={() => setShowSL(!showSL)}
+                    style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#5E6A75', paddingTop: 22 }}
+                    aria-label={showSL ? 'Sembunyikan kata sandi lama' : 'Tampilkan kata sandi lama'}>
+                    <EyeIcon show={showSL} />
+                  </button>
+                </div>
+              )}
+              <div className="field" style={{ position: 'relative' }}>
+                <label htmlFor="in-sb">{isReset ? 'Kata sandi baru' : 'Kata sandi baru (min. 8 karakter)'}</label>
+                <input id="in-sb" type={showSB ? 'text' : 'password'} minLength={8} required autoComplete="new-password" style={{ paddingRight: 44 }} value={f.sb ?? ''} onChange={set('sb')} />
+                <button type="button" onClick={() => setShowSB(!showSB)}
+                  style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#5E6A75', paddingTop: 22 }}
+                  aria-label={showSB ? 'Sembunyikan kata sandi baru' : 'Tampilkan kata sandi baru'}>
+                  <EyeIcon show={showSB} />
+                </button>
+              </div>
             </Baris>
 
             <div className={'br keluar' + (yakin ? ' open' : '')}>

@@ -39,6 +39,7 @@ function Panggung({ children }) {
 }
 
 const JUDUL = ['Belanja', 'di', 'lapak', 'teman', 'sekampus.'];
+const TICKER_ITEMS = ['Pesan antar', 'Ambil di lapak', 'QRIS', 'Virtual account', 'Bayar di tempat', 'Produk mitra KWU'];
 
 export default function Beranda() {
   const { akun, peran, toast } = useSaya();
@@ -77,12 +78,21 @@ export default function Beranda() {
             <p className="lead">Banyak mitra, satu keranjang. Pesan antar ke alamatmu, atau ambil langsung di lapaknya.</p>
             <div className="cta">
               <a href="#katalog" className="btn lg">Lihat produk</a>
-              {peran !== 'mitra' && <Link href="/masuk?daftar=mitra" className="btn lg out">Buka lapakmu</Link>}
+              {peran !== 'mitra' && <Link href="/mitra/tata-cara" className="btn lg out">Buka lapakmu</Link>}
             </div>
           </div>
           <Panggung><Lapak /><Live /></Panggung>
         </div>
-        <div className="ticker" aria-hidden="true"><div>{[0, 1].map((k) => ['Pesan antar', 'Ambil di lapak', 'QRIS', 'Virtual account', 'Bayar di tempat', 'Produk mitra KWU'].map((t) => <span key={k + t}>{t}</span>))}</div></div>
+        <div className="ticker" aria-hidden="true">
+          <div className="ticker-track">
+            <div className="ticker-group">
+              {TICKER_ITEMS.map((t, idx) => <span key={'t1-' + idx}>{t}</span>)}
+            </div>
+            <div className="ticker-group" aria-hidden="true">
+              {TICKER_ITEMS.map((t, idx) => <span key={'t2-' + idx}>{t}</span>)}
+            </div>
+          </div>
+        </div>
       </section>
 
       <div className="wrap">
@@ -139,7 +149,7 @@ export default function Beranda() {
         {peran !== 'mitra' && (
           <div className="band">
             <div><h2>Punya usaha kecil? Buka lapakmu di sini.</h2><p>Kelola produk, stok, pesanan, dan saldo dalam satu tempat.</p></div>
-            <Link href="/masuk?daftar=mitra" className="btn sun lg">Daftar jadi mitra</Link>
+            <Link href="/mitra/tata-cara" className="btn sun lg">Daftar jadi mitra</Link>
           </div>
         )}
       </div></section>

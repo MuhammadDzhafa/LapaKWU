@@ -146,44 +146,55 @@ export default function Checkout() {
           {opsi('metode', 'BAYAR_DI_TEMPAT', '💵 Bayar langsung di lapak mitra')}
         </fieldset>
 
-        {/* QRIS DARI MITRA & UPLOAD BUKTI (ONLINE) */}
+        {/* QRIS DANA TERPUSAT LAPAKWU & UPLOAD BUKTI (ONLINE) */}
         {f.metode === 'QRIS' && (
-          <div className="card pad stack" style={{ border: '2px solid #2563eb', background: '#f0f7ff', borderRadius: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: '1.4rem' }}>📲</span>
+          <div className="card pad stack" style={{ border: '2px solid #2563eb', background: '#f0f7ff', borderRadius: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: '1.5rem' }}>📲</span>
               <div>
-                <b style={{ color: '#1e40af', fontSize: '1rem', display: 'block' }}>QRIS Mitra Toko</b>
-                <small className="muted">Silakan scan QRIS mitra pemilik produk di bawah ini untuk membayar langsung ke mitra:</small>
+                <b style={{ color: '#1e40af', fontSize: '1.05rem', display: 'block' }}>QRIS Resmi LapaKWU (DANA Bisnis)</b>
+                <small className="muted">Pembayaran terpusat menggunakan QRIS DANA LapaKWU. Berlaku untuk DANA, GoPay, ShopeePay, BCA, dan semua M-Banking.</small>
               </div>
             </div>
 
-            {Object.entries(perMitra).map(([mid, subtot]) => {
-              const m = mitras[mid];
-              return (
-                <div key={mid} style={{ background: '#fff', border: '1px solid #bfdbfe', borderRadius: 8, padding: 14, textAlign: 'center' }}>
-                  <b style={{ fontSize: '1.05rem', color: '#1e3a8a' }}>{m?.nama_usaha || 'Lapak Mitra'}</b>
-                  <div style={{ margin: '4px 0 10px 0', fontSize: '0.95rem' }}>
-                    Total yang harus dibayar: <b style={{ color: '#047857' }}>{rp(subtot)}</b>
-                  </div>
+            <div style={{ background: '#fff', border: '1.5px solid #bfdbfe', borderRadius: 10, padding: 16, textAlign: 'center' }}>
+              <div style={{ display: 'inline-block', background: '#1e40af', color: '#fff', fontSize: '0.78rem', fontWeight: 800, padding: '2px 10px', borderRadius: 99, marginBottom: 8 }}>
+                DANA BISNIS MERCHANT LAPAKWU
+              </div>
+              <div style={{ margin: '4px 0 12px 0', fontSize: '1.05rem' }}>
+                Total Pembayaran: <b style={{ color: '#047857', fontSize: '1.25rem' }}>{rp(total)}</b>
+              </div>
 
-                  {m?.id_qris ? (
-                    <div>
-                      <img src={img(m.id_qris)} alt={`QRIS ${m.nama_usaha}`}
-                        style={{ maxWidth: 240, width: '100%', height: 'auto', borderRadius: 8, border: '2px solid #cbd5e1', padding: 6, background: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }} />
-                      <div style={{ marginTop: 6 }}>
-                        <a href={img(m.id_qris)} target="_blank" rel="noopener noreferrer" className="link" style={{ fontSize: '0.85rem' }}>
-                          Buka Gambar QRIS Penuh ↗
-                        </a>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="msg" style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', textAlign: 'left', fontSize: '0.85rem' }}>
-                      ⚠️ <b>Mitra belum mengunggah gambar barcode QRIS.</b> Hubungi mitra untuk informasi pembayaran, lalu upload buktinya di bawah.
-                    </div>
-                  )}
+              {process.env.NEXT_PUBLIC_QRIS_URL ? (
+                <div>
+                  <img
+                    src={process.env.NEXT_PUBLIC_QRIS_URL}
+                    alt="QRIS DANA LapaKWU"
+                    style={{ maxWidth: 240, width: '100%', height: 'auto', borderRadius: 8, border: '2px solid #cbd5e1', padding: 8, background: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                  />
+                  <div style={{ marginTop: 8 }}>
+                    <a href={process.env.NEXT_PUBLIC_QRIS_URL} target="_blank" rel="noopener noreferrer" className="link" style={{ fontSize: '0.85rem' }}>
+                      Buka Gambar QRIS Penuh ↗
+                    </a>
+                  </div>
                 </div>
-              );
-            })}
+              ) : (
+                <div style={{ border: '2px dashed #93c5fd', borderRadius: 10, padding: 16, background: '#f8fafc', maxWidth: 300, margin: '0 auto' }}>
+                  <div style={{ fontSize: '2.5rem', marginBottom: 4 }}>📱</div>
+                  <b style={{ color: '#1e3a8a', display: 'block', fontSize: '0.95rem' }}>Scan QRIS DANA LapaKWU</b>
+                  <p className="muted" style={{ fontSize: '0.82rem', margin: '6px 0 10px' }}>
+                    Silakan scan QRIS DANA Merchant LapaKWU di ponsel Anda senilai <b>{rp(total)}</b>.
+                  </p>
+                  <small style={{ color: '#0369a1', fontSize: '0.78rem' }}>
+                    💡 Admin dapat menaruh link/gambar barcode di variabel <code>NEXT_PUBLIC_QRIS_URL</code> pada <code>.env.local</code>.
+                  </small>
+                </div>
+              )}
+
+              <p className="muted" style={{ fontSize: '0.82rem', margin: '12px 0 0', lineHeight: 1.5 }}>
+                Setelah transfer berhasil, PayHook akan membaca notifikasi DANA dan memverifikasi pesananmu secara otomatis. Invoice resmi akan langsung terbit di akunmu!
+              </p>
+            </div>
 
             <div className="field" style={{ marginTop: 8 }}>
               <label htmlFor="bukti" style={{ fontWeight: 600, color: '#1e3a8a' }}>
@@ -196,7 +207,7 @@ export default function Checkout() {
                 required
                 onChange={handleFileBukti}
               />
-              <small className="muted">Format JPG, PNG, atau WebP (maks. 5 MB). Mitra akan memeriksa bukti ini sebelum mengonfirmasi pesananmu.</small>
+              <small className="muted">Format JPG, PNG, atau WebP (maks. 5 MB). Diperiksa otomatis via PayHook dan diverifikasi Admin.</small>
 
               {previewBukti && (
                 <div style={{ marginTop: 12, padding: 12, background: '#fff', borderRadius: 8, border: '1px solid #93c5fd', textAlign: 'center' }}>
@@ -239,18 +250,28 @@ export default function Checkout() {
         </button>
       </form>
 
-      <aside className="card pad">
-        <h3>Ringkasan</h3>
+      <aside className="card pad" style={{ position: 'sticky', top: 84, alignSelf: 'start', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+        <h3 style={{ marginBottom: 12 }}>Ringkasan Pesanan</h3>
         {it && !it.length && <p className="muted">Keranjang kosong.</p>}
-        <ul className="lines">
-          {(it || []).map((i) => (
-            <li key={i.$id}>
-              <span>{i.nama} × {i.jumlah}</span>
-              <b>{rp(i.subtotal)}</b>
-            </li>
-          ))}
-        </ul>
-        <p className="muted" style={{ marginTop: 12 }}>
+        
+        {/* Section ringkasan pesanan dengan max-height dan scrollable */}
+        <div style={{ overflowY: 'auto', maxHeight: 280, paddingRight: 6, margin: '8px 0', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
+          <ul className="lines" style={{ margin: '8px 0' }}>
+            {(it || []).map((i) => (
+              <li key={i.$id} style={{ padding: '6px 0' }}>
+                <span style={{ fontSize: '0.92rem' }}>{i.nama} × {i.jumlah}</span>
+                <b style={{ fontSize: '0.92rem' }}>{rp(i.subtotal)}</b>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 4 }}>
+          <span style={{ fontWeight: 700, fontSize: '1.02rem' }}>Total Pembayaran</span>
+          <b style={{ fontSize: '1.2rem', color: 'var(--or-d)' }}>{rp(total)}</b>
+        </div>
+
+        <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
           <small>
             Produk dari mitra berbeda dipecah menjadi satu pesanan per mitra. Mitra akan memeriksa pembayaran dan mengonfirmasi pesananmu.
           </small>

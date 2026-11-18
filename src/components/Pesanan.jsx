@@ -4,7 +4,7 @@ import { list, Query, rp, tgl, api, img } from '@/lib/aw';
 
 const BAYAR = {
   BERHASIL: 'Lunas',
-  MENUNGGU: 'Menunggu konfirmasi',
+  MENUNGGU: 'Verifikasi bayar',
   GAGAL: 'Gagal / Dibatalkan',
   REFUND_DIAJUKAN: 'Refund diproses',
   DIKEMBALIKAN: 'Dana dikembalikan',
@@ -50,6 +50,7 @@ export default function Pesanan({ uid, sebagai }) {
   const [d, setD] = useState(null);
   const [msg, setMsg] = useState('');
   const [modalGambar, setModalGambar] = useState(null);
+  const [modalInvoice, setModalInvoice] = useState(null);
   const [modalAksi, setModalAksi] = useState(null); // { id, aksi, judul, pesan, withInput }
   const [busyAksi, setBusyAksi] = useState(false);
   const [sekarang, setSekarang] = useState(Date.now());
@@ -178,12 +179,21 @@ export default function Pesanan({ uid, sebagai }) {
             <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
               <b>Pesanan {p.$id.slice(-6)} • {tgl(p.tanggal_pesanan)}</b>
               <div className="row" style={{ gap: 6 }}>
-                <span className="badge" data-s={p.status_pesanan}>{LABEL[p.status_pesanan]}</span>
-                {p.bayar && (
-                  <span className="badge" data-s={p.bayar.status_pembayaran}>
-                    {p.bayar.status_pembayaran === 'MENUNGGU' ? 'Menunggu konfirmasi' : BAYAR[p.bayar.status_pembayaran]}
-                  </span>
-                )}
+                <span className="badge" data-s={p.status_pesanan}>{LABEL[p.status_pesanan] || p.status_pesanan}</span>
+                {p.bayar && (() => {
+                  let teksBayar = p.bayar.status_pembayaran === 'MENUNGGU'
+                    ? (isOffline ? 'Belum bayar di tenant' : 'Verifikasi bukti transfer')
+                    : (BAYAR[p.bayar.status_pembayaran] || p.bayar.status_pembayaran);
+
+                  // Cegah duplikasi jika teks sama persis dengan status pesanan
+                  if (teksBayar.toLowerCase() === (LABEL[p.status_pesanan] || '').toLowerCase()) return null;
+
+                  return (
+                    <span className="badge" data-s={p.bayar.status_pembayaran}>
+                      {teksBayar}
+                    </span>
+                  );
+                })()}
               </div>
             </div>
 
@@ -247,6 +257,18 @@ export default function Pesanan({ uid, sebagai }) {
               </div>
 
               <span className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
+                {/* TOMBOL INVOICE: Muncul otomatis saat pembayaran sudah Lunas (BERHASIL) */}
+                {p.bayar?.status_pembayaran === 'BERHASIL' && (
+                  <button
+                    type="button"
+                    className="btn sm out"
+                    onClick={() => setModalInvoice(p)}
+                    style={{ borderColor: '#059669', color: '#047857', fontWeight: 700 }}
+                  >
+                    🧾 Lihat Invoice
+                  </button>
+                )}
+
                 {/* PEMBELI: tombol batal hanya untuk bayar di tempat */}
                 {sebagai === 'pembeli' && isOffline && ['MENUNGGU_KONFIRMASI', 'DIPROSES'].includes(p.status_pesanan) && (
                   tombol(p, 'batal', 'Batalkan pesanan', 'out')
@@ -349,6 +371,116 @@ export default function Pesanan({ uid, sebagai }) {
                 type="button"
                 className="btn sm out"
                 onClick={() => setModalGambar(null)}
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL INVOICE PEMBAYARAN */}
+      {modalInvoice && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setModalInvoice(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#fff',
+              borderRadius: 16,
+              padding: 24,
+              maxWidth: 540,
+              width: '100%',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            }}
+          >
+            {/* Header Invoice */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #f1f5f9', paddingBottom: 14 }}>
+              <div>
+                <h3 style={{ margin: 0, color: '#B8500A', fontSize: '1.4rem' }}>Lapa<b style={{ color: '#FF933E' }}>KWU</b></h3>
+                <small className="muted" style={{ fontWeight: 600 }}>INVOICE PEMBAYARAN RESMI</small>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <span className="badge" data-s="BERHASIL" style={{ fontSize: '0.85rem' }}>
+                  ✓ LUNAS
+                </span>
+                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 4 }}>
+                  No: <b>INV-{modalInvoice.$id.slice(-6).toUpperCase()}</b>
+                </div>
+              </div>
+            </div>
+
+            {/* Info Transaksi */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, margin: '16px 0', fontSize: '0.88rem' }}>
+              <div>
+                <span className="muted" style={{ display: 'block', fontSize: '0.78rem' }}>TANGGAL TRANSAKSI</span>
+                <b>{tgl(modalInvoice.tanggal_pesanan)}</b>
+              </div>
+              <div>
+                <span className="muted" style={{ display: 'block', fontSize: '0.78rem' }}>METODE PEMBAYARAN</span>
+                <b>{modalInvoice.bayar?.metode === 'QRIS' ? 'QRIS DANA (LapaKWU)' : 'Bayar di Lapak'}</b>
+              </div>
+              <div>
+                <span className="muted" style={{ display: 'block', fontSize: '0.78rem' }}>LOKASI PENGAMBILAN</span>
+                <b>{modalInvoice.lokasi_pengambilan || 'Tenant Lapak Mitra'}</b>
+              </div>
+              <div>
+                <span className="muted" style={{ display: 'block', fontSize: '0.78rem' }}>STATUS PESANAN</span>
+                <b style={{ color: '#047857' }}>{LABEL[modalInvoice.status_pesanan] || modalInvoice.status_pesanan}</b>
+              </div>
+            </div>
+
+            {/* Rincian Produk */}
+            <div style={{ borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', padding: '12px 0', margin: '14px 0' }}>
+              <b style={{ fontSize: '0.9rem', display: 'block', marginBottom: 8, color: '#334155' }}>Rincian Pembelian:</b>
+              <ul className="lines" style={{ margin: 0 }}>
+                {modalInvoice.items.map((i) => (
+                  <li key={i.$id} style={{ padding: '6px 0', fontSize: '0.9rem' }}>
+                    <span>{i.nama} × {i.jumlah}</span>
+                    <b>{rp(i.subtotal)}</b>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Total Pembayaran */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '14px 0' }}>
+              <span style={{ fontWeight: 700, fontSize: '1.05rem', color: '#1e293b' }}>Total Dibayar</span>
+              <b style={{ fontSize: '1.3rem', color: '#047857' }}>{rp(modalInvoice.total_harga)}</b>
+            </div>
+
+            {/* Catatan footer */}
+            <p className="muted" style={{ fontSize: '0.8rem', textAlign: 'center', margin: '14px 0 0', lineHeight: 1.4 }}>
+              Terima kasih telah berbelanja di LapaKWU. Tunjukkan invoice ini saat mengambil pesanan di lapak mitra.
+            </p>
+
+            {/* Tombol aksi */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+              <button
+                type="button"
+                className="btn sm out"
+                onClick={() => window.print()}
+              >
+                🖨️ Cetak / Unduh PDF
+              </button>
+              <button
+                type="button"
+                className="btn sm"
+                onClick={() => setModalInvoice(null)}
               >
                 Tutup
               </button>

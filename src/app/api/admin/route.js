@@ -1,4 +1,4 @@
-import { svc, siapa, err, getRow, rows, put, upd, del, notif, baca, milik, ID, Query } from '@/lib/server';
+import { svc, siapa, err, getRow, rows, put, upd, del, inc, notif, baca, milik, ID, Query } from '@/lib/server';
 export const dynamic = 'force-dynamic';
 
 async function setPeran(db, users, id, peran, info = {}) {
@@ -64,7 +64,51 @@ export async function POST(req) {
     }
 
     const rf = rfRows.filter((x) => x.status_pembayaran === 'REFUND_DIAJUKAN');
-    return Response.json({ u: uRows, m: validMitras, pr: prRows, ad: adRows, pb: validPembeli, rf });
+    const qrisPending = rfRows.filter((x) => x.metode === 'QRIS' && x.status_pembayaran === 'MENUNGGU');
+    const qrisOrders = qrisPending.length ? await rows(db, 'pesanan', [Query.equal('$id', qrisPending.map((q) => q.id_pesanan))]) : [];
+    const qris = qrisPending.map((by) => ({
+      ...by,
+      pesanan: qrisOrders.find((p) => p.$id === by.id_pesanan) || null,
+    }));
+
+    return Response.json({ u: uRows, m: validMitras, pr: prRows, ad: adRows, pb: validPembeli, rf, qris });
+  }
+
+  if (aksi === 'verifikasi_qris') {
+    const by = await getRow(db, 'pembayaran', id).catch(() => null);
+    if (!by) return err('Pembayaran tidak ditemukan.');
+    if (by.status_pembayaran === 'BERHASIL') return err('Pembayaran sudah berstatus lunas.');
+    const now = new Date().toISOString();
+    await upd(db, 'pembayaran', id, { status_pembayaran: 'BERHASIL', waktu_bayar: now });
+    const ps = await getRow(db, 'pesanan', by.id_pesanan).catch(() => null);
+    if (ps && ps.status_pesanan === 'MENUNGGU_KONFIRMASI') {
+      await upd(db, 'pesanan', ps.$id, { status_pesanan: 'DIPROSES' });
+    }
+    const noPesanan = by.id_pesanan.slice(-6);
+    if (ps?.id_mitra) {
+      await notif(db, ps.id_mitra, 'Pembayaran QRIS Diverifikasi Admin!', `Pesanan #${noPesanan} sebesar Rp ${by.jumlah.toLocaleString('id-ID')} telah diverifikasi lunas oleh Admin LapaKWU. Silakan siapkan pesanan pembeli!`, true);
+    }
+    if (ps?.id_pembeli) {
+      await notif(db, ps.id_pembeli, 'Pembayaran QRIS Diterima & Invoice Terbit!', `Pembayaran pesanan #${noPesanan} telah diverifikasi oleh Admin LapaKWU. Invoice resmi sudah terbit di menu Riwayat Pesanan.`, true);
+    }
+    return Response.json({ ok: true });
+  }
+
+  if (aksi === 'tolak_qris') {
+    const by = await getRow(db, 'pembayaran', id).catch(() => null);
+    if (!by) return err('Pembayaran tidak ditemukan.');
+    await upd(db, 'pembayaran', id, { status_pembayaran: 'GAGAL' });
+    const ps = await getRow(db, 'pesanan', by.id_pesanan).catch(() => null);
+    if (ps) {
+      await upd(db, 'pesanan', ps.$id, { status_pesanan: 'DIBATALKAN', alasan_pembatalan: catatan || 'Pembayaran ditolak admin (bukti/saldo tidak masuk).' });
+      // Kembalikan stok produk
+      const details = await rows(db, 'detail_pesanan', [Query.equal('id_pesanan', ps.$id)]);
+      for (const d of details) {
+        await inc(db, 'produk', d.id_produk, 'stok', d.jumlah).catch(() => {});
+      }
+      await notif(db, ps.id_pembeli, 'Pembayaran QRIS Ditolak', `Pembayaran pesanan #${ps.$id.slice(-6)} ditolak oleh admin: ${catatan || 'Bukti transfer/saldo DANA tidak valid'}. Stok telah dikembalikan.`, true);
+    }
+    return Response.json({ ok: true });
   }
 
   if (aksi === 'cair') { // tandai pencairan komisi/saldo mitra sudah ditransfer
