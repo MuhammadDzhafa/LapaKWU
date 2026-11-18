@@ -1,15 +1,19 @@
 import { execFile } from 'node:child_process';
-import { join } from 'node:path';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { extname, join } from 'node:path';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 let sedangMembaca = false;
 
-export async function bacaBukti(path) {
+export async function bacaBukti(buffer, originalName) {
   const python = process.env.OCR_PYTHON;
   if (!python || sedangMembaca) return null;
   sedangMembaca = true;
+  const folder = await mkdtemp(join(process.env.TMPDIR || '/tmp', 'lapakwu-ocr-'));
+  const path = join(folder, `bukti${extname(originalName || '.jpg') || '.jpg'}`);
   try {
+    await writeFile(path, buffer);
     const { stdout } = await execFileAsync(python, [join(process.cwd(), 'scripts', 'ocr-bukti.py'), path], {
       timeout: 60_000, maxBuffer: 512 * 1024, windowsHide: true,
     });
@@ -20,6 +24,7 @@ export async function bacaBukti(path) {
     console.warn('[ocr] Bukti tidak dapat dibaca. Diteruskan ke pemeriksaan manual.');
     return null;
   } finally {
+    await rm(folder, { recursive: true, force: true }).catch(() => {});
     sedangMembaca = false;
   }
 }

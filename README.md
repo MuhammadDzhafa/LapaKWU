@@ -13,11 +13,21 @@ Aplikasi Next.js (Node.js 22+) dengan autentikasi JWT, MongoDB Atlas Free (M0), 
 
 Atur `MONGODB_URI=mongodb://127.0.0.1:27029/?replicaSet=lapakwuDev` dan `MONGODB_DB=lapakwu` di `.env.local`. Jalankan `npm run mongodb:local` sebelum setup atau migrasi. Perintah ini memakai `data/mongodb-dev/mongod.exe` atau executable dari `MONGOD_PATH`, menyimpan data di `data/mongodb-dev/db`, dan membuka koneksi hanya di komputer ini. `npm run dev` menjalankannya otomatis jika URI lokal tersebut aktif.
 
+## Backblaze B2 storage
+
+Isi tiga variabel berikut di `.env.local`. Product photos, store QRIS images, and payment proofs are stored in the configured B2 bucket.
+
+```env
+Backblaze_keyID=
+Backblaze_app_key=
+Backblaze_bucketName=
+```
+
 ## Memindahkan data dari MySQL
 
 Cadangkan sumber dan hentikan penulisan ke MySQL selama transfer akhir. Gunakan database MongoDB tujuan yang kosong untuk migrasi pertama. Atur `MYSQL_SOURCE_URL` di `.env.local` atau gunakan `DATABASE_URL` lama, lalu jalankan `npm run migrate:mysql` dan `npm run setup`. Skrip memindahkan 16 tabel dengan ID, hash kata sandi, tanggal, dan relasi yang sama. Skrip dapat diulang setelah terputus. ID yang sudah ada dilewati, sehingga perubahan lanjutan pada baris yang sudah dipindah tidak akan tersalin. Aplikasi berjalan dengan MongoDB dan driver MySQL hanya diperlukan untuk menjalankan skrip migrasi.
 
-Bandingkan jumlah baris yang dilaporkan, lalu periksa login, katalog, riwayat pesanan, dan akses bukti lama sebelum mengarahkan trafik ke MongoDB. Salin juga `public/uploads` bila server aplikasi berubah karena file gambar lama berada di disk, sementara database menyimpan ID-nya.
+Bandingkan jumlah baris yang dilaporkan, lalu periksa login, katalog, riwayat pesanan, dan akses bukti lama sebelum mengarahkan trafik ke MongoDB. File media disimpan di Backblaze B2, sementara database menyimpan ID-nya.
 
 ## PaddleOCR untuk bukti QRIS
 
@@ -34,4 +44,4 @@ Backend membandingkan hasil OCR dengan total checkout yang dihitung dari databas
 
 PayHook opsional. Jika sudah dipakai, atur `PAYHOOK_SECRET` dan kirim nilainya melalui header `x-payhook-secret`. Konfirmasi otomatis membutuhkan nominal, referensi transaksi dari payload dana masuk, dan satu bukti OCR yang cocok. Ketika notifikasi DANA tidak menyediakan referensi yang juga tercetak di bukti, gunakan konfirmasi manual.
 
-Bukti baru berukuran maksimal 2 MB dan disimpan di `data/bukti-pembayaran`. Simpan folder ini dan `public/uploads` di disk persisten server. Route bukti baru hanya melayani pemilik, mitra terkait, atau admin yang sudah masuk.
+Bukti baru berukuran maksimal 2 MB dan disimpan di Backblaze B2. Route bukti baru hanya melayani pemilik, mitra terkait, atau admin yang sudah masuk.

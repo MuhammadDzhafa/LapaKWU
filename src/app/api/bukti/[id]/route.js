@@ -1,8 +1,7 @@
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { cariSatu, cariBanyak } from '@/lib/db';
 import { siapa, err } from '@/lib/server';
 import { FORMAT_ID_BUKTI } from '@/lib/bukti-pembayaran';
+import { unduhFile } from '@/lib/backblaze';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +20,7 @@ export async function GET(req, { params }) {
       if (!admin || mitra) return err('Bukti tidak ditemukan.', 404);
     }
   }
-  const buffer = await readFile(join(process.cwd(), 'data', 'bukti-pembayaran', id)).catch(() => null);
+  const buffer = await unduhFile(id).catch(() => null);
   if (!buffer) return err('Bukti tidak ditemukan.', 404);
   const ext = id.split('.').at(-1);
   return new Response(buffer, {

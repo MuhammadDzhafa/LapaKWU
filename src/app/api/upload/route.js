@@ -1,18 +1,15 @@
-// POST /api/upload — Upload gambar produk, QRIS, atau bukti bayar ke public/uploads/
-import { writeFile, mkdir, unlink } from 'node:fs/promises';
-import { join } from 'node:path';
+// POST /api/upload, upload gambar produk, QRIS, atau bukti bayar ke Backblaze B2.
 import { createHash } from 'node:crypto';
 import { nanoid } from 'nanoid';
 import { siapa } from '@/lib/server';
 import { MAKS_BUKTI_PEMBAYARAN, PESAN_UKURAN_BUKTI } from '@/lib/bukti-pembayaran';
 import { tulis } from '@/lib/db';
+import { hapusFile, unggahFile } from '@/lib/backblaze';
 export const dynamic = 'force-dynamic';
 
 const ALLOWED_MIME = ['image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/webp', 'image/gif'];
 const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
 const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
-const UPLOAD_DIR = join(process.cwd(), 'public', 'uploads');
-
 export async function POST(req) {
   try {
     const u = await siapa(req);
@@ -45,32 +42,33 @@ export async function POST(req) {
         : buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP' ? 'webp' : null;
       if (!ekstensi) return Response.json({ error: 'Format bukti pembayaran harus JPG, PNG, atau WebP.' }, { status: 400 });
       const nama = `bukti-${nanoid()}.${ekstensi}`;
-      const folder = join(process.cwd(), 'data', 'bukti-pembayaran');
-      const path = join(folder, nama);
-      await mkdir(folder, { recursive: true });
-      await writeFile(path, buffer, { flag: 'wx' });
+      await unggahFile(nama, buffer, file.type || `image/${ekstensi}`);
       try {
         await tulis('unggahan_bukti', nama, {
           id_pembeli: u.$id, ukuran: buffer.length, sha256: createHash('sha256').update(buffer).digest('hex'),
         });
       } catch (error) {
-        await unlink(path).catch(() => {});
+        await hapusFile(nama).catch(() => {});
         throw error;
       }
       return Response.json({ $id: nama, ok: true });
     }
 
-    // Pastikan folder public/uploads sudah dibuat
-    await mkdir(UPLOAD_DIR, { recursive: true }).catch(() => {});
-
     const cleanExt = (isExtOk ? extFromName : (file.type?.split('/')[1] || 'jpg')).replace('jpeg', 'jpg');
     const nama = `${nanoid()}.${cleanExt}`;
-
-    await writeFile(join(UPLOAD_DIR, nama), buffer);
+    await unggahFile(nama, buffer, file.type || `image/${cleanExt}`);
 
     return Response.json({ $id: nama, ok: true });
   } catch (e) {
-    console.error('[/api/upload] Error:', e?.message || e);
+    console.error('[/api/upload] Error:', {
+      name: e?.name,
+      message: e?.message,
+      code: e?.code,
+      cause: e?.cause?.message,
+      causeCode: e?.cause?.code,
+      causeHost: e?.cause?.hostname,
+      stack: e?.stack,
+    });
     return Response.json({ error: 'Terjadi kesalahan saat mengunggah gambar.' }, { status: 500 });
   }
 }

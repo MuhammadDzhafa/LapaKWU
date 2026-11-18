@@ -1,9 +1,8 @@
-import { stat } from 'node:fs/promises';
-import { join } from 'node:path';
 import { siapa, err, getRow, rows, put, upd, del, dec, notif, ID, Query } from '@/lib/server';
 import { cariSatu, denganTransaksi } from '@/lib/db';
 import { FORMAT_ID_BUKTI, MAKS_BUKTI_PEMBAYARAN, PESAN_UKURAN_BUKTI } from '@/lib/bukti-pembayaran';
 import { bacaBukti, periksaBukti } from '@/lib/ocr-bukti';
+import { unduhFile } from '@/lib/backblaze';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,12 +22,11 @@ export async function POST(req) {
         return err('Harap unggah bukti pembayaran dalam format JPG, PNG, atau WebP.');
       }
       upload = await cariSatu('unggahan_bukti', { _id: b.id_bukti, id_pembeli: u.$id });
-      const path = join(process.cwd(), 'data', 'bukti-pembayaran', b.id_bukti);
-      const file = upload && await stat(path).catch(() => null);
-      if (!file?.isFile()) return err('Bukti pembayaran tidak ditemukan. Unggah kembali.');
-      if (file.size > MAKS_BUKTI_PEMBAYARAN) return err(PESAN_UKURAN_BUKTI);
-      if (file.size !== upload.ukuran) return err('File bukti pembayaran berubah. Unggah kembali.');
-      hasilOcr = await bacaBukti(path);
+      const buffer = upload && await unduhFile(upload.id).catch(() => null);
+      if (!buffer) return err('Bukti pembayaran tidak ditemukan. Unggah kembali.');
+      if (buffer.length > MAKS_BUKTI_PEMBAYARAN) return err(PESAN_UKURAN_BUKTI);
+      if (buffer.length !== upload.ukuran) return err('File bukti pembayaran berubah. Unggah kembali.');
+      hasilOcr = await bacaBukti(buffer, upload.id);
     }
 
     const langsung = b.langsung?.id ? { id_produk: b.langsung.id, jumlah: Number(b.langsung.jumlah ?? 1) } : null;

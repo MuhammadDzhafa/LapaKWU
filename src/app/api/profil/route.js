@@ -1,17 +1,9 @@
 import { siapa, err, getRow, put, upd, baca, milik } from '@/lib/server';
 import { ubahNama, ubahEmail } from '@/lib/auth';
 import { normHp } from '@/lib/kirim';
-import { unlink } from 'node:fs/promises';
-import { join } from 'node:path';
+import { hapusFile } from '@/lib/backblaze';
 
 export const dynamic = 'force-dynamic';
-
-const hapusFileLokal = async (fileId) => {
-  if (!fileId) return;
-  try {
-    await unlink(join(process.cwd(), 'public', 'uploads', fileId));
-  } catch {}
-};
 
 export async function POST(req) {
   try {
@@ -125,12 +117,10 @@ export async function POST(req) {
         if ('alamat' in b) d.alamat_usaha = s(b.alamat);
         if ('rekening' in b) d.rekening = s(b.rekening, 100);
         if ('id_qris' in b) {
-          if (!b.id_qris && mt.id_qris) {
-            await hapusFileLokal(mt.id_qris);
-          }
           d.id_qris = b.id_qris ? s(b.id_qris, 36) : null;
         }
         await upd(null, 'mitra', u.$id, d);
+        if ('id_qris' in b && mt.id_qris && mt.id_qris !== d.id_qris) await hapusFile(mt.id_qris).catch(() => {});
       } else if (pb && 'alamat' in b) await upd(null, 'pembeli', u.$id, { alamat: s(b.alamat) });
       return Response.json({ ok: true });
     }
@@ -143,7 +133,7 @@ export async function POST(req) {
         mt = await getRow(null, 'mitra', u.$id).catch(() => null);
       }
       if (mt?.id_qris) {
-        await hapusFileLokal(mt.id_qris);
+        await hapusFile(mt.id_qris).catch(() => {});
         await upd(null, 'mitra', u.$id, { id_qris: null }).catch(() => {});
       }
       return Response.json({ ok: true });

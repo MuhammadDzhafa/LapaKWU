@@ -1,10 +1,9 @@
-// POST /api/upload/hapus — Hapus file gambar dari public/uploads/
-import { unlink } from 'node:fs/promises';
-import { join, basename } from 'node:path';
-import { siapa, getRow } from '@/lib/server';
+// POST /api/upload/hapus, hapus file dari Backblaze B2.
+import { basename } from 'node:path';
+import { siapa } from '@/lib/server';
+import { hapusFile } from '@/lib/backblaze';
+import { cariSatu } from '@/lib/db';
 export const dynamic = 'force-dynamic';
-
-const UPLOAD_DIR = join(process.cwd(), 'public', 'uploads');
 
 export async function POST(req) {
   try {
@@ -20,10 +19,23 @@ export async function POST(req) {
       return Response.json({ error: 'Nama file tidak valid.' }, { status: 400 });
     }
 
-    await unlink(join(UPLOAD_DIR, namaFile)).catch(() => {}); // abaikan jika sudah tidak ada
+    const [produk, mitra] = await Promise.all([
+      cariSatu('produk', { id_gambar: namaFile, id_mitra: u.$id }),
+      cariSatu('mitra', { _id: u.$id, id_qris: namaFile }),
+    ]);
+    if (!produk && !mitra) return Response.json({ error: 'File tidak ditemukan.' }, { status: 404 });
+    await hapusFile(namaFile);
     return Response.json({ ok: true });
   } catch (e) {
-    console.error('[/api/upload/hapus]', e?.message);
+    console.error('[/api/upload/hapus]', {
+      name: e?.name,
+      message: e?.message,
+      code: e?.code,
+      cause: e?.cause?.message,
+      causeCode: e?.cause?.code,
+      causeHost: e?.cause?.hostname,
+      stack: e?.stack,
+    });
     return Response.json({ error: 'Gagal hapus file.' }, { status: 500 });
   }
 }

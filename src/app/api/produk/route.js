@@ -1,4 +1,5 @@
 import { svc, siapa, err, getRow, put, upd, del, ID, Permission, Role } from '@/lib/server';
+import { hapusFile } from '@/lib/backblaze';
 export const dynamic = 'force-dynamic';
 
 // Kelola produk mitra: tambah, ubah, hapus.
@@ -47,6 +48,7 @@ export async function POST(req) {
     if (b.kategori != null) data.kategori = b.kategori;
     if (b.id_gambar != null) data.id_gambar = b.id_gambar;
     await upd(db, 'produk', p.$id, data);
+      if (b.id_gambar != null && p.id_gambar && p.id_gambar !== b.id_gambar) await hapusFile(p.id_gambar).catch(() => {});
     return Response.json({ ok: true });
   }
 
@@ -55,6 +57,7 @@ export async function POST(req) {
     const p = await getRow(db, 'produk', String(b.id || '')).catch(() => null);
     if (!p || p.id_mitra !== u.$id) return err('Produk tidak ditemukan.', 404);
     await del(db, 'produk', p.$id);
+      if (p.id_gambar) await hapusFile(p.id_gambar).catch(() => {});
     return Response.json({ ok: true });
   }
 

@@ -12,9 +12,9 @@ export const rp = (n) =>
 export const tgl = (d) =>
   new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 
-// URL gambar produk — sekarang file di-serve dari /uploads/<id>
+// URL file gambar, dilayani melalui proxy Backblaze B2.
 export const img = (id) => (
-  typeof id === 'string' && id ? (id.startsWith('bukti-') ? `/api/bukti/${encodeURIComponent(id)}` : `/uploads/${id}`) : null
+  typeof id === 'string' && id ? (id.startsWith('bukti-') ? `/api/bukti/${encodeURIComponent(id)}` : `/api/file/${encodeURIComponent(id)}`) : null
 );
 
 // ── account — pengganti Appwrite Account ──────────────────
