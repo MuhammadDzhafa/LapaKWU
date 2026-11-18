@@ -20,7 +20,7 @@ export default function Detail() {
 
   const cek = () => {
     if (!akun) { r.push('/masuk'); return false; }
-    if (peran !== 'pembeli') { toast('Pembelian hanya untuk akun pembeli.', true); return false; }
+    if (peran === 'mitra' || peran === 'admin') { toast('Pembelian hanya untuk akun pembeli.', true); return false; }
     return true;
   };
   const keranjang = async () => {

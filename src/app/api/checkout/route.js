@@ -9,7 +9,16 @@ export async function POST(req) {
 
   const pg = await getRow(db, 'pengguna', u.$id).catch(() => null);
   if (!pg || pg.status_akun !== 'AKTIF') return err('Akun belum aktif. Verifikasi akunmu dulu.', 403);
-  if (!(await getRow(db, 'pembeli', u.$id).catch(() => null))) return err('Hanya akun pembeli yang bisa checkout.', 403);
+  let pb = await getRow(db, 'pembeli', u.$id).catch(() => null);
+  if (!pb) {
+    const mt = await getRow(db, 'mitra', u.$id).catch(() => null);
+    const ad = await getRow(db, 'admin', u.$id).catch(() => null);
+    if (!mt && !ad) {
+      await put(db, 'pembeli', u.$id, { alamat: '' }, baca(u.$id)).catch(() => {});
+      pb = { $id: u.$id, alamat: '' };
+    }
+  }
+  if (!pb) return err('Hanya akun pembeli yang bisa checkout.', 403);
 
   if (!['QRIS', 'BAYAR_DI_TEMPAT'].includes(b.metode)) return err('Pilih metode pembayaran.');
   if (b.metode === 'QRIS' && !b.id_bukti) return err('Harap unggah bukti pembayaran.');

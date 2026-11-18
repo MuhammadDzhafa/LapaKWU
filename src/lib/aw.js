@@ -26,7 +26,11 @@ export const hapus = (tableId, rowId) => db.deleteRow({ databaseId: DB, tableId,
 export async function hitungKeranjang(uid) {
   const it = await list('item_keranjang', [Query.equal('id_keranjang', uid)]);
   const total = it.reduce((a, i) => a + i.subtotal, 0);
-  await ubah('keranjang', uid, { total_harga: total });
+  try {
+    await ubah('keranjang', uid, { total_harga: total });
+  } catch {
+    await db.createRow({ databaseId: DB, tableId: 'keranjang', rowId: uid, data: { id_pembeli: uid, total_harga: total }, permissions: milik(uid) }).catch(() => {});
+  }
   return total;
 }
 

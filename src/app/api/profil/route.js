@@ -59,7 +59,7 @@ export async function POST(req) {
       }, baca(u.$id)).catch(() => null);
     }
   }
-  if (!pg && ['nama', 'email', 'telepon', 'detail', 'hapus_qris'].includes(b.aksi)) return err('Profil tidak ditemukan.', 404);
+  if (!pg && ['nama', 'email', 'telepon', 'detail'].includes(b.aksi)) return err('Profil tidak ditemukan.', 404);
   // Verifikasi ulang kontak setelah email/nomor verifikasi diganti
   const perluVerif = async () => {
     const pb = await getRow(db, 'pembeli', u.$id).catch(() => null);
@@ -110,12 +110,16 @@ export async function POST(req) {
   }
 
   if (b.aksi === 'hapus_qris') {
-    const mt = await getRow(db, 'mitra', u.$id).catch(() => null);
-    if (!mt) return err('Data mitra tidak ditemukan.', 404);
-    if (mt.id_qris) {
-      await storage.deleteFile({ bucketId: 'gambar-produk', fileId: mt.id_qris }).catch(() => {});
+    let mt = await getRow(db, 'mitra', u.$id).catch(() => null);
+    if (!mt) {
+      const pg0 = await getRow(db, 'pengguna', u.$id).catch(() => null);
+      await put(db, 'mitra', u.$id, { nama_usaha: pg0?.nama || u.name || 'Lapak', alamat_usaha: '-' }, baca(u.$id)).catch(() => {});
+      mt = await getRow(db, 'mitra', u.$id).catch(() => null);
     }
-    await upd(db, 'mitra', u.$id, { id_qris: null });
+    if (mt?.id_qris) {
+      await storage.deleteFile({ bucketId: 'gambar-produk', fileId: mt.id_qris }).catch(() => {});
+      await upd(db, 'mitra', u.$id, { id_qris: null }).catch(() => {});
+    }
     return Response.json({ ok: true });
   }
 

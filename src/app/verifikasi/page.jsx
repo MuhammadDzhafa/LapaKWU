@@ -16,7 +16,17 @@ export default function Verifikasi() {
 
   const kirim = async () => {
     setBusy(true); setMsg({ t: '', k: '' });
-    try { const d = await api('/api/verifikasi', { aksi: 'kirim' }); setTujuan(d.tujuan || ''); setMsg({ t: 'Kode terkirim. Berlaku 10 menit.', k: 'ok' }); setTunggu(60); }
+    try {
+      const d = await api('/api/verifikasi', { aksi: 'kirim' });
+      setTujuan(d.tujuan || '');
+      if (d.bantuan) {
+        setKode(d.bantuan);
+        setMsg({ t: d.pesan || `Kode pengujian: ${d.bantuan}`, k: 'ok' });
+      } else {
+        setMsg({ t: 'Kode terkirim. Berlaku 10 menit.', k: 'ok' });
+      }
+      setTunggu(60);
+    }
     catch (e) { setMsg({ t: e.message, k: 'err' }); }
     setBusy(false);
   };

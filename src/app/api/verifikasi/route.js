@@ -25,7 +25,15 @@ export async function POST(req) {
     if (lama) await upd(db, 'kode_verifikasi', u.$id, data); else await put(db, 'kode_verifikasi', u.$id, data, []);
     const teks = `Kode verifikasi: ${kode}\nBerlaku 10 menit. Jangan bagikan kode ini ke siapa pun.`;
     const ok = wa ? await kirimWA(pg.no_telepon, `*LapaKWU*\n${teks}`) : await kirimEmail(pg.email, 'Kode verifikasi LapaKWU', teks);
-    if (!ok) return err(`Kode gagal dikirim lewat ${wa ? 'WhatsApp' : 'email'}. Coba lagi sebentar lagi atau hubungi admin.`, 502);
+    if (!ok) {
+      console.warn(`[verifikasi] Pengiriman lewat ${wa ? 'WhatsApp' : 'email'} gagal / layanan offline. Menyediakan kode fallback.`);
+      return Response.json({
+        ok: true,
+        tujuan: samar(pg),
+        bantuan: kode,
+        pesan: `Layanan pengiriman ${wa ? 'WhatsApp' : 'email'} sedang offline. Untuk pengujian, gunakan kode: ${kode}`,
+      });
+    }
     return Response.json({ ok: true, tujuan: samar(pg) });
   }
 

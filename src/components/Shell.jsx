@@ -34,7 +34,8 @@ export default function Shell({ children }) {
         catch (e) { galatProfil = e.message; }
       }
       if (!pengguna && !galatProfil) galatProfil = 'Data profilmu belum bisa dibaca.';
-      setS({ akun, pengguna, pembeli, mitra: mt, peran: ad ? 'admin' : mt ? 'mitra' : pembeli ? 'pembeli' : null, galatProfil });
+      const peranAktif = ad ? 'admin' : mt ? 'mitra' : 'pembeli';
+      setS({ akun, pengguna, pembeli, mitra: mt, peran: peranAktif, galatProfil });
     } catch { setS({}); }
   }, []);
   useEffect(() => { muat(); }, [muat]);

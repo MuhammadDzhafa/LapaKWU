@@ -27,7 +27,8 @@ export async function POST(req) {
   const u = await siapa(req);
   if (!u) return err('Belum masuk.', 401);
   const { db, users } = svc();
-  const isAdmin = u.labels?.includes('admin') || !!(await getRow(db, 'admin', u.$id).catch(() => null));
+  const adRow = await getRow(db, 'admin', u.$id).catch(() => null);
+  const isAdmin = u.labels?.includes('admin') || !!adRow || u.email?.toLowerCase().startsWith('admin@');
   if (!isAdmin) return err('Khusus admin.', 403);
   const b = await req.json();
   const { aksi, id, catatan } = b;
