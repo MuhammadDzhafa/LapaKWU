@@ -28,10 +28,13 @@ const indeks = {
 
 export async function getDatabase() {
   if (!state.connection) {
-    if (!process.env.MONGODB_URI) throw Object.assign(new Error('MONGODB_URI belum dikonfigurasi.'), { code: 'MONGODB_CONFIG' });
-    const client = new MongoClient(process.env.MONGODB_URI, { maxPoolSize: 10, serverSelectionTimeoutMS: 8000 });
+    const uri = process.env.MONGODB_URI?.trim();
+    if (!uri) throw Object.assign(new Error('MONGODB_URI belum dikonfigurasi di .env.local.'), { code: 'MONGODB_CONFIG' });
+    const client = new MongoClient(uri, { maxPoolSize: 10, serverSelectionTimeoutMS: 8000 });
     state.connection = client.connect().then(async () => {
-      const db = client.db(process.env.MONGODB_DB || 'lapakwu');
+      const dbName = process.env.MONGODB_DB?.trim();
+      if (!dbName) throw Object.assign(new Error('MONGODB_DB belum dikonfigurasi di .env.local.'), { code: 'MONGODB_CONFIG' });
+      const db = client.db(dbName);
       await Promise.all(Object.entries(indeks).map(([name, specs]) => db.collection(name).createIndexes(specs)));
       return { client, db };
     }).catch(async (error) => {

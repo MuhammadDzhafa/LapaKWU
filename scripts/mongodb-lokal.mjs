@@ -6,12 +6,12 @@ import { MongoClient } from 'mongodb';
 
 const host = '127.0.0.1:27029';
 const set = 'lapakwuDev';
-const uri = 'mongodb://' + host + '/?directConnection=true';
-const config = process.env.MONGODB_URI;
+const config = process.env.MONGODB_URI?.trim();
 if (process.argv.includes('--if-configured') && !config?.startsWith('mongodb://' + host + '/')) process.exit(0);
+if (!config) throw new Error('MONGODB_URI belum dikonfigurasi di .env.local.');
 
 async function perintah(command) {
-  const client = new MongoClient(uri, { serverSelectionTimeoutMS: 1000, connectTimeoutMS: 1000 });
+  const client = new MongoClient(config, { serverSelectionTimeoutMS: 1000, connectTimeoutMS: 1000 });
   try { return await client.db('admin').command(command); }
   finally { await client.close(); }
 }
