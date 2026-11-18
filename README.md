@@ -40,7 +40,7 @@ py -3.12 -m venv .venv-ocr
 
 Di Linux, gunakan `python3.12 -m venv .venv-ocr` dan jalankan perintah pip yang sama dengan `.venv-ocr/bin/python`. Di `.env.local`, isi `OCR_PYTHON` dengan path interpreter tersebut dan `OCR_NAMA_PENERIMA` dengan nama merchant persis seperti yang tercetak pada bukti QRIS. Jalankan skrip sekali dengan gambar contoh untuk mengunduh dan menyiapkan model sebelum menerima pesanan. PaddleOCR berjalan lokal tanpa API OCR berbayar. [Panduan PaddleOCR CPU](https://www.paddleocr.ai/v3.3.2/en/quick_start.html)
 
-Backend membandingkan hasil OCR dengan total checkout yang dihitung dari database, nama penerima yang dikonfigurasi, dan tanggal kalender Jakarta hari ini atau kemarin. Bukti yang cocok tetap menunggu konfirmasi dana masuk. Admin atau mitra dapat memeriksa bukti dan mengonfirmasi secara manual. Bila OCR lambat, sedang dipakai, atau tidak bisa membaca gambar, pesanan masuk pemeriksaan manual.
+Backend membandingkan hasil OCR dengan total checkout yang dihitung dari database, nama penerima yang dikonfigurasi, dan tanggal kalender Jakarta hari ini atau kemarin. Jika semua pemeriksaan cocok, pembayaran otomatis menjadi `BERHASIL` dan pesanan masuk `DIPROSES`. Bila OCR lambat, sedang dipakai, nama penerima belum dikonfigurasi, atau bukti tidak cocok, pembayaran tetap menunggu pemeriksaan manual.
 
 PayHook opsional. Jika sudah dipakai, atur `PAYHOOK_SECRET` dan kirim nilainya melalui header `x-payhook-secret`. Konfirmasi otomatis membutuhkan nominal, referensi transaksi dari payload dana masuk, dan satu bukti OCR yang cocok. Ketika notifikasi DANA tidak menyediakan referensi yang juga tercetak di bukti, gunakan konfirmasi manual.
 

@@ -3,12 +3,14 @@ import contextlib
 import json
 import os
 import sys
+from pathlib import Path
 
 from PIL import Image
 
 
 def main():
     os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
+    os.environ.setdefault("PADDLE_PDX_CACHE_HOME", str(Path.cwd() / "data" / "paddlex"))
     path = sys.argv[1]
     with Image.open(path) as image:
         if image.width * image.height > 12_000_000:

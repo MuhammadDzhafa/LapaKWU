@@ -74,7 +74,9 @@ export function periksaBukti(lines, total, now = new Date(), penerima = process.
   const labelPenerima = /^(?:nama (?:penerima|merchant)|penerima|tujuan|kepada|dibayar ke|transfer ke)(?:\s*:\s*|\s+|$)/i;
   const penerimaTerbaca = lines.flatMap((line, i) => {
     const label = line.match(labelPenerima);
-    return label ? [line.slice(label[0].length).trim() || lines[i + 1] || ''] : [];
+    if (!label) return [];
+    const inline = line.slice(label[0].length).trim();
+    return [inline, lines[i + 1] || '', lines[i - 1] || ''];
   });
   const penerimaCocok = Boolean(nama && (penerimaTerbaca.length ? penerimaTerbaca : lines)
     .some((line) => normal(line) === nama));

@@ -3,5 +3,7 @@ node_modules
 /.next-test/
 .env.local
 /data/bukti-pembayaran/
+/data/paddlex/
 /.venv-ocr/
+/.venv/
 /data/mongodb-dev/
