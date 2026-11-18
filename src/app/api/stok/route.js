@@ -19,6 +19,7 @@ async function ubahRekap(db, rid, uang, jml) {
 }
 
 export async function POST(req) {
+  try {
   const u = await siapa(req);
   if (!u) return err('Belum masuk.', 401);
   const b = await req.json();
@@ -69,4 +70,8 @@ export async function POST(req) {
     return Response.json({ ok: true, dikembalikan: kembali });
   }
   return err('Aksi tidak dikenal.');
+  } catch (e) {
+    console.error('[/api/stok] unhandled error:', e?.message || e);
+    return err('Terjadi kesalahan server. Coba lagi.', 500);
+  }
 }

@@ -23,6 +23,7 @@ async function setPeran(db, users, id, peran, info = {}) {
 }
 
 export async function POST(req) {
+  try {
   const u = await siapa(req);
   if (!u) return err('Belum masuk.', 401);
   const { db, users } = svc();
@@ -152,4 +153,8 @@ export async function POST(req) {
     await users.delete({ userId: id }).catch(() => {});
   } else return err('Aksi tidak dikenal.');
   return Response.json({ ok: true });
+  } catch (e) {
+    console.error('[/api/admin] unhandled error:', e?.message || e);
+    return err('Terjadi kesalahan server. Coba lagi.', 500);
+  }
 }

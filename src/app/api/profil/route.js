@@ -3,10 +3,11 @@ import { normHp } from '@/lib/kirim';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req) {
-  const u = await siapa(req);
+  try {
+    const u = await siapa(req);
   if (!u) return err('Sesi login tidak dikenali server.', 401);
   const b = await req.json();
-  const { db, users } = svc();
+  const { db, users, storage } = svc();
   const s = (v, n = 255) => String(v || '').trim().slice(0, n);
 
   if (b.aksi === 'daftar') {
@@ -99,7 +100,6 @@ export async function POST(req) {
       if ('rekening' in b) d.rekening = s(b.rekening, 100);
       if ('id_qris' in b) {
         if (!b.id_qris && mt.id_qris) {
-          const { storage } = svc();
           await storage.deleteFile({ bucketId: 'gambar-produk', fileId: mt.id_qris }).catch(() => {});
         }
         d.id_qris = b.id_qris ? s(b.id_qris, 36) : null;
@@ -113,7 +113,6 @@ export async function POST(req) {
     const mt = await getRow(db, 'mitra', u.$id).catch(() => null);
     if (!mt) return err('Data mitra tidak ditemukan.', 404);
     if (mt.id_qris) {
-      const { storage } = svc();
       await storage.deleteFile({ bucketId: 'gambar-produk', fileId: mt.id_qris }).catch(() => {});
     }
     await upd(db, 'mitra', u.$id, { id_qris: null });
@@ -140,4 +139,8 @@ export async function POST(req) {
     return Response.json({ ok: true });
   }
   return err('Aksi tidak dikenal.');
+  } catch (e) {
+    console.error('[/api/profil] unhandled error:', e?.message || e);
+    return err('Terjadi kesalahan server. Coba lagi.', 500);
+  }
 }

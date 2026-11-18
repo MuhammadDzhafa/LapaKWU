@@ -7,6 +7,7 @@ const hash = (k, uid) => createHash('sha256').update(`${k}:${uid}:${process.env.
 const samar = (pg) => pg.kanal === 'WHATSAPP' ? pg.no_telepon.slice(0, 5) + '****' + pg.no_telepon.slice(-2) : pg.email.replace(/^(.).*(@.*)$/, '$1***$2');
 
 export async function POST(req) {
+  try {
   const u = await siapa(req);
   if (!u) return err('Belum masuk.', 401);
   const b = await req.json();
@@ -41,4 +42,8 @@ export async function POST(req) {
     return Response.json({ ok: true });
   }
   return err('Aksi tidak dikenal.');
+  } catch (e) {
+    console.error('[/api/verifikasi] unhandled error:', e?.message || e);
+    return err('Terjadi kesalahan server. Coba lagi.', 500);
+  }
 }

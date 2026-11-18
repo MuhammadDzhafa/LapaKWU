@@ -43,6 +43,7 @@ async function bersihkanKedaluwarsa(db) {
 }
 
 export async function POST(req) {
+  try {
   const u = await siapa(req);
   if (!u) return err('Belum masuk.', 401);
   const { id, aksi, alasan } = await req.json();
@@ -136,4 +137,8 @@ export async function POST(req) {
     { terima: 'Pesananmu sedang diproses.', tolak: `Pesanan ditolak mitra: ${data.alasan_pembatalan}.${refund}`, kirim: 'Pesananmu sedang dikirim.', siap: 'Pesananmu siap diambil.', selesai: 'Pesanan selesai. Terima kasih sudah belanja!' }[aksi],
     aksi === 'tolak' || aksi === 'siap');
   return Response.json({ ok: true });
+  } catch (e) {
+    console.error('[/api/pesanan] unhandled error:', e?.message || e);
+    return err('Terjadi kesalahan server. Coba lagi.', 500);
+  }
 }

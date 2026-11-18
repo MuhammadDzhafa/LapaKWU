@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 
 // Mitra mengajukan pencairan saldo (penjualan digital dikurangi komisi) untuk satu periode.
 export async function POST(req) {
+  try {
   const u = await siapa(req);
   if (!u) return err('Belum masuk.', 401);
   const { id } = await req.json();
@@ -18,4 +19,8 @@ export async function POST(req) {
   await upd(db, 'rekap_penjualan', id, { status_pencairan: 'DIAJUKAN' });
   for (const a of await rows(db, 'admin', [Query.limit(5)])) await notif(db, a.$id, 'Pengajuan pencairan', `${mt.nama_usaha} mengajukan pencairan periode ${r.periode} sebesar Rp ${saldo.toLocaleString('id-ID')}.`, true);
   return Response.json({ ok: true });
+  } catch (e) {
+    console.error('[/api/rekap] unhandled error:', e?.message || e);
+    return err('Terjadi kesalahan server. Coba lagi.', 500);
+  }
 }

@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 // batasan permission tabel (label:mitra) yang tidak bisa diset dari klien.
 
 export async function POST(req) {
+  try {
   const u = await siapa(req);
   if (!u) return err('Belum masuk.', 401);
 
@@ -55,4 +56,8 @@ export async function POST(req) {
   }
 
   return err('Aksi tidak dikenal.');
+  } catch (e) {
+    console.error('[/api/produk] unhandled error:', e?.message || e);
+    return err('Terjadi kesalahan server. Coba lagi.', 500);
+  }
 }
