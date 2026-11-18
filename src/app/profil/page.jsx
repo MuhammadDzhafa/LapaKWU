@@ -75,6 +75,30 @@ export default function Profil() {
   const [showSB, setShowSB] = useState(false);
   const [isReset, setIsReset] = useState(false);
   const [resetParams, setResetParams] = useState({ token: '', userId: '' });
+  const [pakeOtp, setPakeOtp] = useState(false);
+  const [mintaOtpBusy, setMintaOtpBusy] = useState(false);
+  const [otpInfo, setOtpInfo] = useState('');
+
+  const kirimOtp = async () => {
+    setMintaOtpBusy(true);
+    setOtpInfo('');
+    try {
+      const res = await fetch('/api/auth/otp-sandi', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ aksi: 'minta_otp' }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || 'Gagal mengirim OTP.');
+      setPakeOtp(true);
+      setOtpInfo(d.pesan || `Kode OTP telah dikirim ke email ${d.email || email}. Cek kotak masuk atau spam.`);
+      toast(`Kode OTP dikirim ke ${d.email || email}`);
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      setMintaOtpBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -216,7 +240,7 @@ export default function Profil() {
 
           <section className="pcard" style={{ '--i': 3 }} aria-labelledby="h-aman">
             <h3 id="h-aman">Keamanan</h3>
-            <Baris id="sandi" ikon={I.lock} label="Kata sandi" nilai="••••••••" tombol="Ganti kata sandi" buka={buka} setBuka={(v) => { if (v === 'sandi') mulai({ sl: '', sb: '' })(); setBuka(v); }}
+            <Baris id="sandi" ikon={I.lock} label="Kata sandi" nilai="••••••••" tombol="Ganti kata sandi" buka={buka} setBuka={(v) => { if (v === 'sandi') { mulai({ sl: '', sb: '', otp: '' })(); setPakeOtp(false); setOtpInfo(''); } setBuka(v); }}
               onSimpan={async () => {
                 if (isReset && resetParams.token) {
                   const res = await fetch('/api/reset-sandi', {
@@ -227,31 +251,128 @@ export default function Profil() {
                   const d = await res.json().catch(() => ({}));
                   if (!res.ok) throw new Error(d.error || 'Gagal mengatur kata sandi baru.');
                   toast('Kata sandi berhasil diperbarui.');
+                } else if (pakeOtp) {
+                  if (!f.otp || !f.sb) throw new Error('Isi kode OTP dan kata sandi baru.');
+                  const res = await fetch('/api/auth/otp-sandi', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ aksi: 'verifikasi_otp', kode: f.otp, sandiBaru: f.sb }),
+                  });
+                  const d = await res.json().catch(() => ({}));
+                  if (!res.ok) throw new Error(d.error || 'Gagal memverifikasi OTP.');
+                  toast('Kata sandi berhasil diubah.');
+                  setPakeOtp(false);
+                  setOtpInfo('');
                 } else {
                   await account.updatePassword({ password: f.sb, oldPassword: f.sl });
-                  toast('Kata sandi diganti.');
+                  toast('Kata sandi berhasil diubah.');
                 }
               }}>
-              {!isReset && (
-                <div className="field" style={{ position: 'relative' }}>
-                  <label htmlFor="in-sl">Kata sandi lama</label>
-                  <input id="in-sl" type={showSL ? 'text' : 'password'} required autoComplete="current-password" style={{ paddingRight: 44 }} value={f.sl ?? ''} onChange={set('sl')} />
-                  <button type="button" onClick={() => setShowSL(!showSL)}
-                    style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#5E6A75', paddingTop: 22 }}
-                    aria-label={showSL ? 'Sembunyikan kata sandi lama' : 'Tampilkan kata sandi lama'}>
-                    <EyeIcon show={showSL} />
-                  </button>
-                </div>
+              {pakeOtp ? (
+                <>
+                  {otpInfo && <p className="msg ok" style={{ marginBottom: 12 }}>{otpInfo}</p>}
+                  <div className="field">
+                    <label htmlFor="in-otp">Kode OTP (6 digit dari email)</label>
+                    <input
+                      id="in-otp"
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      required
+                      placeholder="Contoh: 123456"
+                      autoComplete="one-time-code"
+                      value={f.otp ?? ''}
+                      onChange={set('otp')}
+                    />
+                  </div>
+                  <div className="field" style={{ position: 'relative' }}>
+                    <label htmlFor="in-sb">Kata sandi baru (min. 8 karakter)</label>
+                    <input
+                      id="in-sb"
+                      type={showSB ? 'text' : 'password'}
+                      minLength={8}
+                      required
+                      autoComplete="new-password"
+                      style={{ paddingRight: 44 }}
+                      value={f.sb ?? ''}
+                      onChange={set('sb')}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSB(!showSB)}
+                      style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#5E6A75', paddingTop: 22 }}
+                      aria-label={showSB ? 'Sembunyikan kata sandi baru' : 'Tampilkan kata sandi baru'}
+                    >
+                      <EyeIcon show={showSB} />
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, marginBottom: 12 }}>
+                    <button type="button" className="link" onClick={() => setPakeOtp(false)} style={{ fontSize: '0.85rem' }}>
+                      ← Ingat kata sandi lama
+                    </button>
+                    <button type="button" className="link" onClick={kirimOtp} disabled={mintaOtpBusy} style={{ fontSize: '0.85rem' }}>
+                      {mintaOtpBusy ? 'Mengirim…' : 'Kirim ulang OTP'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {!isReset && (
+                    <div className="field" style={{ position: 'relative' }}>
+                      <label htmlFor="in-sl">Kata sandi lama</label>
+                      <input
+                        id="in-sl"
+                        type={showSL ? 'text' : 'password'}
+                        required
+                        autoComplete="current-password"
+                        style={{ paddingRight: 44 }}
+                        value={f.sl ?? ''}
+                        onChange={set('sl')}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSL(!showSL)}
+                        style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#5E6A75', paddingTop: 22 }}
+                        aria-label={showSL ? 'Sembunyikan kata sandi lama' : 'Tampilkan kata sandi lama'}
+                      >
+                        <EyeIcon show={showSL} />
+                      </button>
+                    </div>
+                  )}
+                  <div style={{ textAlign: 'right', marginTop: -8, marginBottom: 12 }}>
+                    <button
+                      type="button"
+                      className="link"
+                      onClick={kirimOtp}
+                      disabled={mintaOtpBusy}
+                      style={{ fontSize: '0.85rem' }}
+                    >
+                      {mintaOtpBusy ? 'Mengirim kode…' : 'Lupa kata sandi lama? Kirim kode OTP ke email →'}
+                    </button>
+                  </div>
+                  <div className="field" style={{ position: 'relative' }}>
+                    <label htmlFor="in-sb">{isReset ? 'Kata sandi baru' : 'Kata sandi baru (min. 8 karakter)'}</label>
+                    <input
+                      id="in-sb"
+                      type={showSB ? 'text' : 'password'}
+                      minLength={8}
+                      required
+                      autoComplete="new-password"
+                      style={{ paddingRight: 44 }}
+                      value={f.sb ?? ''}
+                      onChange={set('sb')}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSB(!showSB)}
+                      style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#5E6A75', paddingTop: 22 }}
+                      aria-label={showSB ? 'Sembunyikan kata sandi baru' : 'Tampilkan kata sandi baru'}
+                    >
+                      <EyeIcon show={showSB} />
+                    </button>
+                  </div>
+                </>
               )}
-              <div className="field" style={{ position: 'relative' }}>
-                <label htmlFor="in-sb">{isReset ? 'Kata sandi baru' : 'Kata sandi baru (min. 8 karakter)'}</label>
-                <input id="in-sb" type={showSB ? 'text' : 'password'} minLength={8} required autoComplete="new-password" style={{ paddingRight: 44 }} value={f.sb ?? ''} onChange={set('sb')} />
-                <button type="button" onClick={() => setShowSB(!showSB)}
-                  style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#5E6A75', paddingTop: 22 }}
-                  aria-label={showSB ? 'Sembunyikan kata sandi baru' : 'Tampilkan kata sandi baru'}>
-                  <EyeIcon show={showSB} />
-                </button>
-              </div>
             </Baris>
 
             <div className={'br keluar' + (yakin ? ' open' : '')}>

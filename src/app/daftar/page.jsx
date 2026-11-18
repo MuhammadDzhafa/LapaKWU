@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { account, ID, api } from '@/lib/aw';
@@ -19,17 +19,23 @@ export default function Daftar() {
   const r = useRouter();
   const [f, setF] = useState({ email: '', password: '', nama: '', alamat: '', telp: '', kanal: 'EMAIL' });
   const [msg, setMsg] = useState('');
+  const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
   const [showPass, setShowPass] = useState(false);
+  const nameRef = useRef(null);
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
 
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem('lapakwu_prefill');
       if (raw) {
-        const { email, password } = JSON.parse(raw);
+        const { email, password, dariLogin } = JSON.parse(raw);
         setF((x) => ({ ...x, email: email || '', password: password || '' }));
+        if (dariLogin) {
+          setInfo('Email belum terdaftar. Silakan lengkapi nama dan alamat untuk menyelesaikan pendaftaran akun barumu.');
+        }
         sessionStorage.removeItem('lapakwu_prefill');
+        setTimeout(() => nameRef.current?.focus(), 150);
       }
     } catch {}
   }, []);
@@ -63,10 +69,16 @@ export default function Daftar() {
   return (
     <main className="wrap" style={{ maxWidth: 520 }}>
       <h2>Buat akun LapaKWU</h2>
+      {info && (
+        <div style={{ background: 'var(--tint)', border: '1.5px solid var(--or)', borderRadius: '16px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '1.25rem' }}>👋</span>
+          <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--ink)', fontWeight: 600 }}>{info}</p>
+        </div>
+      )}
       <form className="card pad" onSubmit={kirim}>
         <div className="field">
           <label htmlFor="n">Nama lengkap</label>
-          <input id="n" required autoComplete="name" maxLength={100} value={f.nama} onChange={set('nama')} />
+          <input ref={nameRef} id="n" required autoComplete="name" maxLength={100} value={f.nama} onChange={set('nama')} />
         </div>
         <div className="field">
           <label htmlFor="e">Email</label>

@@ -2,8 +2,9 @@ import { svc, siapa, err, getRow, put, upd, del, ID, Permission, Role } from '@/
 export const dynamic = 'force-dynamic';
 
 // Kelola produk mitra: tambah, ubah, hapus.
-// Semua operasi dijalankan server-side dengan API key sehingga tidak terkena
-// batasan permission tabel (label:mitra) yang tidak bisa diset dari klien.
+// Akses tulis diperiksa di server berdasarkan akun mitra pemilik produk.
+const hargaValid = (n) => Number.isFinite(+n) && +n >= 0 && Number.isSafeInteger(Math.round(+n * 100));
+const stokValid = (n) => Number.isSafeInteger(+n) && +n >= 0;
 
 export async function POST(req) {
   try {
@@ -22,6 +23,7 @@ export async function POST(req) {
   if (b.aksi === 'tambah') {
     const { nama, harga, kategori, deskripsi, stok, id_gambar } = b;
     if (!nama || harga == null || !kategori || stok == null) return err('Data produk tidak lengkap.');
+    if (!hargaValid(harga) || !stokValid(stok)) return err('Harga atau stok tidak valid.');
     const data = { id_mitra: u.$id, nama, harga: +harga, kategori, deskripsi: deskripsi || '', stok: +stok };
     if (id_gambar) data.id_gambar = id_gambar;
     const row = await put(db, 'produk', ID.unique(), data, [
@@ -36,6 +38,7 @@ export async function POST(req) {
   if (b.aksi === 'ubah') {
     const p = await getRow(db, 'produk', String(b.id || '')).catch(() => null);
     if (!p || p.id_mitra !== u.$id) return err('Produk tidak ditemukan.', 404);
+    if ((b.harga != null && !hargaValid(b.harga)) || (b.stok != null && !stokValid(b.stok))) return err('Harga atau stok tidak valid.');
     const data = {};
     if (b.nama != null) data.nama = b.nama;
     if (b.harga != null) data.harga = +b.harga;
@@ -57,6 +60,7 @@ export async function POST(req) {
 
   return err('Aksi tidak dikenal.');
   } catch (e) {
+    if (e.code === 409) return err(e.message, 409);
     console.error('[/api/produk] unhandled error:', e?.message || e);
     return err('Terjadi kesalahan server. Coba lagi.', 500);
   }

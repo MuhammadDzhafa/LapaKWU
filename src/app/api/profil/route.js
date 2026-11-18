@@ -1,148 +1,175 @@
-import { svc, siapa, err, getRow, put, upd, baca, milik } from '@/lib/server';
+import { siapa, err, getRow, put, upd, baca, milik } from '@/lib/server';
+import { ubahNama, ubahEmail } from '@/lib/auth';
 import { normHp } from '@/lib/kirim';
+import { unlink } from 'node:fs/promises';
+import { join } from 'node:path';
+
 export const dynamic = 'force-dynamic';
+
+const hapusFileLokal = async (fileId) => {
+  if (!fileId) return;
+  try {
+    await unlink(join(process.cwd(), 'public', 'uploads', fileId));
+  } catch {}
+};
 
 export async function POST(req) {
   try {
     const u = await siapa(req);
-  if (!u) return err('Sesi login tidak dikenali server.', 401);
-  const b = await req.json();
-  const { db, users, storage } = svc();
-  const s = (v, n = 255) => String(v || '').trim().slice(0, n);
+    if (!u) return err('Sesi login tidak dikenali server.', 401);
+    const b = await req.json();
+    const s = (v, n = 255) => String(v || '').trim().slice(0, n);
 
-  if (b.aksi === 'daftar') {
-    if (await getRow(db, 'pengguna', u.$id).catch(() => null)) return Response.json({ ok: true });
-    const kanal = b.kanal === 'WHATSAPP' ? 'WHATSAPP' : 'EMAIL';
-    const hp = normHp(b.no_telepon);
-    if (kanal === 'WHATSAPP' && !hp) return err('Isi nomor WhatsApp yang valid, misalnya 0812xxxxxxx.');
-    if (b.peran === 'mitra' && !s(b.nama_usaha)) return err('Isi nama usaha.');
-    await put(db, 'pengguna', u.$id, { nama: u.name, email: u.email, no_telepon: hp || '', status_akun: 'MENUNGGU_VERIFIKASI', kanal, kontak_terverifikasi: false }, baca(u.$id));
-    if (b.peran === 'mitra') await put(db, 'mitra', u.$id, { nama_usaha: s(b.nama_usaha), alamat_usaha: s(b.alamat) }, baca(u.$id));
-    else {
-      await put(db, 'pembeli', u.$id, { alamat: s(b.alamat) }, baca(u.$id));
-      await put(db, 'keranjang', u.$id, { id_pembeli: u.$id, total_harga: 0 }, milik(u.$id));
-    }
-    return Response.json({ ok: true });
-  }
+    if (b.aksi === 'daftar') {
+      const kanal = b.kanal === 'WHATSAPP' ? 'WHATSAPP' : 'EMAIL';
+      const hp = normHp(b.no_telepon);
+      if (kanal === 'WHATSAPP' && !hp) return err('Isi nomor WhatsApp yang valid, misalnya 0812xxxxxxx.');
+      if (b.peran === 'mitra' && !s(b.nama_usaha)) return err('Isi nama usaha.');
 
-  // Pulihkan profil yang hilang atau tidak terbaca (mis. pendaftaran terputus setelah akun dibuat).
-  if (b.aksi === 'pulihkan') {
-    const adaAdmin = await getRow(db, 'admin', u.$id).catch(() => null);
-    const pg0 = await getRow(db, 'pengguna', u.$id).catch(() => null);
-    if (!pg0) {
-      await put(db, 'pengguna', u.$id, { nama: u.name || u.email.split('@')[0], email: u.email, no_telepon: '', status_akun: adaAdmin ? 'AKTIF' : 'MENUNGGU_VERIFIKASI', kanal: 'EMAIL', kontak_terverifikasi: !!adaAdmin }, baca(u.$id));
-    } else await db.updateRow({ databaseId: 'lapakwu', tableId: 'pengguna', rowId: u.$id, data: {}, permissions: baca(u.$id) }).catch(() => {});
-    const mt = await getRow(db, 'mitra', u.$id).catch(() => null);
-    const pb = await getRow(db, 'pembeli', u.$id).catch(() => null);
-    if (mt) await db.updateRow({ databaseId: 'lapakwu', tableId: 'mitra', rowId: u.$id, data: {}, permissions: baca(u.$id) }).catch(() => {});
-    else if (pb) await db.updateRow({ databaseId: 'lapakwu', tableId: 'pembeli', rowId: u.$id, data: {}, permissions: baca(u.$id) }).catch(() => {});
-    else if (!adaAdmin) {
-      await put(db, 'pembeli', u.$id, { alamat: '' }, baca(u.$id));
-      if (!(await getRow(db, 'keranjang', u.$id).catch(() => null))) await put(db, 'keranjang', u.$id, { id_pembeli: u.$id, total_harga: 0 }, milik(u.$id));
-    }
-    return Response.json({ ok: true });
-  }
-
-  let pg = await getRow(db, 'pengguna', u.$id).catch(() => null);
-  if (!pg) {
-    const mt0 = await getRow(db, 'mitra', u.$id).catch(() => null);
-    const pb0 = await getRow(db, 'pembeli', u.$id).catch(() => null);
-    if (mt0 || pb0) {
-      // Auto-heal profil pengguna jika terputus
-      pg = await put(db, 'pengguna', u.$id, {
-        nama: u.name || u.email.split('@')[0],
-        email: u.email,
-        no_telepon: '',
-        status_akun: 'AKTIF',
-        kanal: 'EMAIL',
-        kontak_terverifikasi: true,
-      }, baca(u.$id)).catch(() => null);
-    }
-  }
-  if (!pg && ['nama', 'email', 'telepon', 'detail'].includes(b.aksi)) return err('Profil tidak ditemukan.', 404);
-  // Verifikasi ulang kontak setelah email/nomor verifikasi diganti
-  const perluVerif = async () => {
-    const pb = await getRow(db, 'pembeli', u.$id).catch(() => null);
-    await upd(db, 'pengguna', u.$id, { kontak_terverifikasi: false, ...(pb ? { status_akun: 'MENUNGGU_VERIFIKASI' } : {}) });
-  };
-
-  if (b.aksi === 'nama') {
-    const nama = s(b.nama, 100);
-    if (!nama) return err('Nama tidak boleh kosong.');
-    await users.updateName({ userId: u.$id, name: nama });
-    await upd(db, 'pengguna', u.$id, { nama });
-    return Response.json({ ok: true });
-  }
-
-  if (b.aksi === 'email') { // email akun sudah diganti di Appwrite oleh klien; di sini hanya disinkronkan
-    await upd(db, 'pengguna', u.$id, { email: u.email });
-    if (pg.kanal === 'EMAIL') { await perluVerif(); return Response.json({ ok: true, verifikasi: true }); }
-    return Response.json({ ok: true });
-  }
-
-  if (b.aksi === 'telepon') {
-    const kosong = !String(b.no_telepon || '').trim();
-    const hp = normHp(b.no_telepon);
-    if (kosong && pg.kanal === 'WHATSAPP') return err('Nomor WhatsApp wajib diisi karena dipakai untuk verifikasi.');
-    if (!kosong && !hp) return err('Nomor telepon tidak valid. Contoh: 0812xxxxxxx.');
-    await upd(db, 'pengguna', u.$id, { no_telepon: hp || '' });
-    if (pg.kanal === 'WHATSAPP' && hp !== pg.no_telepon) { await perluVerif(); return Response.json({ ok: true, verifikasi: true }); }
-    return Response.json({ ok: true });
-  }
-
-  if (b.aksi === 'detail') {
-    const mt = await getRow(db, 'mitra', u.$id).catch(() => null);
-    const pb = await getRow(db, 'pembeli', u.$id).catch(() => null);
-    if (mt) {
-      const d = {};
-      if ('nama_usaha' in b) { if (!s(b.nama_usaha)) return err('Nama usaha tidak boleh kosong.'); d.nama_usaha = s(b.nama_usaha); }
-      if ('alamat' in b) d.alamat_usaha = s(b.alamat);
-      if ('rekening' in b) d.rekening = s(b.rekening, 100);
-      if ('id_qris' in b) {
-        if (!b.id_qris && mt.id_qris) {
-          await storage.deleteFile({ bucketId: 'gambar-produk', fileId: mt.id_qris }).catch(() => {});
-        }
-        d.id_qris = b.id_qris ? s(b.id_qris, 36) : null;
+      const pgAda = await getRow(null, 'pengguna', u.$id).catch(() => null);
+      if (pgAda) {
+        await upd(null, 'pengguna', u.$id, {
+          ...(hp ? { no_telepon: hp } : {}),
+          kanal,
+        });
+      } else {
+        await put(null, 'pengguna', u.$id, { nama: u.name, email: u.email, no_telepon: hp || '', status_akun: 'AKTIF', kanal, kontak_terverifikasi: true }, []);
       }
-      await upd(db, 'mitra', u.$id, d);
-    } else if (pb && 'alamat' in b) await upd(db, 'pembeli', u.$id, { alamat: s(b.alamat) });
-    return Response.json({ ok: true });
-  }
 
-  if (b.aksi === 'hapus_qris') {
-    let mt = await getRow(db, 'mitra', u.$id).catch(() => null);
-    if (!mt) {
-      const pg0 = await getRow(db, 'pengguna', u.$id).catch(() => null);
-      await put(db, 'mitra', u.$id, { nama_usaha: pg0?.nama || u.name || 'Lapak', alamat_usaha: '-' }, baca(u.$id)).catch(() => {});
-      mt = await getRow(db, 'mitra', u.$id).catch(() => null);
+      if (b.peran === 'mitra') {
+        const mtAda = await getRow(null, 'mitra', u.$id).catch(() => null);
+        if (mtAda) await upd(null, 'mitra', u.$id, { nama_usaha: s(b.nama_usaha), alamat_usaha: s(b.alamat) });
+        else await put(null, 'mitra', u.$id, { nama_usaha: s(b.nama_usaha), alamat_usaha: s(b.alamat) }, []);
+      } else {
+        const pbAda = await getRow(null, 'pembeli', u.$id).catch(() => null);
+        if (pbAda) await upd(null, 'pembeli', u.$id, { alamat: s(b.alamat) });
+        else await put(null, 'pembeli', u.$id, { alamat: s(b.alamat) }, []);
+        if (!(await getRow(null, 'keranjang', u.$id).catch(() => null))) {
+          await put(null, 'keranjang', u.$id, { id_pembeli: u.$id, total_harga: 0 }, []);
+        }
+      }
+      return Response.json({ ok: true });
     }
-    if (mt?.id_qris) {
-      await storage.deleteFile({ bucketId: 'gambar-produk', fileId: mt.id_qris }).catch(() => {});
-      await upd(db, 'mitra', u.$id, { id_qris: null }).catch(() => {});
-    }
-    return Response.json({ ok: true });
-  }
 
-  if (b.aksi === 'ubah') {
-    const pg = await getRow(db, 'pengguna', u.$id).catch(() => null);
-    if (!pg) return err('Profil tidak ditemukan.', 404);
-    const nama = s(b.nama, 100);
-    if (!nama) return err('Nama tidak boleh kosong.');
-    const data = { nama };
-    if (pg.kanal !== 'WHATSAPP') { // nomor WA dipakai untuk verifikasi, jadi tidak bisa diganti di sini
-      if (b.no_telepon && !normHp(b.no_telepon)) return err('Nomor telepon tidak valid.');
-      data.no_telepon = normHp(b.no_telepon) || '';
+    // Pulihkan profil yang hilang atau tidak terbaca
+    if (b.aksi === 'pulihkan') {
+      const adaAdmin = await getRow(null, 'admin', u.$id).catch(() => null);
+      const pg0 = await getRow(null, 'pengguna', u.$id).catch(() => null);
+      if (!pg0) {
+        await put(null, 'pengguna', u.$id, { nama: u.name || u.email.split('@')[0], email: u.email, no_telepon: '', status_akun: adaAdmin ? 'AKTIF' : 'MENUNGGU_VERIFIKASI', kanal: 'EMAIL', kontak_terverifikasi: !!adaAdmin }, []);
+      }
+      const mt = await getRow(null, 'mitra', u.$id).catch(() => null);
+      const pb = await getRow(null, 'pembeli', u.$id).catch(() => null);
+      if (!mt && !pb && !adaAdmin) {
+        await put(null, 'pembeli', u.$id, { alamat: '' }, []);
+        if (!(await getRow(null, 'keranjang', u.$id).catch(() => null))) {
+          await put(null, 'keranjang', u.$id, { id_pembeli: u.$id, total_harga: 0 }, []);
+        }
+      }
+      return Response.json({ ok: true });
     }
-    await users.updateName({ userId: u.$id, name: nama });
-    await upd(db, 'pengguna', u.$id, data);
-    if (await getRow(db, 'pembeli', u.$id).catch(() => null)) await upd(db, 'pembeli', u.$id, { alamat: s(b.alamat) });
-    if (await getRow(db, 'mitra', u.$id).catch(() => null)) {
-      if (!s(b.nama_usaha)) return err('Nama usaha tidak boleh kosong.');
-      await upd(db, 'mitra', u.$id, { nama_usaha: s(b.nama_usaha), alamat_usaha: s(b.alamat), rekening: s(b.rekening, 100) });
+
+    let pg = await getRow(null, 'pengguna', u.$id).catch(() => null);
+    if (!pg) {
+      const mt0 = await getRow(null, 'mitra', u.$id).catch(() => null);
+      const pb0 = await getRow(null, 'pembeli', u.$id).catch(() => null);
+      if (mt0 || pb0) {
+        pg = await put(null, 'pengguna', u.$id, {
+          nama: u.name || u.email.split('@')[0],
+          email: u.email,
+          no_telepon: '',
+          status_akun: 'AKTIF',
+          kanal: 'EMAIL',
+          kontak_terverifikasi: true,
+        }, []).catch(() => null);
+      }
     }
-    return Response.json({ ok: true });
-  }
-  return err('Aksi tidak dikenal.');
+    if (!pg && ['nama', 'email', 'telepon', 'detail'].includes(b.aksi)) return err('Profil tidak ditemukan.', 404);
+
+    const perluVerif = async () => {
+      const pb = await getRow(null, 'pembeli', u.$id).catch(() => null);
+      await upd(null, 'pengguna', u.$id, { kontak_terverifikasi: false, ...(pb ? { status_akun: 'MENUNGGU_VERIFIKASI' } : {}) });
+    };
+
+    if (b.aksi === 'nama') {
+      const nama = s(b.nama, 100);
+      if (!nama) return err('Nama tidak boleh kosong.');
+      await ubahNama(u.$id, nama);
+      await upd(null, 'pengguna', u.$id, { nama });
+      return Response.json({ ok: true });
+    }
+
+    if (b.aksi === 'email') {
+      await ubahEmail(u.$id, u.email);
+      await upd(null, 'pengguna', u.$id, { email: u.email });
+      if (pg.kanal === 'EMAIL') { await perluVerif(); return Response.json({ ok: true, verifikasi: true }); }
+      return Response.json({ ok: true });
+    }
+
+    if (b.aksi === 'telepon') {
+      const kosong = !String(b.no_telepon || '').trim();
+      const hp = normHp(b.no_telepon);
+      if (kosong && pg.kanal === 'WHATSAPP') return err('Nomor WhatsApp wajib diisi karena dipakai untuk verifikasi.');
+      if (!kosong && !hp) return err('Nomor telepon tidak valid. Contoh: 0812xxxxxxx.');
+      await upd(null, 'pengguna', u.$id, { no_telepon: hp || '' });
+      if (pg.kanal === 'WHATSAPP' && hp !== pg.no_telepon) { await perluVerif(); return Response.json({ ok: true, verifikasi: true }); }
+      return Response.json({ ok: true });
+    }
+
+    if (b.aksi === 'detail') {
+      const mt = await getRow(null, 'mitra', u.$id).catch(() => null);
+      const pb = await getRow(null, 'pembeli', u.$id).catch(() => null);
+      if (mt) {
+        const d = {};
+        if ('nama_usaha' in b) { if (!s(b.nama_usaha)) return err('Nama usaha tidak boleh kosong.'); d.nama_usaha = s(b.nama_usaha); }
+        if ('alamat' in b) d.alamat_usaha = s(b.alamat);
+        if ('rekening' in b) d.rekening = s(b.rekening, 100);
+        if ('id_qris' in b) {
+          if (!b.id_qris && mt.id_qris) {
+            await hapusFileLokal(mt.id_qris);
+          }
+          d.id_qris = b.id_qris ? s(b.id_qris, 36) : null;
+        }
+        await upd(null, 'mitra', u.$id, d);
+      } else if (pb && 'alamat' in b) await upd(null, 'pembeli', u.$id, { alamat: s(b.alamat) });
+      return Response.json({ ok: true });
+    }
+
+    if (b.aksi === 'hapus_qris') {
+      let mt = await getRow(null, 'mitra', u.$id).catch(() => null);
+      if (!mt) {
+        const pg0 = await getRow(null, 'pengguna', u.$id).catch(() => null);
+        await put(null, 'mitra', u.$id, { nama_usaha: pg0?.nama || u.name || 'Lapak', alamat_usaha: '-' }, []).catch(() => {});
+        mt = await getRow(null, 'mitra', u.$id).catch(() => null);
+      }
+      if (mt?.id_qris) {
+        await hapusFileLokal(mt.id_qris);
+        await upd(null, 'mitra', u.$id, { id_qris: null }).catch(() => {});
+      }
+      return Response.json({ ok: true });
+    }
+
+    if (b.aksi === 'ubah') {
+      const pgTarget = await getRow(null, 'pengguna', u.$id).catch(() => null);
+      if (!pgTarget) return err('Profil tidak ditemukan.', 404);
+      const nama = s(b.nama, 100);
+      if (!nama) return err('Nama tidak boleh kosong.');
+      const data = { nama };
+      if (pgTarget.kanal !== 'WHATSAPP') {
+        if (b.no_telepon && !normHp(b.no_telepon)) return err('Nomor telepon tidak valid.');
+        data.no_telepon = normHp(b.no_telepon) || '';
+      }
+      await ubahNama(u.$id, nama);
+      await upd(null, 'pengguna', u.$id, data);
+      if (await getRow(null, 'pembeli', u.$id).catch(() => null)) await upd(null, 'pembeli', u.$id, { alamat: s(b.alamat) });
+      if (await getRow(null, 'mitra', u.$id).catch(() => null)) {
+        if (!s(b.nama_usaha)) return err('Nama usaha tidak boleh kosong.');
+        await upd(null, 'mitra', u.$id, { nama_usaha: s(b.nama_usaha), alamat_usaha: s(b.alamat), rekening: s(b.rekening, 100) });
+      }
+      return Response.json({ ok: true });
+    }
+
+    return err('Aksi tidak dikenal.');
   } catch (e) {
     console.error('[/api/profil] unhandled error:', e?.message || e);
     return err('Terjadi kesalahan server. Coba lagi.', 500);

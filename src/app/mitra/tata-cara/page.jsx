@@ -2,7 +2,7 @@
 import Link from 'next/link';
 
 // TODO: Ganti dengan nomor WhatsApp Admin LapaKWU yang sebenarnya
-const ADMIN_WA = '6281234567890';
+const ADMIN_WA = '62895334248010';
 
 const pesanWA = () => {
   const teks = encodeURIComponent(

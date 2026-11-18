@@ -42,7 +42,7 @@ const JUDUL = ['Belanja', 'di', 'lapak', 'teman', 'sekampus.'];
 const TICKER_ITEMS = ['Pesan antar', 'Ambil di lapak', 'QRIS', 'Virtual account', 'Bayar di tempat', 'Produk mitra KWU'];
 
 export default function Beranda() {
-  const { akun, peran, toast } = useSaya();
+  const { akun, peran, toast, keranjang, ubahItemKeranjang } = useSaya();
   const r = useRouter();
   const [p, setP] = useState(null);
   const [m, setM] = useState([]);
@@ -61,11 +61,14 @@ export default function Beranda() {
   const kat = useMemo(() => ['Semua', ...new Set((p || []).map((x) => x.kategori))], [p]);
   const lapakAda = m.filter((x) => (p || []).some((y) => y.id_mitra === x.$id));
   const tampil = (p || []).filter((x) => (k === 'Semua' || x.kategori === k) && (!lapak || x.id_mitra === lapak) && x.nama.toLowerCase().includes(q.toLowerCase()));
+  const keranjangMap = useMemo(() => Object.fromEntries((keranjang || []).map((i) => [i.id_produk, i.jumlah])), [keranjang]);
 
-  const tambah = async (x) => {
-    if (!akun) return r.push('/masuk');
-    if (peran !== 'pembeli') return toast('Keranjang hanya untuk akun pembeli.', true);
-    try { await tambahKeranjang(akun.$id, x, 1); toast(`${x.nama} masuk keranjang`); setBaru(x.$id); setTimeout(() => setBaru((v) => (v === x.$id ? null : v)), 1100); } catch (e) { toast(e.message, true); }
+  const handleUbah = (x, delta) => {
+    ubahItemKeranjang(x, delta);
+    if (delta > 0) {
+      setBaru(x.$id);
+      setTimeout(() => setBaru((v) => (v === x.$id ? null : v)), 800);
+    }
   };
 
   return (
@@ -130,7 +133,39 @@ export default function Beranda() {
                 <small className="muted">{nama[x.id_mitra] || 'Mitra'}</small>
                 <div className="pf">
                   <span className="tag">{rp(x.harga)}</span>
-                  {x.stok > 0 && <button className={'plus' + (baru === x.$id ? ' ok' : '')} aria-label={`Tambah ${x.nama} ke keranjang`} onClick={() => tambah(x)}>{baru === x.$id ? '✓' : '+'}</button>}
+                  {x.stok > 0 && (
+                    keranjangMap[x.$id] > 0 ? (
+                      <div className="stepper-card" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          className="step-btn minus"
+                          aria-label={`Kurangi ${x.nama}`}
+                          onClick={(e) => { e.preventDefault(); handleUbah(x, -1); }}
+                        >
+                          −
+                        </button>
+                        <span className="step-num">{keranjangMap[x.$id]}</span>
+                        <button
+                          type="button"
+                          className="step-btn plus-btn"
+                          aria-label={`Tambah ${x.nama}`}
+                          disabled={keranjangMap[x.$id] >= x.stok}
+                          onClick={(e) => { e.preventDefault(); handleUbah(x, 1); }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className={'plus' + (baru === x.$id ? ' ok' : '')}
+                        aria-label={`Tambah ${x.nama} ke keranjang`}
+                        onClick={(e) => { e.preventDefault(); handleUbah(x, 1); }}
+                      >
+                        {baru === x.$id ? '✓' : '+'}
+                      </button>
+                    )
+                  )}
                 </div>
               </div>
             </article>

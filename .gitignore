@@ -1,3 +1,7 @@
 node_modules
 .next
+/.next-test/
 .env.local
+/data/bukti-pembayaran/
+/.venv-ocr/
+/data/mongodb-dev/

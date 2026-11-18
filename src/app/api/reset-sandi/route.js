@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
-import { svc, err, getRow, upd, del } from '@/lib/server';
+import { err, getRow, upd, del } from '@/lib/server';
+import { ubahPassword } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 const hashToken = (tok, uid) =>
-  createHash('sha256').update(`${tok}:${uid}:${process.env.APPWRITE_API_KEY}`).digest('hex');
+  createHash('sha256').update(`${tok}:${uid}:${process.env.JWT_SECRET || 'lapakwu'}`).digest('hex');
 
 export async function POST(req) {
   try {
@@ -18,7 +19,7 @@ export async function POST(req) {
       return err('Kata sandi minimal 8 karakter.');
     }
 
-    const { db, users } = svc();
+    const { db } = { db: null };
 
     const record = await getRow(db, 'kode_verifikasi', userId).catch(() => null);
     if (!record || record.kanal !== 'RESET_PASSWORD') {
@@ -40,8 +41,8 @@ export async function POST(req) {
       return err('Token reset tidak valid.');
     }
 
-    // Update password user di Appwrite via Admin SDK (tanpa perlu password lama)
-    await users.updatePassword({ userId, password: sandi });
+    // Update password user via auth.js (bcrypt hash)
+    await ubahPassword(userId, sandi);
 
     // Hapus token setelah berhasil digunakan
     await del(db, 'kode_verifikasi', userId).catch(() => {});

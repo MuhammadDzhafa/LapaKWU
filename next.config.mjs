@@ -1,2 +1,3 @@
-// Jangan isi `output` (Appwrite Sites menangani build SSR sendiri).
-export default {};
+export default {
+  distDir: process.env.LAPAKWU_DIST_DIR || '.next',
+};

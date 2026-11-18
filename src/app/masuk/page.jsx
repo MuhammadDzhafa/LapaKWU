@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { account, ambil } from '@/lib/aw';
+import { account } from '@/lib/aw';
 
 const EyeIcon = ({ show }) => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -30,31 +30,12 @@ export default function Masuk() {
 
       // Determine role and redirect accordingly
       const me = await account.get();
-      const uid = me.$id;
 
-      const [adm, mt] = await Promise.all([
-        ambil('admin', uid).catch(() => null),
-        ambil('mitra', uid).catch(() => null),
-      ]);
-
-      if (adm) {
-        location.href = '/admin/dashboard';
+      if (me.peran === 'admin') {
+        location.href = '/admin';
         return;
       }
 
-      if (mt) {
-        const intent = sessionStorage.getItem('lapakwu_checkout_intent');
-        if (intent) {
-          const { productId, quantity } = JSON.parse(intent);
-          sessionStorage.removeItem('lapakwu_checkout_intent');
-          location.href = `/checkout?beli=${productId}&jml=${quantity}`;
-          return;
-        }
-        location.href = '/';
-        return;
-      }
-
-      // pembeli or fallback
       const intent = sessionStorage.getItem('lapakwu_checkout_intent');
       if (intent) {
         const { productId, quantity } = JSON.parse(intent);
@@ -67,13 +48,14 @@ export default function Masuk() {
     } catch (er) {
       const errMsg = er.message || '';
       const isNotFound =
-        errMsg.toLowerCase().includes('user with the requested id could not be found') ||
-        errMsg.toLowerCase().includes('invalid credentials') ||
+        er.notFound === true ||
         er.code === 404 ||
-        er.type === 'user_not_found';
+        er.type === 'user_not_found' ||
+        errMsg.toLowerCase().includes('belum terdaftar') ||
+        errMsg.toLowerCase().includes('user with the requested id could not be found');
 
       if (isNotFound) {
-        sessionStorage.setItem('lapakwu_prefill', JSON.stringify({ email: f.email, password: f.password }));
+        sessionStorage.setItem('lapakwu_prefill', JSON.stringify({ email: f.email, password: f.password, dariLogin: true }));
         r.push('/daftar');
         return;
       }
@@ -120,7 +102,16 @@ export default function Masuk() {
       </form>
       <p className="muted" style={{ textAlign: 'center', marginTop: 16 }}>
         Belum punya akun?{' '}
-        <Link href="/daftar">Daftar di sini</Link>
+        <Link
+          href="/daftar"
+          onClick={() => {
+            if (f.email || f.password) {
+              sessionStorage.setItem('lapakwu_prefill', JSON.stringify({ email: f.email, password: f.password }));
+            }
+          }}
+        >
+          Daftar di sini
+        </Link>
       </p>
     </main>
   );

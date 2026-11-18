@@ -1,0 +1,30 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { cariSatu, cariBanyak } from '@/lib/db';
+import { siapa, err } from '@/lib/server';
+import { FORMAT_ID_BUKTI } from '@/lib/bukti-pembayaran';
+
+export const dynamic = 'force-dynamic';
+
+export async function GET(req, { params }) {
+  const u = await siapa(req);
+  if (!u) return err('Belum masuk.', 401);
+  const { id } = await params;
+  if (!FORMAT_ID_BUKTI.test(id)) return err('Bukti tidak ditemukan.', 404);
+  const upload = await cariSatu('unggahan_bukti', { _id: id });
+  if (!upload) return err('Bukti tidak ditemukan.', 404);
+  if (upload.id_pembeli !== u.$id) {
+    const pembayaran = await cariBanyak('pembayaran', { id_bukti: id });
+    const peserta = await cariSatu('pesanan', { _id: { $in: pembayaran.map((p) => p.id_pesanan) }, id_mitra: u.$id });
+    if (!peserta) {
+      const [admin, mitra] = await Promise.all([cariSatu('admin', { _id: u.$id }), cariSatu('mitra', { _id: u.$id })]);
+      if (!admin || mitra) return err('Bukti tidak ditemukan.', 404);
+    }
+  }
+  const buffer = await readFile(join(process.cwd(), 'data', 'bukti-pembayaran', id)).catch(() => null);
+  if (!buffer) return err('Bukti tidak ditemukan.', 404);
+  const ext = id.split('.').at(-1);
+  return new Response(buffer, {
+    headers: { 'Content-Type': ext === 'jpg' ? 'image/jpeg' : 'image/' + ext, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' },
+  });
+}

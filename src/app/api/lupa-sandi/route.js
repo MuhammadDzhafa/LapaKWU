@@ -1,11 +1,11 @@
 import { randomBytes, createHash } from 'node:crypto';
-import { svc, err, getRow, put, upd, Query } from '@/lib/server';
+import { err, getRow, put, upd } from '@/lib/server';
 import { sendResetPasswordEmail } from '@/lib/kirim';
 
 export const dynamic = 'force-dynamic';
 
 const hashToken = (tok, uid) =>
-  createHash('sha256').update(`${tok}:${uid}:${process.env.APPWRITE_API_KEY}`).digest('hex');
+  createHash('sha256').update(`${tok}:${uid}:${process.env.JWT_SECRET || 'lapakwu'}`).digest('hex');
 
 export async function POST(req) {
   try {
@@ -13,17 +13,17 @@ export async function POST(req) {
     if (!email || typeof email !== 'string') return err('Email wajib diisi.');
 
     const cleanEmail = email.trim().toLowerCase();
-    const { db, users } = svc();
+    const { db } = { db: null };
 
     // Cari user berdasarkan email
-    const userList = await users.list([Query.equal('email', cleanEmail), Query.limit(1)]);
-    if (!userList.users || userList.users.length === 0) {
+    const { cariAkunByEmail } = await import('@/lib/auth');
+    const targetUser = await cariAkunByEmail(cleanEmail);
+    if (!targetUser) {
       // Keamanan: jangan beri tahu apakah email terdaftar atau tidak (anti-enumeration)
       return Response.json({ ok: true });
     }
 
-    const targetUser = userList.users[0];
-    const uid = targetUser.$id;
+    const uid = targetUser.id;
 
     // Generate token reset yang aman
     const rawToken = randomBytes(24).toString('hex');
@@ -44,16 +44,15 @@ export async function POST(req) {
       await put(db, 'kode_verifikasi', uid, recordData, []);
     }
 
-    // Tentukan URL dasar aplikasi
-    const host = req.headers.get('host') || 'localhost:3000';
-    const proto = req.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${proto}://${host}`;
-
-    // Link mengarah ke form reset password
-    const resetUrl = `${baseUrl}/reset-sandi?token=${rawToken}&userId=${uid}`;
+    const requestUrl = new URL(req.url);
+    const configured = new URL(process.env.NEXT_PUBLIC_APP_URL || requestUrl.origin);
+    const loopback = ['localhost', '127.0.0.1', '[::1]'];
+    const lokal = loopback.includes(configured.hostname) && loopback.includes(requestUrl.hostname);
+    const resetUrl = new URL('/reset-sandi', lokal ? requestUrl.origin : configured.origin);
+    resetUrl.search = new URLSearchParams({ token: rawToken, userId: uid });
 
     // Kirim email via Nodemailer (Gmail SMTP)
-    await sendResetPasswordEmail(cleanEmail, resetUrl);
+    await sendResetPasswordEmail(cleanEmail, resetUrl.toString());
 
     return Response.json({ ok: true });
   } catch (e) {

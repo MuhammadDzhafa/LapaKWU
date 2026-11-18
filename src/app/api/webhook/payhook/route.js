@@ -1,139 +1,91 @@
-import { svc, rows, getRow, upd, notif, Query } from '@/lib/server';
+import { timingSafeEqual } from 'node:crypto';
+import { err, upd, notif } from '@/lib/server';
+import { cariBanyak, cariSatu, denganTransaksi, tulis } from '@/lib/db';
+import { rupiahDalamSen } from '@/lib/ocr-bukti';
 
 export const dynamic = 'force-dynamic';
 
-// Fungsi untuk mengekstrak nominal uang dari notifikasi DANA / E-Wallet
-function ekstrakNominal(teks) {
-  if (!teks) return null;
-  // Contoh teks notifikasi DANA:
-  // "Kamu menerima pembayaran sebesar Rp 25.000 dari..."
-  // "Berhasil menerima Rp. 30.000 dari..."
-  // "Pembayaran QRIS Rp25.500 diterima"
-  const polaRp = /Rp\.?\s*([\d\.]+)/i;
-  const match = teks.match(polaRp);
-  if (match && match[1]) {
-    const angka = parseInt(match[1].replace(/\./g, ''), 10);
-    if (!isNaN(angka) && angka > 0) return angka;
-  }
+function teksPayload(value) {
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  return value && typeof value === 'object' ? Object.values(value).map(teksPayload).join(' ') : '';
+}
 
-  // Fallback: cari angka minimal 4 digit (misal: 10000)
-  const polaAngka = /(?:sebesar|masuk|terima)\s*(\d[\d\.\,]+)/i;
-  const matchAngka = teks.match(polaAngka);
-  if (matchAngka && matchAngka[1]) {
-    const angka = parseInt(matchAngka[1].replace(/[\.\,]/g, ''), 10);
-    if (!isNaN(angka) && angka > 0) return angka;
-  }
+async function bacaPayload(req) {
+  const jenis = req.headers.get('content-type') || '';
+  if (jenis.includes('application/json')) return req.json();
+  if (jenis.includes('form')) return Object.fromEntries(await req.formData());
+  const text = await req.text();
+  try { return JSON.parse(text); } catch { return { text }; }
+}
 
-  return null;
+function rahasiaCocok(req) {
+  const nilai = req.headers.get('x-payhook-secret');
+  if (!nilai || !process.env.PAYHOOK_SECRET) return false;
+  const expected = Buffer.from(process.env.PAYHOOK_SECRET);
+  const actual = Buffer.from(nilai);
+  return actual.length === expected.length && timingSafeEqual(expected, actual);
 }
 
 export async function POST(req) {
   try {
-    // 1. Verifikasi secret key (opsional, jika dikonfigurasi di PayHook Header x-payhook-secret)
-    const secret = req.headers.get('x-payhook-secret');
-    const secretEnv = process.env.PAYHOOK_SECRET;
-    if (secretEnv && secret !== secretEnv) {
-      console.warn('[PayHook Webhook] Unauthorized secret key');
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    const payload = await bacaPayload(req) ?? {};
+    const teks = teksPayload(payload);
+    const nominalPayload = payload.nominal ?? payload.amount;
+    const raw = teks.match(/\b(?:RP|IDR)\.?\s*(\d[\d.,]*)/i)?.[1]
+      ?? (['string', 'number'].includes(typeof nominalPayload) ? String(nominalPayload) : undefined)
+      ?? teks.match(/(?:diterima|masuk|menerima)\s*[:=]?\s*(\d[\d.,]*)/i)?.[1];
+    const nominal = raw ? rupiahDalamSen(raw) / 100 : 0;
+    const uji = !teks || payload.test === true || payload.ping === true || payload.action === 'test' || /\b(test|ping|uji coba)\b/i.test(teks);
+    if (uji && !nominal) return Response.json({ ok: true, status: 'connected', pesan: 'Webhook LapaKWU berhasil terhubung dengan PayHook!' });
+    if (!rahasiaCocok(req)) return err('Unauthorized', 401);
+    if (!nominal || (payload.direction !== 'incoming' && !/\b(menerima|diterima|uang masuk|saldo masuk|transfer masuk|pembayaran masuk)\b/i.test(teks))) {
+      return Response.json({ ok: true, terproses: false, pesan: 'Notifikasi dana masuk tidak ditemukan.' });
     }
 
-    const payload = await req.json().catch(() => ({}));
-    console.log('[PayHook DANA Webhook] Payload diterima:', JSON.stringify(payload));
-
-    // Gabungkan kemungkinan field pesan dari berbagai aplikasi forwarder Android
-    const teksNotifikasi = [
-      payload.title,
-      payload.message,
-      payload.text,
-      payload.content,
-      payload.notification,
-      payload.body,
-    ].filter(Boolean).join(' ');
-
-    if (!teksNotifikasi) {
-      return Response.json({ ok: false, error: 'Pesan notifikasi kosong.' }, { status: 400 });
+    const ref = payload.referensi ?? payload.reference ?? teks.match(/(?:referensi|reference|ref\.?|id transaksi)\s*[:#]?\s*([A-Z0-9-]{8,64})\b/i)?.[1];
+    if (typeof ref !== 'string' || !/^[A-Z0-9-]{8,64}$/i.test(ref)) {
+      return Response.json({ ok: true, terproses: false, nominal, pesan: 'Referensi transaksi tidak tersedia. Cocokkan dana masuk secara manual.' });
     }
+    const referensi = ref.toUpperCase();
+    const hasil = await denganTransaksi(async () => {
+      if (await cariSatu('payhook_event', { _id: referensi })) return null;
+      const cocok = await cariBanyak('bukti_checkout', {
+        referensi, total: nominal, status_ocr: 'COCOK', status_pembayaran: 'MENUNGGU',
+        created_at: { $gte: new Date(Date.now() - 48 * 60 * 60 * 1000) },
+      }, { limit: 2 });
+      if (cocok.length !== 1) return null;
+      const bukti = cocok[0];
+      const daftar = await cariBanyak('pembayaran', { id_bukti_checkout: bukti.id, metode: 'QRIS' });
+      if (!daftar.length || daftar.some((bayar) => !['MENUNGGU', 'BERHASIL'].includes(bayar.status_pembayaran))) return null;
 
-    // 2. Ekstrak nominal uang masuk
-    const nominal = ekstrakNominal(teksNotifikasi);
-    if (!nominal) {
-      console.warn('[PayHook Webhook] Nominal uang tidak terdeteksi pada teks:', teksNotifikasi);
-      return Response.json({ ok: false, pesan: 'Nominal tidak terdeteksi pada notifikasi.' });
-    }
-
-    console.log(`[PayHook Webhook] Terdeteksi transfer masuk DANA: Rp ${nominal.toLocaleString('id-ID')}`);
-
-    const { db } = svc();
-
-    // 3. Cari data pembayaran QRIS berstatus MENUNGGU dengan nominal yang cocok
-    const listBayar = await rows(db, 'pembayaran', [
-      Query.equal('metode', 'QRIS'),
-      Query.equal('status_pembayaran', 'MENUNGGU'),
-      Query.equal('jumlah', nominal),
-      Query.orderDesc('$createdAt'),
-      Query.limit(1),
-    ]);
-
-    if (!listBayar.length) {
-      console.warn(`[PayHook Webhook] Tidak ditemukan pembayaran menunggu sebesar Rp ${nominal}`);
-      return Response.json({
-        ok: true,
-        terproses: false,
-        pesan: `Tidak ada transaksi yang cocok untuk nominal Rp ${nominal}. Disimpan untuk verifikasi manual admin.`,
-      });
-    }
-
-    const bayar = listBayar[0];
-    const pesananId = bayar.id_pesanan;
-    const now = new Date().toISOString();
-
-    // 4. Update status pembayaran menjadi BERHASIL (Lunas)
-    await upd(db, 'pembayaran', bayar.$id, {
-      status_pembayaran: 'BERHASIL',
-      waktu_bayar: now,
+      const orders = [];
+      for (const bayar of daftar) {
+        const order = await cariSatu('pesanan', { _id: bayar.id_pesanan });
+        if (!order || order.status_pesanan === 'DIBATALKAN') return null;
+        orders.push([order, bayar]);
+      }
+      const now = new Date();
+      await tulis('payhook_event', referensi, { id_bukti_checkout: bukti.id });
+      await upd(null, 'bukti_checkout', bukti.id, { status_pembayaran: 'BERHASIL', waktu_bayar: now });
+      for (const [order, bayar] of orders) {
+        if (bayar.status_pembayaran === 'BERHASIL') continue;
+        await upd(null, 'pembayaran', bayar.id, { status_pembayaran: 'BERHASIL', waktu_bayar: now });
+        if (order.status_pesanan === 'MENUNGGU_KONFIRMASI') {
+          await upd(null, 'pesanan', order.id, { status_pesanan: 'DIPROSES' });
+        }
+        const judul = 'Pembayaran QRIS terverifikasi';
+        const pesan = 'Dana untuk pesanan #' + order.id.slice(-6) + ' telah diterima. Invoice tersedia di Riwayat Pesanan.';
+        for (const uid of [order.id_pembeli, order.id_mitra]) {
+          await notif(null, uid, judul, pesan, true);
+        }
+      }
+      return { ids: orders.map(([order]) => order.id) };
     });
-
-    // 5. Update status pesanan menjadi DIPROSES
-    const ps = await getRow(db, 'pesanan', pesananId).catch(() => null);
-    if (ps && ps.status_pesanan === 'MENUNGGU_KONFIRMASI') {
-      await upd(db, 'pesanan', pesananId, { status_pesanan: 'DIPROSES' });
-    }
-
-    const noPesanan = pesananId.slice(-6);
-
-    // 6. Notifikasi otomatis ke MITRA: pembayaran lunas, siapkan pesanan!
-    if (ps?.id_mitra) {
-      await notif(
-        db,
-        ps.id_mitra,
-        'Pembayaran QRIS DANA Terverifikasi!',
-        `Pesanan #${noPesanan} sebesar Rp ${nominal.toLocaleString('id-ID')} telah dibayar via QRIS DANA dan otomatis lunas. Silakan siapkan pesanan pembeli!`,
-        true // Kirim WhatsApp/Email
-      );
-    }
-
-    // 7. Notifikasi otomatis ke PEMBELI: invoice terbit
-    if (ps?.id_pembeli) {
-      await notif(
-        db,
-        ps.id_pembeli,
-        'Pembayaran Berhasil & Invoice Terbit!',
-        `Pembayaran pesanan #${noPesanan} sebesar Rp ${nominal.toLocaleString('id-ID')} telah berhasil diterima. Invoice resmi sudah terbit di menu Riwayat Pesanan.`,
-        true // Kirim WhatsApp/Email
-      );
-    }
-
-    console.log(`[PayHook Webhook] Berhasil memverifikasi pesanan #${noPesanan}`);
-
-    return Response.json({
-      ok: true,
-      terproses: true,
-      pesananId,
-      nominal,
-      pesan: 'Pembayaran berhasil diverifikasi otomatis oleh PayHook.',
-    });
-  } catch (err) {
-    console.error('[/api/webhook/payhook] Error:', err.message || err);
-    return Response.json({ error: err.message }, { status: 500 });
+    if (!hasil) return Response.json({ ok: true, terproses: false, nominal, pesan: 'Tidak ada bukti OCR yang cocok atau transaksi sudah diproses.' });
+    return Response.json({ ok: true, terproses: true, pesananId: hasil.ids[0], pesananIds: hasil.ids, nominal, pesan: 'Pembayaran berhasil diverifikasi.' });
+  } catch (e) {
+    if (e.code === 409) return Response.json({ ok: true, terproses: false, pesan: 'Transaksi sudah diproses.' });
+    console.error('[payhook]', e?.message);
+    return err('Gagal memproses notifikasi pembayaran.', 500);
   }
 }

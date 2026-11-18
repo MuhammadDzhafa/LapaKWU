@@ -87,6 +87,42 @@ export async function sendResetPasswordEmail(to, resetUrl) {
   }
 }
 
+export async function sendOtpPasswordEmail(to, otpCode) {
+  const transporter = getTransporter();
+  if (!transporter) {
+    console.warn('[sendOtpPasswordEmail] EMAIL_USER atau EMAIL_PASS belum diset di .env');
+    return false;
+  }
+  const subjek = `${otpCode} adalah Kode Verifikasi Ganti Kata Sandi LapaKWU`;
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:500px;margin:auto;padding:28px;border:1px solid #F0DEB0;background:#FFF8E6;border-radius:14px;color:#22313F">
+      <h2 style="margin:0 0 14px;color:#B8500A">LapaKWU</h2>
+      <p style="font-size:15px;line-height:1.6">Halo,</p>
+      <p style="font-size:15px;line-height:1.6">Kami menerima permintaan untuk mengganti kata sandi akun LapaKWU kamu. Gunakan kode verifikasi (OTP) 6 digit berikut:</p>
+      <div style="text-align:center;margin:24px 0">
+        <span style="display:inline-block;background:#FF933E;color:#22313F;font-size:32px;font-weight:800;letter-spacing:6px;padding:12px 28px;border-radius:12px;box-shadow:0 4px 12px rgba(184,80,10,0.25)">
+          ${otpCode}
+        </span>
+      </div>
+      <p style="font-size:13px;line-height:1.5;color:#5E6A75">Kode ini berlaku selama <b>10 menit</b>. Jangan berikan kode ini kepada siapa pun demi keamanan akunmu.</p>
+      <p style="font-size:12px;line-height:1.4;color:#788693;margin-top:20px">Jika kamu tidak merasa meminta kode ini, abaikan email ini atau segera amankan akunmu.</p>
+    </div>
+  `;
+  try {
+    await transporter.sendMail({
+      from: `"LapaKWU" <${process.env.EMAIL_USER}>`,
+      to,
+      subject: subjek,
+      text: `Kode verifikasi ganti kata sandi LapaKWU: ${otpCode}. Berlaku 10 menit.`,
+      html,
+    });
+    return true;
+  } catch (e) {
+    console.error('[sendOtpPasswordEmail] Nodemailer error:', e?.message || e);
+    return false;
+  }
+}
+
 export async function kirimWA(nomor, pesan) {
   const token = process.env.FONNTE_TOKEN;
   if (!token || !nomor) return false;

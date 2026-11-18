@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { list, ambil, api, storage, ID, BUCKET, Query, rp, img } from '@/lib/aw';
+import { list, ambil, api, storage, Query, rp, img } from '@/lib/aw';
+import { MAKS_BUKTI_PEMBAYARAN, PESAN_UKURAN_BUKTI } from '@/lib/bukti-pembayaran';
 import { useSaya } from '@/components/Shell';
 
 export default function Checkout() {
-  const { akun, peran, pengguna, pembeli } = useSaya();
+  const { akun, peran, pengguna, pembeli, selesaiCheckout } = useSaya();
   const [lg, setLg] = useState(null); // beli langsung: { id, jumlah }
   const r = useRouter();
   const [it, setIt] = useState(null);
@@ -13,6 +14,7 @@ export default function Checkout() {
   const [f, setF] = useState({ metode: 'QRIS' });
   const [fileBukti, setFileBukti] = useState(null);
   const [previewBukti, setPreviewBukti] = useState(null);
+  const [qrisError, setQrisError] = useState(false);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -49,24 +51,27 @@ export default function Checkout() {
     })().catch((e) => setMsg(e.message));
   }, [akun]);
 
-  const handleFileBukti = (e) => {
-    const file = e.target.files[0];
-    if (!file) {
-      setFileBukti(null);
+  useEffect(() => {
+    if (!fileBukti) {
       setPreviewBukti(null);
       return;
     }
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setMsg('Format bukti pembayaran harus JPG, PNG, atau WebP.');
-      return;
+    const url = URL.createObjectURL(fileBukti);
+    setPreviewBukti(url);
+    return () => URL.revokeObjectURL(url);
+  }, [fileBukti]);
+
+  const handleFileBukti = (e) => {
+    const file = e.target.files[0];
+    let galat = '';
+    if (file && !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      galat = 'Format bukti pembayaran harus JPG, PNG, atau WebP.';
+    } else if (file && file.size > MAKS_BUKTI_PEMBAYARAN) {
+      galat = PESAN_UKURAN_BUKTI;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setMsg('Ukuran bukti pembayaran maksimal 5 MB.');
-      return;
-    }
-    setMsg('');
-    setFileBukti(file);
-    setPreviewBukti(URL.createObjectURL(file));
+    if (galat) e.target.value = '';
+    setFileBukti(galat ? null : file || null);
+    setMsg(galat);
   };
 
   const pesan = async (e) => {
@@ -84,7 +89,7 @@ export default function Checkout() {
         return;
       }
       try {
-        const fileRes = await storage.createFile({ bucketId: BUCKET, fileId: ID.unique(), file: fileBukti });
+        const fileRes = await storage.createFile({ file: fileBukti, jenis: 'bukti-pembayaran' });
         id_bukti = fileRes.$id;
       } catch (errUpload) {
         setMsg('Gagal mengunggah bukti pembayaran: ' + errUpload.message);
@@ -94,7 +99,8 @@ export default function Checkout() {
     }
 
     try {
-      await api('/api/checkout', { metode: f.metode, id_bukti, langsung: lg });
+      const hasil = await api('/api/checkout', { metode: f.metode, id_bukti, langsung: lg });
+      selesaiCheckout(akun.$id, hasil.itemTerpesan);
       r.push('/pesanan');
     } catch (er) {
       setMsg(er.message);
@@ -102,8 +108,12 @@ export default function Checkout() {
     setBusy(false);
   };
 
-  if (peran && peran !== 'pembeli') {
-    return <main className="wrap"><p className="kosong">Checkout hanya untuk akun pembeli.</p></main>;
+  if (!akun) {
+    return (
+      <main className="wrap">
+        <p className="kosong">Silakan <a href="/masuk" className="link">masuk</a> terlebih dahulu untuk melakukan checkout.</p>
+      </main>
+    );
   }
 
   const total = (it || []).reduce((a, i) => a + i.subtotal, 0);
@@ -165,11 +175,12 @@ export default function Checkout() {
                 Total Pembayaran: <b style={{ color: '#047857', fontSize: '1.25rem' }}>{rp(total)}</b>
               </div>
 
-              {process.env.NEXT_PUBLIC_QRIS_URL ? (
+              {process.env.NEXT_PUBLIC_QRIS_URL && !qrisError ? (
                 <div>
                   <img
                     src={process.env.NEXT_PUBLIC_QRIS_URL}
                     alt="QRIS DANA LapaKWU"
+                    onError={() => setQrisError(true)}
                     style={{ maxWidth: 240, width: '100%', height: 'auto', borderRadius: 8, border: '2px solid #cbd5e1', padding: 8, background: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
                   />
                   <div style={{ marginTop: 8 }}>
@@ -186,13 +197,13 @@ export default function Checkout() {
                     Silakan scan QRIS DANA Merchant LapaKWU di ponsel Anda senilai <b>{rp(total)}</b>.
                   </p>
                   <small style={{ color: '#0369a1', fontSize: '0.78rem' }}>
-                    💡 Admin dapat menaruh link/gambar barcode di variabel <code>NEXT_PUBLIC_QRIS_URL</code> pada <code>.env.local</code>.
+                    💡 Taruh file barcode QRIS Anda di folder <code>public/qris.png</code> atau isi link gambar online di <code>NEXT_PUBLIC_QRIS_URL</code>.
                   </small>
                 </div>
               )}
 
               <p className="muted" style={{ fontSize: '0.82rem', margin: '12px 0 0', lineHeight: 1.5 }}>
-                Setelah transfer berhasil, PayHook akan membaca notifikasi DANA dan memverifikasi pesananmu secara otomatis. Invoice resmi akan langsung terbit di akunmu!
+                Unggah bukti yang menampilkan nominal, nama penerima, dan tanggal transaksi. Invoice terbit setelah dana masuk dikonfirmasi.
               </p>
             </div>
 
@@ -207,9 +218,9 @@ export default function Checkout() {
                 required
                 onChange={handleFileBukti}
               />
-              <small className="muted">Format JPG, PNG, atau WebP (maks. 5 MB). Diperiksa otomatis via PayHook dan diverifikasi Admin.</small>
+              <small className="muted">Format JPG, PNG, atau WebP (maks. 2 MB).</small>
 
-              {previewBukti && (
+              {fileBukti && previewBukti && (
                 <div style={{ marginTop: 12, padding: 12, background: '#fff', borderRadius: 8, border: '1px solid #93c5fd', textAlign: 'center' }}>
                   <b style={{ fontSize: '0.9rem', color: '#1e40af', display: 'block', marginBottom: 8 }}>Preview Bukti Pembayaran Anda:</b>
                   <img

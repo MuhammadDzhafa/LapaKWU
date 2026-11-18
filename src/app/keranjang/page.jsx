@@ -1,20 +1,24 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { list, ubah, hapus, hitungKeranjang, Query, rp } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
 
 export default function Keranjang() {
-  const { akun, peran, memuat } = useSaya();
+  const { akun, memuat, keranjang, muatKeranjang } = useSaya();
   const [it, setIt] = useState(null);
   const [msg, setMsg] = useState('');
 
-  const muat = useCallback(async () => {
-    const x = await list('item_keranjang', [Query.equal('id_keranjang', akun.$id)]);
-    const ps = x.length ? await list('produk', [Query.equal('$id', x.map((i) => i.id_produk))]) : [];
-    setIt(x.map((i) => ({ ...i, p: ps.find((p) => p.$id === i.id_produk) })));
-  }, [akun]);
-  useEffect(() => { if (akun) muat().catch((e) => setMsg(e.message)); }, [akun, muat]);
+  useEffect(() => {
+    if (!akun) return;
+    let aktif = true;
+    const muatProduk = async () => {
+      const ps = keranjang.length ? await list('produk', [Query.equal('$id', keranjang.map((i) => i.id_produk))]) : [];
+      if (aktif) setIt(keranjang.map((i) => ({ ...i, p: ps.find((p) => p.$id === i.id_produk) })));
+    };
+    muatProduk().catch((e) => { if (aktif) setMsg(e.message); });
+    return () => { aktif = false; };
+  }, [akun, keranjang]);
 
   const ganti = async (i, d) => {
     // Guard: verifikasi kepemilikan item keranjang
@@ -25,12 +29,14 @@ export default function Keranjang() {
       else if (!i.p) return setMsg('Produk ini sudah dihapus mitra. Hapus dari keranjang.');
       else if (j > i.p.stok) return setMsg(`Stok ${i.p.nama} tersisa ${i.p.stok}.`);
       else await ubah('item_keranjang', i.$id, { jumlah: j, subtotal: j * i.p.harga });
-      await hitungKeranjang(akun.$id); setMsg(''); muat();
+      await hitungKeranjang(akun.$id);
+      setMsg('');
+      await muatKeranjang(akun.$id);
     } catch (e) { setMsg(e.message); }
   };
 
   if (memuat) return <main className="wrap" />;
-  if (peran !== 'pembeli') return <main className="wrap"><p className="kosong">Masuk sebagai pembeli untuk memakai keranjang. <Link className="link" href="/masuk">Masuk</Link></p></main>;
+  if (!akun) return <main className="wrap"><p className="kosong">Silakan masuk untuk melihat keranjang belanja. <Link className="link" href="/masuk">Masuk</Link></p></main>;
   const total = (it || []).reduce((a, i) => a + i.subtotal, 0);
   return (
     <main className="wrap">

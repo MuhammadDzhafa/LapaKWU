@@ -222,8 +222,11 @@ export default function Pesanan({ uid, sebagai }) {
                     <div>
                       <b style={{ fontSize: '0.9rem' }}>Bukti Pembayaran Pembeli</b>
                       <div className="muted" style={{ fontSize: '0.8rem' }}>
-                        {p.bayar.status_pembayaran === 'BERHASIL' ? '✓ Sudah dikonfirmasi lunas oleh mitra' : 'Menunggu verifikasi bukti oleh mitra'}
+                        {p.bayar.status_pembayaran === 'BERHASIL' ? '✓ Pembayaran dikonfirmasi' : 'Menunggu konfirmasi dana masuk'}
                       </div>
+                      {p.bayar.status_ocr && <small className="muted">
+                        {p.bayar.status_ocr === 'COCOK' ? 'OCR cocok dengan data pembayaran.' : 'Bukti perlu pemeriksaan manual.'}
+                      </small>}
                     </div>
                   </div>
                   <button type="button" className="btn sm out" onClick={() => setModalGambar(img(p.bayar.id_bukti))} style={{ fontSize: '0.8rem' }}>

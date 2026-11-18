@@ -1,17 +1,22 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ambil, tambahKeranjang, rp, img } from '@/lib/aw';
+import Link from 'next/link';
+import { ambil, rp, img } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
 
 export default function Detail() {
   const { id } = useParams();
   const r = useRouter();
-  const { akun, peran, toast } = useSaya();
+  const { akun, peran, toast, keranjang, ubahItemKeranjang } = useSaya();
   const [p, setP] = useState(null);
   const [mt, setMt] = useState(null);
   const [n, setN] = useState(1);
   const [inputVal, setInputVal] = useState('1');
+
+  const inCartQty = useMemo(() => {
+    return (keranjang || []).find((i) => i.id_produk === id)?.jumlah || 0;
+  }, [keranjang, id]);
 
   useEffect(() => {
     ambil('produk', id).then(async (x) => { setP(x); setMt(await ambil('mitra', x.id_mitra).catch(() => null)); }).catch(() => setP(false));
@@ -46,16 +51,16 @@ export default function Detail() {
   };
 
   const cek = () => {
-    if (peran === 'mitra' || peran === 'admin') { toast('Pembelian hanya untuk akun pembeli.', true); return false; }
     return true;
   };
-  const keranjang = async () => {
+  const tambahKeKeranjang = async () => {
     if (!akun) {
+      sessionStorage.setItem('lapakwu_checkout_intent', JSON.stringify({ productId: id, quantity: n }));
       r.push('/masuk');
       return;
     }
     if (!cek()) return;
-    try { const j = await tambahKeranjang(akun.$id, p, n); toast(`Keranjang: ${j} × ${p.nama}`); } catch (e) { toast(e.message, true); }
+    await ubahItemKeranjang(p, n);
   };
   const beli = () => {
     if (!akun) {
@@ -95,9 +100,15 @@ export default function Detail() {
             <button type="button" className="btn out sm" aria-label="Tambah" disabled={n >= p.stok} onClick={() => updateQty(n + 1)}>+</button>
             <b style={{ marginLeft: 8 }}>{rp(p.harga * n)}</b>
           </div>
+          {inCartQty > 0 && (
+            <div style={{ background: 'var(--tint)', border: '1px solid var(--or)', padding: '10px 16px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+              <span>✓ <b>{inCartQty}</b> produk sudah ada di keranjangmu</span>
+              <Link href="/keranjang" className="link" style={{ fontSize: '0.92rem' }}>Buka Keranjang →</Link>
+            </div>
+          )}
           <div className="row">
             <button className="btn sun lg" onClick={beli}>Beli sekarang</button>
-            <button className="btn out lg" onClick={keranjang}>Tambah ke keranjang</button>
+            <button className="btn out lg" onClick={tambahKeKeranjang}>+ Tambah ke keranjang</button>
           </div>
         </>) : <p className="msg err">Produk ini sedang habis.</p>}
       </div>

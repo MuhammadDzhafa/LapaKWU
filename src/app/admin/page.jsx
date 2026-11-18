@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { list, hapus, api, Query, rp, img } from '@/lib/aw';
+import { list, hapus, api, Query, rp, img, tgl } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
 import Rekap from '@/components/Rekap';
 import Modal from '@/components/Modal';
@@ -166,7 +166,7 @@ export default function Admin() {
               <div>
                 <b style={{ color: '#14532d' }}>Verifikasi Pembayaran QRIS DANA (PayHook & Manual)</b>
                 <p className="muted" style={{ margin: 0, fontSize: '0.88rem' }}>
-                  Jika PayHook aktif di ponsel Android, pembayaran yang nominalnya cocok akan otomatis terverifikasi lunas.
+                  PayHook dapat mengonfirmasi dana masuk jika nominal dan referensi transaksi cocok dengan bukti yang lolos pemeriksaan OCR.
                   Jika transfer belum otomatis terverifikasi (misal HP offline atau pembeli salah nominal), Admin bisa melakukan verifikasi manual di bawah ini.
                 </p>
               </div>
@@ -220,6 +220,10 @@ export default function Admin() {
                         ) : (
                           <span className="muted"><small>Tanpa file</small></span>
                         )}
+                        {x.status_ocr && <small className="muted" style={{ display: 'block' }}>
+                          {x.status_ocr === 'COCOK' ? 'OCR cocok' : 'Perlu tinjauan manual'}
+                          {x.hasil_ocr?.tanggal && ' · ' + tgl(x.hasil_ocr.tanggal)}
+                        </small>}
                       </td>
                       <td>
                         <div className="row" style={{ gap: 6 }}>

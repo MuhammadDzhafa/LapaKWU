@@ -8,8 +8,21 @@ import Pesanan from '@/components/Pesanan';
 export default function PesananSaya() {
   const { akun, peran, memuat } = useSaya();
   const [n, setN] = useState([]);
+  const [galat, setGalat] = useState('');
+  const [menandai, setMenandai] = useState(null);
   useEffect(() => { if (akun) list('notifikasi', [Query.equal('id_pengguna', akun.$id), Query.orderDesc('$createdAt'), Query.limit(10)]).then(setN).catch(() => {}); }, [akun]);
-  const baca = async (x) => { await ubah('notifikasi', x.$id, { sudah_dibaca: true }); setN(n.map((y) => (y.$id === x.$id ? { ...y, sudah_dibaca: true } : y))); };
+  const baca = async (x) => {
+    setGalat('');
+    setMenandai(x.$id);
+    try {
+      await ubah('notifikasi', x.$id, { sudah_dibaca: true });
+      setN((prev) => prev.map((y) => (y.$id === x.$id ? { ...y, sudah_dibaca: true } : y)));
+    } catch {
+      setGalat('Pemberitahuan gagal ditandai. Silakan coba lagi.');
+    } finally {
+      setMenandai(null);
+    }
+  };
 
   if (memuat) return <main className="wrap" />;
   if (!akun) return <main className="wrap"><p className="kosong"><Link className="link" href="/masuk">Masuk</Link> untuk melihat pesananmu.</p></main>;
@@ -17,11 +30,12 @@ export default function PesananSaya() {
     <main className="wrap split s2">
       <section><h2>Riwayat pesanan</h2><Pesanan uid={akun.$id} sebagai="pembeli" /></section>
       <aside><h3>Pemberitahuan</h3>
+        {galat && <p className="msg err" role="alert">{galat}</p>}
         {!n.length && <p className="muted">Belum ada pemberitahuan.</p>}
         <div className="stack">{n.map((x) => (
           <div key={x.$id} className="card pad" style={{ opacity: x.sudah_dibaca ? .6 : 1 }}>
             <b>{x.judul}</b><p style={{ margin: '4px 0' }}><small>{x.pesan}</small></p>
-            {!x.sudah_dibaca && <button className="link" onClick={() => baca(x)}>Tandai dibaca</button>}
+            {!x.sudah_dibaca && <button className="link" disabled={menandai !== null} onClick={() => baca(x)}>Tandai dibaca</button>}
           </div>))}
         </div>
       </aside>
