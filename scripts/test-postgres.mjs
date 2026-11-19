@@ -28,6 +28,7 @@ try {
     await pastikanPembeli({ $id: partnerId, name: 'Test Mitra', email: `${partnerId}@example.invalid` });
     await tulis('mitra', partnerId, { nama_usaha: 'Lapak Tes', alamat_usaha: 'Alamat tes' });
     await tulis('produk', productId, { id_mitra: partnerId, nama: 'Produk tes', harga: 12500, kategori: 'Tes', stok: 3 });
+    await tulis('rekap_penjualan', partnerId, { id_mitra: partnerId, periode: '2026-01', total_penjualan: 12500 });
     await tulis('pesanan', orderId, {
       id_pembeli: id, id_mitra: partnerId, tanggal_pesanan: new Date(), jenis_pemesanan: 'OFFLINE',
       total_harga: 12500, status_pesanan: 'MENUNGGU_KONFIRMASI',
@@ -48,6 +49,8 @@ try {
   assert.deepEqual(payment?.hasil_ocr, { nominal: 12500, penerima_cocok: false }, 'object JSONB');
   assert.equal((await cariBanyak('users', { $or: [{ _id: id }, { email: 'tidak-ada@example.invalid' }] })).length, 1, 'filter OR');
   assert.equal((await cariBanyak('pesanan', { _id: { $in: [orderId, 'id-tidak-ada'] } })).length, 1, 'filter IN');
+  assert.equal((await cariBanyak('produk', { _id: productId, stok: { $in: [3, 4] } })).length, 1, 'filter IN numerik');
+  assert.equal((await cariSatu('rekap_penjualan', { _id: partnerId }))?.total_penjualan, 12500, 'total rekap dikembalikan sebagai number');
   assert.equal((await cariBanyak('pesanan', { created_at: { $gte: new Date(Date.now() - 60_000) } })).length, 1, 'filter tanggal');
 
   const stockUpdate = await ubahData('produk', { _id: productId, stok: { $gte: 2 } }, {}, { inc: { stok: -2 } });

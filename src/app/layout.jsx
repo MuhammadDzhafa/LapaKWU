@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="id">
+    <html lang="id" data-scroll-behavior="smooth">
       <head>
         <meta name="theme-color" content="#FFCB56" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />

@@ -1,5 +1,5 @@
 import { BATAS_BAYAR_TENANT_MS, tenggatBayarTenant } from '@/lib/pembayaran-tenant';
-import { cariBanyak, denganTransaksi, ubahData } from '@/lib/db';
+import { cariBanyak, denganTransaksi, kunciPesanan, ubahData } from '@/lib/db';
 import { svc, siapa, err, getRow, rows, upd, inc, notif, Query } from '@/lib/server';
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +11,7 @@ const ALUR = {
   kirim: [['DIPROSES'], 'DIKIRIM', 'ONLINE'],
   siap: [['DIPROSES'], 'SIAP_DIAMBIL', 'OFFLINE'],
   selesai: [['DIKIRIM', 'SIAP_DIAMBIL'], 'SELESAI'],
-  konfirmasi_bayar: [['MENUNGGU_KONFIRMASI', 'DIPROSES', 'SIAP_DIAMBIL', 'DIKIRIM'], 'DIPROSES'], // mitra konfirmasi bayar online / offline
+  konfirmasi_bayar: [['MENUNGGU_KONFIRMASI', 'DIPROSES'], 'SELESAI'],
   batal_kedaluwarsa: [['MENUNGGU_KONFIRMASI', 'DIPROSES'], 'DIBATALKAN'], // pembatalan otomatis >1 jam offline
 };
 
@@ -25,6 +25,7 @@ async function bersihkanKedaluwarsa(db) {
     }, { limit: 25, sort: { created_at: 1 } });
     for (const calon of pembayaran) {
       await denganTransaksi(async () => {
+        if (!await kunciPesanan(calon.id_pesanan)) return;
         const by = await getRow(db, 'pembayaran', calon.id);
         const ps = await getRow(db, 'pesanan', by.id_pesanan);
         if (by.status_pembayaran !== 'MENUNGGU' || !['MENUNGGU_KONFIRMASI', 'DIPROSES'].includes(ps.status_pesanan) || tenggatBayarTenant(ps) > sekarang) return;
@@ -66,8 +67,8 @@ export async function POST(req) {
   if (aksi !== 'batal_kedaluwarsa') await bersihkanKedaluwarsa(db);
 
   return await denganTransaksi(async () => {
-    const p = await getRow(db, 'pesanan', id).catch(() => null);
-    if (!p) return err('Pesanan tidak ditemukan.', 404);
+    if (!await kunciPesanan(id)) return err('Pesanan tidak ditemukan.', 404);
+    const p = await getRow(db, 'pesanan', id);
     const boleh = aksi === 'batal' ? p.id_pembeli === u.$id : (aksi === 'batal_kedaluwarsa' ? (p.id_pembeli === u.$id || p.id_mitra === u.$id) : p.id_mitra === u.$id);
     if (!boleh) return err('Kamu tidak berhak mengubah pesanan ini.', 403);
     const a = ALUR[aksi];

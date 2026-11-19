@@ -11,6 +11,7 @@ node_modules
 /.venv-ocr/
 /.venv/
 /data/mongodb-dev/
+/data/postgres-dev/
 /data/unggahan-dev/
 /.next-verifikasi/
 /.next-verifikasi-dev/

@@ -36,7 +36,7 @@ const kolom = {
 };
 const jsonKolom = new Set(['catatan_ocr', 'hasil_ocr']);
 const tanggal = new Set(['created_at', 'updated_at', 'kedaluwarsa', 'waktu_kirim', 'tanggal_pesanan', 'waktu_pengambilan', 'waktu_bayar', 'tanggal_cair', 'waktu']);
-const numerik = new Set(['harga', 'stok', 'total_harga', 'jumlah', 'subtotal', 'harga_satuan', 'jumlah_transaksi', 'total_komisi', 'total_digital', 'total_offline', 'jumlah_offline', 'total', 'ukuran', 'percobaan', 'nomor_tenant', 'nominal']);
+const numerik = new Set(['harga', 'stok', 'total_harga', 'jumlah', 'subtotal', 'harga_satuan', 'total_penjualan', 'jumlah_transaksi', 'total_komisi', 'total_digital', 'total_offline', 'jumlah_offline', 'total', 'ukuran', 'percobaan', 'nomor_tenant', 'nominal']);
 
 function namaTabel(tabel) {
   if (!koleksiInti.includes(tabel)) throw Object.assign(new Error('Tabel tidak diizinkan.'), { code: 400 });
@@ -64,6 +64,12 @@ async function query(text, values = []) {
 }
 
 export { query as queryDatabase };
+
+export async function kunciPesanan(id) {
+  if (typeof id !== 'string') return false;
+  const result = await query('SELECT id FROM pesanan WHERE id = $1 FOR UPDATE', [id]);
+  return Boolean(result.rowCount);
+}
 
 export async function denganTransaksi(jalankan) {
   if (transaksi.getStore()) return jalankan();
@@ -126,7 +132,7 @@ function kondisi(tabel, filter = {}, values = []) {
       if (op === '$in') {
         if (!Array.isArray(raw) || !raw.length) { parts.push('FALSE'); continue; }
         const marks = raw.map((v) => { values.push(nilaiDb(field, v)); return `$${values.length}`; });
-        parts.push(`${col} = ANY(ARRAY[${marks.join(', ')}])`);
+        parts.push(`${col} IN (${marks.join(', ')})`);
         continue;
       }
       const sqlOp = ({ $eq: '=', $gt: '>', $gte: '>=', $lt: '<', $lte: '<=' })[op];

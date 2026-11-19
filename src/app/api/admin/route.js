@@ -1,4 +1,4 @@
-import { cariBanyak, cariSatu, denganTransaksi, ubahData } from '@/lib/db';
+import { cariBanyak, cariSatu, denganTransaksi, kunciPesanan, ubahData } from '@/lib/db';
 import { siapa, err, getRow, rows, put, upd, del, inc, notif, Query } from '@/lib/server';
 import { buatAkun, cariAkunByEmail, hapusAkun, ubahPassword } from '@/lib/auth';
 import { nanoid } from 'nanoid';
@@ -78,15 +78,21 @@ export async function POST(req) {
     try {
       await upd(null, 'mitra', mitra.$id, { nomor_tenant });
     } catch (error) {
-      if (error.code === 11000) return err('Nomor tenant sudah digunakan mitra lain.', 409);
+      if (error.code === '23505') return err('Nomor tenant sudah digunakan mitra lain.', 409);
       throw error;
     }
     return Response.json({ ok: true });
   }
 
   return await denganTransaksi(async () => {
+    async function pembayaranTerkunci() {
+      if (typeof id !== 'string') return null;
+      const awal = await cariSatu('pembayaran', { _id: id });
+      if (!awal || !await kunciPesanan(awal.id_pesanan)) return null;
+      return getRow(null, 'pembayaran', id);
+    }
     if (aksi === 'verifikasi_qris') {
-      const by = await getRow(null, 'pembayaran', id).catch(() => null);
+      const by = await pembayaranTerkunci();
       if (by?.metode !== 'QRIS' || by.status_pembayaran !== 'MENUNGGU') return err('Pembayaran QRIS tidak dalam status menunggu.');
       const ps = await getRow(null, 'pesanan', by.id_pesanan).catch(() => null);
       if (!ps || ps.status_pesanan === 'DIBATALKAN') return err('Pesanan sudah dibatalkan atau tidak ditemukan.', 409);
@@ -100,7 +106,7 @@ export async function POST(req) {
     }
 
     if (aksi === 'tolak_qris') {
-      const by = await getRow(null, 'pembayaran', id).catch(() => null);
+      const by = await pembayaranTerkunci();
       if (by?.metode !== 'QRIS' || by.status_pembayaran !== 'MENUNGGU') return err('Pembayaran QRIS tidak dalam status menunggu.');
       const ps = await getRow(null, 'pesanan', by.id_pesanan).catch(() => null);
       if (!ps || ps.status_pesanan === 'DIBATALKAN') return err('Pesanan sudah dibatalkan atau tidak ditemukan.', 409);
@@ -128,7 +134,7 @@ export async function POST(req) {
     }
 
     if (aksi === 'refund') {
-      const by = await getRow(null, 'pembayaran', id).catch(() => null);
+      const by = await pembayaranTerkunci();
       if (!by || by.status_pembayaran !== 'REFUND_DIAJUKAN') return err('Pembayaran tidak dalam status refund.');
       const ps = await getRow(null, 'pesanan', by.id_pesanan);
       await upd(null, 'pembayaran', id, { status_pembayaran: 'DIKEMBALIKAN' });
