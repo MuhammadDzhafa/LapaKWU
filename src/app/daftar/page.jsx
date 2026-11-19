@@ -29,8 +29,8 @@ export default function Daftar() {
     try {
       const raw = sessionStorage.getItem('lapakwu_prefill');
       if (raw) {
-        const { email, password, dariLogin } = JSON.parse(raw);
-        setF((x) => ({ ...x, email: email || '', password: password || '' }));
+        const { email, dariLogin } = JSON.parse(raw);
+        setF((x) => ({ ...x, email: email || '' }));
         if (dariLogin) {
           setInfo('Email belum terdaftar. Silakan lengkapi nama dan alamat untuk menyelesaikan pendaftaran akun barumu.');
         }

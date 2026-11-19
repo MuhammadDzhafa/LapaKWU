@@ -41,7 +41,7 @@ function Panggung({ children }) {
 }
 
 const JUDUL = ['Belanja', 'di', 'lapak', 'teman', 'sekampus.'];
-const TICKER_ITEMS = ['Pesan antar', 'Ambil di lapak', 'QRIS', 'Bayar di tempat', 'Produk mitra KWU'];
+const TICKER_ITEMS = ['Ambil di lapak', 'QRIS', 'Bayar di tempat', 'Produk mitra KWU'];
 
 export default function Beranda() {
   const { akun, peran, toast, keranjang, ubahItemKeranjang } = useSaya();
@@ -82,7 +82,7 @@ export default function Beranda() {
         <div className="wrap">
           <div>
             <h1 aria-label={JUDUL.join(' ')}>{JUDUL.map((w, i) => <Fragment key={w}><span className="w" aria-hidden="true" style={{ '--w': i }}><span>{w}</span></span>{i < JUDUL.length - 1 && ' '}</Fragment>)}</h1>
-            <p className="lead">Banyak mitra, satu keranjang. Pesan antar ke alamatmu, atau ambil langsung di lapaknya.</p>
+            <p className="lead">Banyak mitra, satu keranjang. Bayar lewat QRIS atau langsung di lapak, lalu ambil pesananmu saat siap.</p>
             <div className="cta">
               <a href="#katalog" className="btn lg">Lihat produk</a>
               {peran !== 'mitra' && <Link href="/mitra/tata-cara" className="btn lg out">Buka lapakmu</Link>}
@@ -194,8 +194,8 @@ export default function Beranda() {
         <h2>Cara belanja</h2><p className="sub">Tiga langkah, dari katalog sampai barang di tanganmu.</p>
         <div className="steps">
           <div className="step"><i>1</i><h3>Pilih produk</h3><p className="muted">Cari di katalog, lalu masukkan ke keranjang atau langsung beli sekarang.</p></div>
-          <div className="step"><i>2</i><h3>Bayar dan pesan</h3><p className="muted">Pilih dikirim atau ambil sendiri, lalu bayar lewat QRIS atau di tempat.</p></div>
-          <div className="step"><i>3</i><h3>Terima atau ambil</h3><p className="muted">Pantau status pesananmu. Mitra mendapat kabar lewat email atau WhatsApp.</p></div>
+          <div className="step"><i>2</i><h3>Bayar dan pesan</h3><p className="muted">Pilih QRIS dengan unggah bukti transfer, atau bayar langsung di lapak.</p></div>
+          <div className="step"><i>3</i><h3>Ambil pesanan</h3><p className="muted">Pantau status pesananmu dan ambil dari lapak mitra setelah siap.</p></div>
         </div>
         <section className="denah-beranda" id="denah" aria-labelledby="judul-denah">
           <h2 id="judul-denah">Denah tenant</h2>

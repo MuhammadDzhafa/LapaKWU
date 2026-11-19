@@ -1,5 +1,7 @@
-import { denganTransaksi, ubahData } from '@/lib/db';
+import { denganTransaksi, kunciProduk, ubahData } from '@/lib/db';
 import { svc, siapa, err, getRow, rows, put, upd, del, dec, inc, ID, Query } from '@/lib/server';
+import { periodeJakarta } from '@/lib/waktu';
+import { hitungKomisi } from '@/lib/komisi';
 export const dynamic = 'force-dynamic';
 
 // Stok dan penjualan langsung di lapak (offline), dikelola mitra:
@@ -7,7 +9,7 @@ export const dynamic = 'force-dynamic';
 //   jual    : stok -jumlah, dicatat ke penjualan_offline, masuk rekap bulan berjalan
 //   koreksi : turunkan jumlah terjual offline bulan ini jadi `jumlah` (hanya boleh turun);
 //             catatan terbaru dihapus, stok dikembalikan, rekap berkurang otomatis
-const periodeIni = () => new Date().toISOString().slice(0, 7);
+const periodeIni = () => periodeJakarta();
 
 async function rekapId(db, mid, periode) {
   const rid = `${mid}_${periode}`;
@@ -18,7 +20,7 @@ async function rekapId(db, mid, periode) {
   return rid;
 }
 async function ubahRekap(db, rid, uang, jml) {
-  for (const [k, v] of [['total_penjualan', uang], ['total_offline', uang], ['jumlah_transaksi', jml], ['jumlah_offline', jml]]) if (v) await inc(db, 'rekap_penjualan', rid, k, v);
+  for (const [k, v] of [['total_penjualan', uang], ['total_offline', uang], ['jumlah_transaksi', jml], ['jumlah_offline', jml], ['total_komisi', hitungKomisi(uang)]]) if (v) await inc(db, 'rekap_penjualan', rid, k, v);
 }
 
 export async function POST(req) {
@@ -32,8 +34,12 @@ export async function POST(req) {
   if (!(await getRow(db, 'mitra', u.$id).catch(() => null))) return err('Hanya mitra yang bisa mengelola stok.', 403);
 
   return await denganTransaksi(async () => {
-    const p = await getRow(db, 'produk', String(b.id || '')).catch(() => null);
+    let p = await getRow(db, 'produk', String(b.id || '')).catch(() => null);
     if (!p || p.id_mitra !== u.$id) return err('Produk tidak ditemukan.', 404);
+    if (!await kunciProduk(p.$id)) return err('Produk tidak ditemukan.', 404);
+    const produkTerkunci = await getRow(db, 'produk', p.$id).catch(() => null);
+    if (!produkTerkunci || produkTerkunci.id_mitra !== u.$id) return err('Produk tidak ditemukan.', 404);
+    p = produkTerkunci;
     const jml = Math.floor(+b.jumlah);
     const periode = periodeIni();
 
@@ -54,7 +60,8 @@ export async function POST(req) {
 
     if (b.aksi === 'koreksi') {
       const baru = Math.floor(+b.baru);
-      const log = await rows(db, 'penjualan_offline', [Query.equal('id_mitra', u.$id), Query.equal('id_produk', p.$id), Query.equal('periode', periode), Query.orderDesc('waktu'), Query.limit(100)]);
+      const log = await rows(db, 'penjualan_offline', [Query.equal('id_mitra', u.$id), Query.equal('id_produk', p.$id), Query.equal('periode', periode), Query.orderDesc('waktu'), Query.limit(500)]);
+      if (log.length === 500) return err('Koreksi dibatasi pada 500 catatan terakhir. Hubungi admin untuk koreksi periode dengan lebih banyak catatan.');
       const sekarang = log.reduce((a, l) => a + l.jumlah, 0);
       if (!(baru >= 0) || baru > sekarang) return err(`Isi angka 0 sampai ${sekarang}. Menambah penjualan lewat tombol −.`);
       let sisa = sekarang - baru, uang = 0, kembali = 0;

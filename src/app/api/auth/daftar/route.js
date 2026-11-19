@@ -2,16 +2,24 @@
 import { buatAkun, cariAkunByEmail, setSesiCookie } from '@/lib/auth';
 import { denganTransaksi, pastikanPembeli } from '@/lib/db';
 import { nanoid } from 'nanoid';
+import { alamatKlien, batasiLaju } from '@/lib/rate-limit';
+import { originValid } from '@/lib/server';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req) {
   try {
+    if (!originValid(req)) return Response.json({ error: 'Sumber permintaan tidak diizinkan.' }, { status: 403 });
     const { email, password, nama, userId } = await req.json();
     if (!email || !password || !nama) return Response.json({ error: 'Isi nama, email, dan kata sandi.' }, { status: 400 });
     if (password.length < 8) return Response.json({ error: 'Kata sandi minimal 8 karakter.' }, { status: 400 });
 
     const emailNorm = email.trim().toLowerCase();
     const namaNorm = nama.trim();
+    const allowed = await Promise.all([
+      batasiLaju(`signup-ip:${alamatKlien(req)}`, 10, 3600),
+      batasiLaju(`signup-email:${emailNorm}`, 3, 3600),
+    ]);
+    if (allowed.includes(false)) return Response.json({ error: 'Batas pendaftaran tercapai. Coba lagi nanti.' }, { status: 429 });
 
     const ada = await cariAkunByEmail(emailNorm);
     if (ada) return Response.json({ error: 'Email sudah terdaftar.' }, { status: 409 });

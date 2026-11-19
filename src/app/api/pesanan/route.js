@@ -1,6 +1,8 @@
 import { BATAS_BAYAR_TENANT_MS, tenggatBayarTenant } from '@/lib/pembayaran-tenant';
 import { cariBanyak, denganTransaksi, kunciPesanan, ubahData } from '@/lib/db';
 import { svc, siapa, err, getRow, rows, upd, inc, notif, Query } from '@/lib/server';
+import { periodeJakarta } from '@/lib/waktu';
+import { hitungKomisi } from '@/lib/komisi';
 export const dynamic = 'force-dynamic';
 
 // aksi -> [status asal, status baru, jenis yang diizinkan]
@@ -47,13 +49,19 @@ async function bersihkanKedaluwarsa(db) {
 }
 
 async function catatRekap(db, p, by) {
-  const rid = `${p.id_mitra}_${new Date().toISOString().slice(0, 7)}`;
+  const rid = `${p.id_mitra}_${periodeJakarta()}`;
   await ubahData('rekap_penjualan', { _id: rid }, {
     id_mitra: p.id_mitra, periode: rid.slice(-7), total_penjualan: 0, jumlah_transaksi: 0,
     total_komisi: 0, total_digital: 0, total_offline: 0, jumlah_offline: 0, status_pencairan: 'BELUM',
   }, { upsert: true, insertOnly: true });
   const digital = by && by.metode !== 'BAYAR_DI_TEMPAT' ? p.total_harga : 0;
-  for (const [k, v] of [['total_penjualan', p.total_harga], ['jumlah_transaksi', 1], ['total_digital', digital]]) if (v) await inc(db, 'rekap_penjualan', rid, k, v);
+  const offline = by?.metode === 'BAYAR_DI_TEMPAT' ? p.total_harga : 0;
+  const komisi = hitungKomisi(p.total_harga);
+  const detail = offline ? await rows(db, 'detail_pesanan', [Query.equal('id_pesanan', p.$id)]) : [];
+  const unitOffline = detail.reduce((sum, item) => sum + item.jumlah, 0);
+  for (const [k, v] of [['total_penjualan', p.total_harga], ['jumlah_transaksi', 1], ['total_digital', digital], ['total_offline', offline], ['jumlah_offline', unitOffline], ['total_komisi', komisi]]) {
+    if (v) await inc(db, 'rekap_penjualan', rid, k, v);
+  }
 }
 
 export async function POST(req) {

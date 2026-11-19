@@ -9,11 +9,11 @@ export const koleksiInti = [
   'users', 'pengguna', 'kode_verifikasi', 'notifikasi', 'pembeli', 'mitra', 'admin',
   'produk', 'keranjang', 'item_keranjang', 'pesanan', 'detail_pesanan', 'payment_gateway',
   'pembayaran', 'rekap_penjualan', 'penjualan_offline', 'unggahan_bukti', 'bukti_checkout', 'payhook_event',
-  'pencairan_dompet',
+  'pencairan_dompet', 'unggahan_file',
 ];
 
 const kolom = {
-  users: ['nama', 'email', 'password_hash'],
+  users: ['nama', 'email', 'password_hash', 'session_version'],
   pengguna: ['nama', 'email', 'no_telepon', 'status_akun', 'kanal', 'kontak_terverifikasi'],
   kode_verifikasi: ['kode_hash', 'kanal', 'tujuan', 'kedaluwarsa', 'percobaan'],
   notifikasi: ['id_pengguna', 'judul', 'pesan', 'waktu_kirim', 'sudah_dibaca'],
@@ -33,10 +33,11 @@ const kolom = {
   bukti_checkout: ['id_pembeli', 'id_bukti', 'total', 'status_ocr', 'referensi', 'status_pembayaran', 'waktu_bayar'],
   payhook_event: ['id_bukti_checkout'],
   pencairan_dompet: ['id_mitra', 'nama_usaha', 'id_qris', 'nominal', 'status', 'tanggal_cair', 'id_admin'],
+  unggahan_file: ['id_pengguna', 'ukuran', 'jenis'],
 };
 const jsonKolom = new Set(['catatan_ocr', 'hasil_ocr']);
 const tanggal = new Set(['created_at', 'updated_at', 'kedaluwarsa', 'waktu_kirim', 'tanggal_pesanan', 'waktu_pengambilan', 'waktu_bayar', 'tanggal_cair', 'waktu']);
-const numerik = new Set(['harga', 'stok', 'total_harga', 'jumlah', 'subtotal', 'harga_satuan', 'total_penjualan', 'jumlah_transaksi', 'total_komisi', 'total_digital', 'total_offline', 'jumlah_offline', 'total', 'ukuran', 'percobaan', 'nomor_tenant', 'nominal']);
+const numerik = new Set(['harga', 'stok', 'total_harga', 'jumlah', 'subtotal', 'harga_satuan', 'total_penjualan', 'jumlah_transaksi', 'total_komisi', 'total_digital', 'total_offline', 'jumlah_offline', 'total', 'ukuran', 'percobaan', 'nomor_tenant', 'nominal', 'session_version']);
 
 function namaTabel(tabel) {
   if (!koleksiInti.includes(tabel)) throw Object.assign(new Error('Tabel tidak diizinkan.'), { code: 400 });
@@ -68,6 +69,12 @@ export { query as queryDatabase };
 export async function kunciPesanan(id) {
   if (typeof id !== 'string') return false;
   const result = await query('SELECT id FROM pesanan WHERE id = $1 FOR UPDATE', [id]);
+  return Boolean(result.rowCount);
+}
+
+export async function kunciProduk(id) {
+  if (typeof id !== 'string') return false;
+  const result = await query('SELECT id FROM produk WHERE id = $1 FOR UPDATE', [id]);
   return Boolean(result.rowCount);
 }
 
@@ -171,6 +178,8 @@ export async function cariSatu(tabel, filter = {}) {
 
 export async function cariBanyak(tabel, filter = {}, { sort, limit = 100, skip = 0 } = {}) {
   if (limit === 0) return [];
+  if (!Number.isSafeInteger(limit) || limit < 0 || !Number.isSafeInteger(skip) || skip < 0) throw new Error('Batas kueri tidak valid.');
+  limit = Math.min(limit, 5000);
   const table = namaTabel(tabel), values = [];
   const where = kondisi(tabel, filter, values);
   let order = '';
@@ -252,7 +261,7 @@ export async function hapusData(tabel, filter, banyak = false) {
 
 export async function pastikanPembeli({ $id, name, email }) {
   const options = { upsert: true, insertOnly: true };
-  await ubahData('pengguna', { _id: $id }, { nama: name || 'Pengguna', email, no_telepon: '', status_akun: 'AKTIF', kanal: 'EMAIL', kontak_terverifikasi: true }, options);
+  await ubahData('pengguna', { _id: $id }, { nama: name || 'Pengguna', email, no_telepon: '', status_akun: 'MENUNGGU_VERIFIKASI', kanal: 'EMAIL', kontak_terverifikasi: false }, options);
   await ubahData('pembeli', { _id: $id }, { alamat: '' }, options);
   await ubahData('keranjang', { _id: $id }, { id_pembeli: $id, total_harga: 0 }, options);
 }

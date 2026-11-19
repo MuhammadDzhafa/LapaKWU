@@ -1,6 +1,8 @@
 import { siapa, err, getRow, put, upd, baca, milik } from '@/lib/server';
 import { ubahNama, ubahEmail } from '@/lib/auth';
 import { normHp } from '@/lib/kirim';
+import { cariSatu, hapusData } from '@/lib/db';
+import { hapusFile } from '@/lib/backblaze';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,32 +14,28 @@ export async function POST(req) {
     const s = (v, n = 255) => String(v || '').trim().slice(0, n);
 
     if (b.aksi === 'daftar') {
+      if (b.peran === 'mitra') return err('Pendaftaran mitra dilakukan melalui Admin LapaKWU.', 403);
       const kanal = b.kanal === 'WHATSAPP' ? 'WHATSAPP' : 'EMAIL';
       const hp = normHp(b.no_telepon);
       if (kanal === 'WHATSAPP' && !hp) return err('Isi nomor WhatsApp yang valid, misalnya 0812xxxxxxx.');
-      if (b.peran === 'mitra' && !s(b.nama_usaha)) return err('Isi nama usaha.');
 
       const pgAda = await getRow(null, 'pengguna', u.$id).catch(() => null);
       if (pgAda) {
+        const kanalBerubah = kanal !== pgAda.kanal;
+        const kontakBerubah = kanal === 'WHATSAPP' ? hp !== pgAda.no_telepon : kanalBerubah;
         await upd(null, 'pengguna', u.$id, {
           ...(hp ? { no_telepon: hp } : {}),
           kanal,
+          ...(kontakBerubah ? { status_akun: 'MENUNGGU_VERIFIKASI', kontak_terverifikasi: false } : {}),
         });
       } else {
-        await put(null, 'pengguna', u.$id, { nama: u.name, email: u.email, no_telepon: hp || '', status_akun: 'AKTIF', kanal, kontak_terverifikasi: true }, []);
+        await put(null, 'pengguna', u.$id, { nama: u.name, email: u.email, no_telepon: hp || '', status_akun: 'MENUNGGU_VERIFIKASI', kanal, kontak_terverifikasi: false }, []);
       }
-
-      if (b.peran === 'mitra') {
-        const mtAda = await getRow(null, 'mitra', u.$id).catch(() => null);
-        if (mtAda) await upd(null, 'mitra', u.$id, { nama_usaha: s(b.nama_usaha), alamat_usaha: s(b.alamat) });
-        else await put(null, 'mitra', u.$id, { nama_usaha: s(b.nama_usaha), alamat_usaha: s(b.alamat) }, []);
-      } else {
-        const pbAda = await getRow(null, 'pembeli', u.$id).catch(() => null);
-        if (pbAda) await upd(null, 'pembeli', u.$id, { alamat: s(b.alamat) });
-        else await put(null, 'pembeli', u.$id, { alamat: s(b.alamat) }, []);
-        if (!(await getRow(null, 'keranjang', u.$id).catch(() => null))) {
-          await put(null, 'keranjang', u.$id, { id_pembeli: u.$id, total_harga: 0 }, []);
-        }
+      const pbAda = await getRow(null, 'pembeli', u.$id).catch(() => null);
+      if (pbAda) await upd(null, 'pembeli', u.$id, { alamat: s(b.alamat) });
+      else await put(null, 'pembeli', u.$id, { alamat: s(b.alamat) }, []);
+      if (!(await getRow(null, 'keranjang', u.$id).catch(() => null))) {
+        await put(null, 'keranjang', u.$id, { id_pembeli: u.$id, total_harga: 0 }, []);
       }
       return Response.json({ ok: true });
     }
@@ -115,6 +113,7 @@ export async function POST(req) {
         if ('nama_usaha' in b) { if (!s(b.nama_usaha)) return err('Nama usaha tidak boleh kosong.'); d.nama_usaha = s(b.nama_usaha); }
         if ('alamat' in b) d.alamat_usaha = s(b.alamat);
         if ('id_qris' in b) {
+          if (b.id_qris && !(await cariSatu('unggahan_file', { _id: s(b.id_qris, 36), id_pengguna: u.$id }))) return err('File QRIS tidak ditemukan atau bukan milik akun ini.', 403);
           d.id_qris = b.id_qris ? s(b.id_qris, 36) : null;
         }
         await upd(null, 'mitra', u.$id, d);
@@ -127,6 +126,14 @@ export async function POST(req) {
       if (!mt) return err('Khusus mitra.', 403);
       // Pengajuan yang sudah tercatat memakai gambar QRIS saat pengajuan dibuat.
       await upd(null, 'mitra', u.$id, { id_qris: null });
+      if (mt.id_qris) {
+        const file = await cariSatu('unggahan_file', { _id: mt.id_qris, id_pengguna: u.$id });
+        const payout = await cariSatu('pencairan_dompet', { id_qris: mt.id_qris, status: 'DIAJUKAN' });
+        if (file && !payout) {
+          await hapusFile(mt.id_qris).catch(() => {});
+          await hapusData('unggahan_file', { _id: mt.id_qris, id_pengguna: u.$id });
+        }
+      }
       return Response.json({ ok: true });
     }
 

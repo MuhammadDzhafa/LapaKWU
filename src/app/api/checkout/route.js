@@ -1,5 +1,5 @@
 import { siapa, err, getRow, rows, put, upd, del, dec, notif, ID, Query } from '@/lib/server';
-import { cariSatu, denganTransaksi } from '@/lib/db';
+import { cariSatu, denganTransaksi, queryDatabase } from '@/lib/db';
 import { FORMAT_ID_BUKTI, MAKS_BUKTI_PEMBAYARAN, PESAN_UKURAN_BUKTI } from '@/lib/bukti-pembayaran';
 import { bacaBukti, periksaBukti } from '@/lib/ocr-bukti';
 import { unduhFile } from '@/lib/backblaze';
@@ -11,6 +11,7 @@ export async function POST(req) {
     const u = await siapa(req);
     if (!u) return err('Belum masuk.', 401);
     const b = await req.json();
+    if (typeof b.request_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(b.request_id)) return err('ID checkout tidak valid. Muat ulang halaman dan coba lagi.');
     if (!['QRIS', 'BAYAR_DI_TEMPAT'].includes(b.metode)) return err('Pilih metode pembayaran.');
     const pg = await cariSatu('pengguna', { _id: u.$id });
     if (pg?.status_akun !== 'AKTIF') return err('Akun belum aktif. Verifikasi akunmu dulu.', 403);
@@ -35,6 +36,11 @@ export async function POST(req) {
     }
 
     const hasil = await denganTransaksi(async () => {
+      const { rows: [pernah] } = await queryDatabase('SELECT id_pembeli, response FROM checkout_request WHERE id = $1 FOR UPDATE', [b.request_id]);
+      if (pernah) {
+        if (pernah.id_pembeli !== u.$id) return { error: 'ID checkout sudah digunakan.', status: 409 };
+        if (pernah.response) return { ...pernah.response, idempotent: true };
+      }
       const cart = langsung ? [] : await rows(null, 'item_keranjang', [Query.equal('id_keranjang', u.$id)]);
       const items = langsung ? [langsung] : cart;
       if (!items.length) return { error: 'Keranjang kosong.' };
@@ -63,6 +69,15 @@ export async function POST(req) {
           status_ocr: verifikasi.status, referensi: verifikasi.referensi,
           status_pembayaran: 'MENUNGGU',
         });
+      }
+      const { rows: [claim] } = await queryDatabase(
+        'INSERT INTO checkout_request (id, id_pembeli) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING RETURNING id',
+        [b.request_id, u.$id]
+      );
+      if (!claim) {
+        const { rows: [existing] } = await queryDatabase('SELECT id_pembeli, response FROM checkout_request WHERE id = $1 FOR UPDATE', [b.request_id]);
+        if (existing?.id_pembeli === u.$id && existing.response) return { ...existing.response, idempotent: true };
+        return { error: 'Checkout sedang diproses. Tunggu sebentar lalu muat ulang pesanan.', status: 409 };
       }
       for (const item of items) await dec(null, 'produk', item.id_produk, 'stok', item.jumlah);
 
@@ -100,7 +115,9 @@ export async function POST(req) {
       for (const item of cart) await del(null, 'item_keranjang', item.$id);
       if (cart.length) await upd(null, 'keranjang', u.$id, { total_harga: 0 });
 
-      return { jumlah: perMitra.size, itemTerpesan: cart.map((item) => item.$id), statusOcr: verifikasi?.status };
+      const response = { jumlah: perMitra.size, itemTerpesan: cart.map((item) => item.$id), statusOcr: verifikasi?.status };
+      await queryDatabase('UPDATE checkout_request SET response = $1::jsonb WHERE id = $2', [JSON.stringify(response), b.request_id]);
+      return response;
     });
 
     if (hasil.error) return err(hasil.error, hasil.status);

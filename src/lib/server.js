@@ -9,9 +9,24 @@ export const ID = Object.assign(() => nanoid(), {
   custom: (id) => id,
 });
 
+export function originValid(req) {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return true;
+  const origin = req.headers.get('origin');
+  if (!origin || req.headers.get('sec-fetch-site') === 'cross-site') return false;
+  try {
+    const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || new URL(req.url).host;
+    const proto = req.headers.get('x-forwarded-proto') || new URL(req.url).protocol.replace(':', '');
+    const requestOrigin = `${proto}://${host}`;
+    const allowed = new Set([requestOrigin]);
+    if (process.env.NEXT_PUBLIC_APP_URL) allowed.add(new URL(process.env.NEXT_PUBLIC_APP_URL).origin);
+    return allowed.has(new URL(origin).origin);
+  } catch { return false; }
+}
+
 // ── Auth helper ────────────────────────────────────────────
 // Ambil user dari JWT cookie (server-side Next.js route handler)
 export async function siapa(req) {
+  if (!originValid(req)) return null;
   // Dukung dua mode: JWT cookie (browser) atau header x-jwt (token lama)
   // Untuk migrasi: cek header x-jwt dulu (klien lama kirim JWT Appwrite), lalu fallback ke cookie
   const cookie = req.headers.get('cookie') || '';
@@ -22,6 +37,8 @@ export async function siapa(req) {
   if (!payload?.sub) return null;
   const akun = await cariAkunById(payload.sub);
   if (!akun) return null;
+  const profil = await cariSatu('pengguna', { _id: payload.sub });
+  if (!profil || profil.status_akun === 'DIBLOKIR' || (payload.sv ?? 0) !== (akun.session_version || 0)) return null;
   // Kembalikan objek mirip Appwrite user agar kode API tidak perlu banyak diubah
   return { $id: akun.id, name: akun.nama, email: akun.email };
 }
@@ -57,18 +74,24 @@ const operators = { eq: '$eq', gt: '$gt', lt: '$lt' };
 export async function rows(_, tabel, queries = []) {
   const filters = [];
   let limit = 100;
-  let sort;
+  let offset = 0;
+  let sort = { id: 1 };
   for (const q of queries) {
     if (!q) continue;
     if (q.type === 'limit') {
       if (!Number.isInteger(q.n) || q.n < 0) throw new Error('Limit tidak valid.');
-      limit = q.n;
+      limit = Math.min(q.n, 500);
+      continue;
+    }
+    if (q.type === 'offset') {
+      if (!Number.isSafeInteger(q.n) || q.n < 0) throw new Error('Offset tidak valid.');
+      offset = Math.min(q.n, 1_000_000);
       continue;
     }
     const col = Object.hasOwn(aliases, q.col) ? aliases[q.col] : q.col;
     if (typeof col !== 'string' || !/^[a-z_][a-z0-9_]*$/.test(col)) throw new Error('Kolom tidak valid.');
     if (q.type === 'orderDesc' || q.type === 'orderAsc') {
-      sort = { [col]: q.type === 'orderDesc' ? -1 : 1 };
+      sort = { [col]: q.type === 'orderDesc' ? -1 : 1, id: 1 };
     } else if (q.type === 'eq' && Array.isArray(q.val) && q.val.every(skalar)) {
       filters.push({ [col]: { $in: q.val.map((v) => nilaiDb(col, v)) } });
     } else if (Object.hasOwn(operators, q.type) && skalar(q.val)) {
@@ -77,7 +100,7 @@ export async function rows(_, tabel, queries = []) {
       throw new Error('Filter tidak valid.');
     }
   }
-  return (await cariBanyak(tabel, filters.length ? { $and: filters } : {}, { limit, sort })).map(metadata);
+  return (await cariBanyak(tabel, filters.length ? { $and: filters } : {}, { limit, skip: offset, sort })).map(metadata);
 }
 
 export async function put(_, tabel, id, data = {}) {
@@ -105,7 +128,7 @@ async function hapusRelasi(tabel, id) {
   }
   for (const [koleksi, field] of cascade) {
     if (relasiHapus[koleksi]) {
-      for (const row of await cariBanyak(koleksi, { [field]: id }, { limit: 2147483647 })) await hapusRelasi(koleksi, row.id);
+      for (const row of await cariBanyak(koleksi, { [field]: id }, { limit: 5000 })) await hapusRelasi(koleksi, row.id);
     } else {
       await hapusData(koleksi, { [field]: id }, true);
     }
@@ -144,6 +167,7 @@ export const milik = (_uid) => [];
 export const Query = {
   equal: (col, val) => ({ type: 'eq', col, val }),
   limit: (n) => ({ type: 'limit', n }),
+  offset: (n) => ({ type: 'offset', n }),
   orderDesc: (col) => ({ type: 'orderDesc', col }),
   orderAsc: (col) => ({ type: 'orderAsc', col }),
   greaterThan: (col, val) => ({ type: 'gt', col, val }),

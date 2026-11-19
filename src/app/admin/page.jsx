@@ -21,6 +21,7 @@ export default function Admin() {
   const { akun, peran, memuat, toast } = useSaya();
   const [tab, setTab] = useState('mitra');
   const [d, setD] = useState({ u: [], m: [], pr: [], ad: [], pb: [], rf: [], qris: [] });
+  const [muatLanjutan, setMuatLanjutan] = useState(false);
   const [pencairan, setPencairan] = useState([]);
   const [f, setF] = useState({ peran: 'pembeli' });
   const [modalInfo, setModalInfo] = useState(null);
@@ -29,10 +30,12 @@ export default function Admin() {
   const [simpanTenant, setSimpanTenant] = useState(null);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
-  const muat = useCallback(async () => {
+  const muat = useCallback(async (offset = 0, append = false) => {
     try {
-      const data = await api('/api/admin', { aksi: 'muat' });
-      setD(data);
+      const data = await api('/api/admin', { aksi: 'muat', offset });
+      setD((sebelumnya) => append
+        ? Object.fromEntries(['u', 'm', 'pr', 'ad', 'pb', 'rf', 'qris'].map((key) => [key, [...(sebelumnya[key] || []), ...(data[key] || [])]]).concat([['hasMore', data.hasMore], ['offset', data.offset]]))
+        : data);
     } catch (e) {
       toast(e.message, true);
     }
@@ -208,7 +211,7 @@ export default function Admin() {
                   tombolOk: 'Sudah dibayar',
                   onOk: async () => {
                     setBusyModal(true);
-                    if (await act('konfirmasi_pencairan', x.id, {}, 'Pencairan berhasil dikonfirmasi.')) {
+                    if (await act('konfirmasi_pencairan', x.id, { sudah_dibayar: true }, 'Pencairan manual berhasil dicatat.')) {
                       setPencairan((items) => items.filter((item) => item.id !== x.id));
                       setModalInfo(null);
                     }
@@ -365,10 +368,11 @@ export default function Admin() {
 
       {tab === 'rekap' && <Rekap nama={nama} />}
 
-      {tab === 'refund' && <div className="scroll"><table><thead><tr><th>Pesanan</th><th>Metode</th><th>Jumlah</th><th></th></tr></thead><tbody>
+      {tab === 'refund' && <div className="stack"><p className="muted">Refund dilakukan manual melalui kanal pembayaran di luar aplikasi. Tandai selesai hanya setelah dana benar-benar dikirim kepada pembeli.</p><div className="scroll"><table><thead><tr><th>Pesanan</th><th>Metode</th><th>Jumlah</th><th></th></tr></thead><tbody>
         {d.rf.map((x) => <tr key={x.$id}><td>{x.id_pesanan.slice(-6)}</td><td>{x.metode.replaceAll('_', ' ')}</td><td>{rp(x.jumlah)}</td>
-          <td><button className="btn sm sun" onClick={() => act('refund', x.$id, {}, 'Refund dicatat.')}>Tandai sudah dikembalikan</button></td></tr>)}
-        {!d.rf.length && <tr><td colSpan="4" className="muted">Tidak ada refund yang menunggu.</td></tr>}</tbody></table></div>}
+          <td><button className="btn sm sun" onClick={() => act('refund', x.$id, { sudah_ditransfer: true }, 'Refund manual sudah dicatat.')}>Dana sudah ditransfer</button></td></tr>)}
+        {!d.rf.length && <tr><td colSpan="4" className="muted">Tidak ada refund yang menunggu.</td></tr>}</tbody></table></div></div>}
+      {d.hasMore && <div className="row" style={{ justifyContent: 'center', marginTop: 16 }}><button className="btn out" type="button" disabled={muatLanjutan} onClick={async () => { setMuatLanjutan(true); await muat((d.offset || 0) + 500, true); setMuatLanjutan(false); }}>{muatLanjutan ? 'Memuat…' : 'Muat 500 data berikutnya'}</button></div>}
 
       {/* MODAL PREVIEW BUKTI TRANSFER */}
       {modalGambar && (

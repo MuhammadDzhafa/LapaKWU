@@ -2,7 +2,7 @@
 import { basename } from 'node:path';
 import { siapa } from '@/lib/server';
 import { hapusFile } from '@/lib/backblaze';
-import { cariSatu } from '@/lib/db';
+import { cariSatu, hapusData } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req) {
@@ -19,9 +19,20 @@ export async function POST(req) {
       return Response.json({ error: 'Nama file tidak valid.' }, { status: 400 });
     }
 
-    const produk = await cariSatu('produk', { id_gambar: namaFile, id_mitra: u.$id });
-    if (!produk) return Response.json({ error: 'File tidak ditemukan.' }, { status: 404 });
+    const file = await cariSatu('unggahan_file', { _id: namaFile, id_pengguna: u.$id });
+    if (!file) return Response.json({ error: 'File tidak ditemukan.' }, { status: 404 });
+    const [produk, mitra, payout, bukti, pembayaran] = await Promise.all([
+      cariSatu('produk', { id_gambar: namaFile }),
+      cariSatu('mitra', { _id: u.$id, id_qris: namaFile }),
+      cariSatu('pencairan_dompet', { id_qris: namaFile }),
+      cariSatu('unggahan_bukti', { _id: namaFile, id_pembeli: u.$id }),
+      cariSatu('pembayaran', { id_bukti: namaFile }),
+    ]);
+    const checkout = bukti ? await cariSatu('bukti_checkout', { id_bukti: namaFile }) : null;
+    if (produk || mitra || payout || pembayaran || checkout) return Response.json({ error: 'File masih digunakan. Lepaskan dari produk, QRIS, atau pesanan terlebih dahulu.' }, { status: 409 });
     await hapusFile(namaFile);
+    await hapusData('unggahan_file', { _id: namaFile, id_pengguna: u.$id });
+    await hapusData('unggahan_bukti', { _id: namaFile, id_pembeli: u.$id }).catch(() => {});
     return Response.json({ ok: true });
   } catch (e) {
     console.error('[/api/upload/hapus]', {

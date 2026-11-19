@@ -1,14 +1,16 @@
 import { createHash } from 'node:crypto';
-import { err, getRow, upd, del } from '@/lib/server';
-import { ubahPassword } from '@/lib/auth';
+import { err, originValid } from '@/lib/server';
+import { ubahPassword, getJwtSecret } from '@/lib/auth';
+import { cariSatu, hapusData, ubahData, denganTransaksi, queryDatabase } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 const hashToken = (tok, uid) =>
-  createHash('sha256').update(`${tok}:${uid}:${process.env.JWT_SECRET || 'lapakwu'}`).digest('hex');
+  createHash('sha256').update(`${tok}:${uid}:${new TextDecoder().decode(getJwtSecret())}`).digest('hex');
 
 export async function POST(req) {
   try {
+    if (!originValid(req)) return err('Sumber permintaan tidak diizinkan.', 403);
     const { token, userId, sandi } = await req.json();
 
     if (!token || !userId || !sandi) {
@@ -19,15 +21,13 @@ export async function POST(req) {
       return err('Kata sandi minimal 8 karakter.');
     }
 
-    const { db } = { db: null };
-
-    const record = await getRow(db, 'kode_verifikasi', userId).catch(() => null);
+    const record = await cariSatu('kode_verifikasi', { _id: userId });
     if (!record || record.kanal !== 'RESET_PASSWORD') {
       return err('Permintaan reset tidak ditemukan atau sudah digunakan.');
     }
 
     if (new Date(record.kedaluwarsa) < new Date()) {
-      await del(db, 'kode_verifikasi', userId).catch(() => {});
+      await hapusData('kode_verifikasi', { _id: userId, kode_hash: record.kode_hash }).catch(() => {});
       return err('Link reset kata sandi sudah kedaluwarsa. Silakan minta link baru.');
     }
 
@@ -37,15 +37,21 @@ export async function POST(req) {
 
     const incomingHash = hashToken(String(token).trim(), userId);
     if (incomingHash !== record.kode_hash) {
-      await upd(db, 'kode_verifikasi', userId, { percobaan: record.percobaan + 1 }).catch(() => {});
+      await ubahData('kode_verifikasi', { _id: userId, kode_hash: record.kode_hash, percobaan: { $lt: 5 } }, {}, { inc: { percobaan: 1 } });
       return err('Token reset tidak valid.');
     }
 
-    // Update password user via auth.js (bcrypt hash)
-    await ubahPassword(userId, sandi);
-
-    // Hapus token setelah berhasil digunakan
-    await del(db, 'kode_verifikasi', userId).catch(() => {});
+    const dipakai = await denganTransaksi(async () => {
+      await queryDatabase('SELECT id FROM kode_verifikasi WHERE id = $1 FOR UPDATE', [userId]);
+      const terbaru = await cariSatu('kode_verifikasi', { _id: userId });
+      if (!terbaru || terbaru.kanal !== 'RESET_PASSWORD' || terbaru.kode_hash !== record.kode_hash ||
+        terbaru.percobaan >= 5 || new Date(terbaru.kedaluwarsa) <= new Date()) return false;
+      const consume = await hapusData('kode_verifikasi', { _id: userId, kode_hash: record.kode_hash, percobaan: { $lt: 5 }, kedaluwarsa: { $gt: new Date() } });
+      if (!consume.deletedCount) return false;
+      await ubahPassword(userId, sandi);
+      return true;
+    });
+    if (!dipakai) return err('Token reset sudah tidak berlaku atau sudah digunakan.', 409);
 
     return Response.json({ ok: true, pesan: 'Kata sandi berhasil diperbarui.' });
   } catch (e) {

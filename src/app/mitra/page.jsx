@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { list, api, storage, ID, Query, BUCKET, rp, img } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
+import { periodeJakarta } from '@/lib/waktu';
 import Pesanan from '@/components/Pesanan';
 import DompetMitra from '@/components/DompetMitra';
 import Rekap from '@/components/Rekap';
@@ -39,7 +40,7 @@ export default function Lapak() {
     }).catch(() => {});
   }, [akun, peran, muat]);
 
-  const bln = () => new Date().toISOString().slice(0, 7);
+const bln = () => periodeJakarta();
   const muatOff = useCallback(() => list('penjualan_offline', [Query.equal('id_mitra', akun.$id), Query.equal('periode', bln()), Query.limit(500)]).then(setOff).catch(() => setOff([])), [akun]);
   useEffect(() => { if (akun && peran === 'mitra' && tab === 'offline') muatOff(); }, [akun, peran, tab, muatOff]);
   if (memuat) return <main className="wrap" />;

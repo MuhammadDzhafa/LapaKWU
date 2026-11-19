@@ -1,10 +1,12 @@
 // POST /api/auth/ganti-sandi — Ganti kata sandi dengan kata sandi lama
 import { getUserIdDariCookie, cariAkunById, verifikasiPassword, ubahPassword } from '@/lib/auth';
 import { cariSatu } from '@/lib/db';
+import { originValid } from '@/lib/server';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req) {
   try {
+    if (!originValid(req)) return Response.json({ error: 'Sumber permintaan tidak diizinkan.' }, { status: 403 });
     const uid = await getUserIdDariCookie();
     if (!uid) return Response.json({ error: 'Belum masuk.' }, { status: 401 });
 

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { list, ambil, api, storage, Query, rp, img } from '@/lib/aw';
 import { MAKS_BUKTI_PEMBAYARAN, PESAN_UKURAN_BUKTI } from '@/lib/bukti-pembayaran';
@@ -17,6 +17,7 @@ export default function Checkout() {
   const [qrisError, setQrisError] = useState(false);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
+  const checkoutId = useRef(null);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   // set tidak digunakan langsung di JSX, opsi() dipakai untuk radio metode pembayaran
 
@@ -99,7 +100,11 @@ export default function Checkout() {
     }
 
     try {
-      const hasil = await api('/api/checkout', { metode: f.metode, id_bukti, langsung: lg });
+      checkoutId.current ||= sessionStorage.getItem('lapakwu_checkout_request') || crypto.randomUUID();
+      sessionStorage.setItem('lapakwu_checkout_request', checkoutId.current);
+      const hasil = await api('/api/checkout', { metode: f.metode, id_bukti, langsung: lg, request_id: checkoutId.current });
+      sessionStorage.removeItem('lapakwu_checkout_request');
+      checkoutId.current = null;
       selesaiCheckout(akun.$id, hasil.itemTerpesan);
       toast('Pesanan berhasil dibuat.');
       r.push('/pesanan');

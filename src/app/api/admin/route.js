@@ -35,27 +35,29 @@ export async function POST(req) {
   }
 
   if (aksi === 'muat') {
+    const offset = Number.isSafeInteger(b.offset) && b.offset >= 0 ? Math.min(b.offset, 1_000_000) : 0;
+    const halaman = (tabel) => [Query.limit(500), Query.offset(offset)];
     const [uRows, mRows, prRows, adRows, pbRows, rfRows] = await Promise.all([
-      rows(null, 'pengguna', []),
-      rows(null, 'mitra', []),
-      rows(null, 'produk', []),
-      rows(null, 'admin', []),
-      rows(null, 'pembeli', []),
-      rows(null, 'pembayaran', []),
+      rows(null, 'pengguna', halaman('pengguna')),
+      rows(null, 'mitra', halaman('mitra')),
+      rows(null, 'produk', halaman('produk')),
+      rows(null, 'admin', halaman('admin')),
+      rows(null, 'pembeli', halaman('pembeli')),
+      rows(null, 'pembayaran', [Query.equal('status_pembayaran', ['MENUNGGU', 'REFUND_DIAJUKAN']), ...halaman('pembayaran')]),
     ]);
 
     const idsPeran = [...new Set([...mRows, ...pbRows].map((row) => row.$id))];
-    const penggunaPeran = await rows(null, 'pengguna', [Query.equal('$id', idsPeran), Query.limit(idsPeran.length)]);
+    const penggunaPeran = await cariBanyak('pengguna', { _id: { $in: idsPeran } }, { limit: 5000 });
     const validUserIds = new Set(penggunaPeran.map((row) => row.$id));
     const validMitras = mRows.filter((row) => validUserIds.has(row.$id));
     const validPembeli = pbRows.filter((row) => validUserIds.has(row.$id));
 
     const rf = rfRows.filter((x) => x.status_pembayaran === 'REFUND_DIAJUKAN');
     const qrisPending = rfRows.filter((x) => x.metode === 'QRIS' && x.status_pembayaran === 'MENUNGGU');
-    const qrisOrders = qrisPending.length ? await rows(null, 'pesanan', [Query.equal('id', qrisPending.map((q) => q.id_pesanan))]) : [];
+    const qrisOrders = qrisPending.length ? await rows(null, 'pesanan', [Query.equal('id', qrisPending.map((q) => q.id_pesanan)), Query.limit(500)]) : [];
     const idsBukti = [...new Set(qrisPending.map((by) => by.id_bukti_checkout).filter(Boolean))];
     const buktiCheckout = idsBukti.length
-      ? await cariBanyak('bukti_checkout', { _id: { $in: idsBukti } })
+      ? await cariBanyak('bukti_checkout', { _id: { $in: idsBukti } }, { limit: 5000 })
       : [];
     const buktiPerId = new Map(buktiCheckout.map((bukti) => [bukti.id, bukti]));
     const qris = qrisPending.map((by) => ({
@@ -64,7 +66,8 @@ export async function POST(req) {
       dana_terdeteksi: Boolean(buktiPerId.get(by.id_bukti_checkout)?.waktu_dana_masuk),
     }));
 
-    return Response.json({ u: uRows, m: validMitras, pr: prRows, ad: adRows, pb: validPembeli, rf, qris });
+    return Response.json({ u: uRows, m: validMitras, pr: prRows, ad: adRows, pb: validPembeli, rf, qris,
+      hasMore: [uRows, mRows, prRows, adRows, pbRows, rfRows].some((page) => page.length === 500), offset });
   }
 
   if (aksi === 'atur_tenant') {
@@ -119,6 +122,7 @@ export async function POST(req) {
     }
 
     if (aksi === 'konfirmasi_pencairan') {
+      if (b.sudah_dibayar !== true) return err('Lakukan pembayaran manual terlebih dahulu, lalu konfirmasikan.', 400);
       if (typeof id !== 'string') return err('ID pencairan tidak valid.');
       const pengajuan = await cariSatu('pencairan_dompet', { _id: id });
       if (!pengajuan) return err('Pengajuan tidak ditemukan.', 404);
@@ -129,16 +133,17 @@ export async function POST(req) {
       });
       if (!perubahan.matchedCount) return Response.json({ ok: true });
       await notif(null, pengajuan.id_mitra, 'Saldo sudah dicairkan',
-        'Admin sudah mengonfirmasi pembayaran QRIS sebesar Rp' + pengajuan.nominal.toLocaleString('id-ID') + '.');
+        'Admin telah mencatat pencairan manual melalui QRIS sebesar Rp' + pengajuan.nominal.toLocaleString('id-ID') + '.');
       return Response.json({ ok: true });
     }
 
     if (aksi === 'refund') {
+      if (b.sudah_ditransfer !== true) return err('Lakukan refund manual terlebih dahulu, lalu konfirmasikan.', 400);
       const by = await pembayaranTerkunci();
       if (!by || by.status_pembayaran !== 'REFUND_DIAJUKAN') return err('Pembayaran tidak dalam status refund.');
       const ps = await getRow(null, 'pesanan', by.id_pesanan);
       await upd(null, 'pembayaran', id, { status_pembayaran: 'DIKEMBALIKAN' });
-      await notif(null, ps.id_pembeli, 'Dana dikembalikan', `Dana pesanan ${ps.$id.slice(-6)} sebesar Rp ${by.jumlah.toLocaleString('id-ID')} sudah dikembalikan.`, true);
+      await notif(null, ps.id_pembeli, 'Refund dicatat admin', `Admin telah mencatat refund manual pesanan ${ps.$id.slice(-6)} sebesar Rp ${by.jumlah.toLocaleString('id-ID')}.`, true);
       return Response.json({ ok: true });
     }
 

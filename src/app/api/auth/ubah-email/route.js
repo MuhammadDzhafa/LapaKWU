@@ -1,10 +1,12 @@
 // POST /api/auth/ubah-email — Ubah email akun setelah konfirmasi password
 import { getUserIdDariCookie, cariAkunByEmail, verifikasiPassword, ubahEmail } from '@/lib/auth';
 import { cariSatu, ubahData, denganTransaksi } from '@/lib/db';
+import { originValid } from '@/lib/server';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req) {
   try {
+    if (!originValid(req)) return Response.json({ error: 'Sumber permintaan tidak diizinkan.' }, { status: 403 });
     const uid = await getUserIdDariCookie();
     if (!uid) return Response.json({ error: 'Belum masuk.' }, { status: 401 });
 
