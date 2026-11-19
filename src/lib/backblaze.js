@@ -1,7 +1,15 @@
 import { createHash } from 'node:crypto';
 import https from 'node:https';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 const state = globalThis[Symbol.for('lapakwu.backblaze')] ??= {};
+
+function lokasiLokal(name) {
+  if (process.env.NODE_ENV !== 'development' || process.env.LAPAKWU_STORAGE !== 'local') return null;
+  if (!/^[\w-]+\.[a-z0-9]+$/i.test(name)) throw new Error('Nama file tidak valid.');
+  return join(process.cwd(), 'data', 'unggahan-dev', name);
+}
 
 function konfigurasi() {
   const keyId = process.env.Backblaze_keyID?.trim();
@@ -77,6 +85,12 @@ async function uploadUrl(auth) {
 }
 
 export async function unggahFile(name, buffer, contentType) {
+  const path = lokasiLokal(name);
+  if (path) {
+    await mkdir(join(process.cwd(), 'data', 'unggahan-dev'), { recursive: true });
+    await writeFile(path, buffer, { flag: 'wx' });
+    return { id: name, name };
+  }
   const auth = await otorisasi();
   const target = await uploadUrl(auth);
   const sha1 = createHash('sha1').update(buffer).digest('hex');
@@ -95,6 +109,15 @@ export async function unggahFile(name, buffer, contentType) {
 }
 
 export async function unduhFile(name) {
+  const path = lokasiLokal(name);
+  if (path) {
+    try {
+      return await readFile(path);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+      // Unggahan sebelum mode lokal diaktifkan masih tersimpan di Backblaze.
+    }
+  }
   const auth = await otorisasi();
   const url = `${auth.downloadUrl}/file/${encodeURIComponent(auth.bucketName)}/${name.split('/').map(encodeURIComponent).join('/')}`;
   const response = await request(url, {
@@ -108,6 +131,11 @@ export async function unduhFile(name) {
 }
 
 export async function hapusFile(name) {
+  const path = lokasiLokal(name);
+  if (path) {
+    await unlink(path).catch((error) => { if (error.code !== 'ENOENT') throw error; });
+    return;
+  }
   const auth = await otorisasi();
   const id = await bucketId(auth);
   const listed = await jsonResponse(request(`${auth.apiUrl}/b2api/v4/b2_list_file_versions`, {

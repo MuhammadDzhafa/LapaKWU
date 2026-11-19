@@ -45,11 +45,11 @@ export default function Verifikasi() {
   if (memuat) return <main className="wrap" />;
   if (!akun) return <main className="wrap"><p className="kosong"><Link className="link" href="/masuk">Masuk</Link> dulu untuk memverifikasi akun.</p></main>;
   if (pengguna?.kontak_terverifikasi) return (
-    <main className="wrap" style={{ maxWidth: 560 }}><h2>Akun terverifikasi</h2>
+    <main className="wrap auth" style={{ maxWidth: 560 }}><h2>Akun terverifikasi</h2>
       <p className="msg ok">{peran === 'mitra' ? 'Tinggal menunggu persetujuan admin sebelum kamu bisa menambah produk.' : 'Akunmu sudah aktif dan siap dipakai belanja.'}</p>
       <Link className="btn" href={peran === 'mitra' ? '/mitra' : '/'}>{peran === 'mitra' ? 'Ke lapak saya' : 'Mulai belanja'}</Link></main>);
   return (
-    <main className="wrap" style={{ maxWidth: 560 }}>
+    <main className="wrap auth" style={{ maxWidth: 560 }}>
       <h2>Verifikasi lewat {wa ? 'WhatsApp' : 'email'}</h2>
       <p className="muted">{tujuan ? `Kami mengirim kode 6 digit ke ${tujuan}.` : `Kami akan mengirim kode 6 digit ke ${wa ? 'nomor WhatsApp' : 'email'}-mu.`}</p>
       <form className="card pad" onSubmit={cek}>

@@ -4,11 +4,12 @@ import Link from 'next/link';
 import { list, api, storage, ID, Query, BUCKET, rp, img } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
 import Pesanan from '@/components/Pesanan';
+import DompetMitra from '@/components/DompetMitra';
 import Rekap from '@/components/Rekap';
 import Modal from '@/components/Modal';
 
 export default function Lapak() {
-  const { akun, peran, pengguna, mitra, memuat, muat: muatSaya } = useSaya();
+  const { akun, peran, pengguna, mitra, memuat, muat: muatSaya, toast } = useSaya();
   const [tab, setTab] = useState('produk');
   const [ps, setPs] = useState(null);
   const [msg, setMsg] = useState('');
@@ -59,7 +60,7 @@ export default function Lapak() {
       let id_gambar;
       if (file) id_gambar = (await storage.createFile({ bucketId: BUCKET, fileId: ID.unique(), file })).$id;
       await api('/api/produk', { aksi: 'tambah', nama: f.nama, harga: +f.harga, kategori: f.kategori, deskripsi: f.deskripsi, stok: +f.stok, ...(id_gambar ? { id_gambar } : {}) });
-      setF({ nama: '', harga: '', kategori: '', deskripsi: '', stok: '' }); setFile(null); setPreview(null); e.target.reset(); await muat(); setMsg('Produk ditambahkan.');
+      setF({ nama: '', harga: '', kategori: '', deskripsi: '', stok: '' }); setFile(null); setPreview(null); e.target.reset(); toast('Produk berhasil ditambahkan.'); await muat();
     } catch (er) { setMsg(er.message); }
   };
   const segarkanStat = () => list('rekap_penjualan', [Query.equal('id_mitra', akun.$id)]).then((rk) => setSt((s) => s && ({ ...s, jual: rk.find((x) => x.periode === bln())?.total_penjualan || 0 }))).catch(() => {});
@@ -192,7 +193,7 @@ export default function Lapak() {
   const hapusQris = () => {
     setModalInfo({
       judul: 'Hapus Barcode QRIS Toko?',
-      pesan: 'Gambar barcode QRIS tokomu akan dihapus. Pembeli tidak dapat membayar via QRIS toko sampai kamu mengunggah barcode QRIS baru.',
+      pesan: 'Gambar barcode QRIS tokomu akan dihapus. Unggah QRIS baru sebelum mengajukan pencairan berikutnya.',
       warnaOk: 'red',
       tombolOk: 'Hapus QRIS',
       onOk: async () => {
@@ -232,8 +233,8 @@ export default function Lapak() {
       <h2>Lapak {mitra?.nama_usaha}</h2>
       {st && <div className="stats"><div className="stat"><small>Pesanan baru</small><b>{st.baru}</b></div><div className="stat"><small>Penjualan bulan ini</small><b>{rp(st.jual)}</b></div></div>}
       {!mitra?.id_qris && (
-        <div className="msg" style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-          <span>⚠️ <b>Barcode QRIS toko belum diunggah.</b> Pembeli online membutuhkan barcode QRIS tokomu untuk transfer saat checkout.</span>
+        <div className="msg" style={{ background: 'var(--tint)', border: '1px solid var(--ye)', color: 'var(--ink)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <span>⚠️ <b>Barcode QRIS toko belum diunggah.</b> Unggah QRIS untuk menerima pencairan saldo.</span>
           <button type="button" className="btn sm" onClick={() => setTab('qris')} style={{ whiteSpace: 'nowrap' }}>Upload QRIS Sekarang</button>
         </div>
       )}
@@ -244,6 +245,7 @@ export default function Lapak() {
           ['offline', 'Terjual offline'],
           ['pesanan', 'Pesanan masuk'],
           ['qris', 'QRIS Toko'],
+          ['dompet', 'Dompet Mitra'],
           ['rekap', 'Rekap Penjualan'],
         ].map(([k, t]) => (
           <button key={k} className={'chip' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>
@@ -298,21 +300,23 @@ export default function Lapak() {
 
       {tab === 'pesanan' && <Pesanan uid={akun.$id} sebagai="mitra" />}
 
+      {tab === 'dompet' && <DompetMitra bukaQris={() => setTab('qris')} punyaQris={Boolean(mitra?.id_qris)} />}
+
       {tab === 'qris' && (
         <div className="card pad stack" style={{ maxWidth: 560 }}>
           <h3>Pengaturan QRIS Toko</h3>
           <p className="muted" style={{ fontSize: '0.875rem' }}>
-            QRIS toko ini akan langsung ditampilkan kepada pembeli saat mereka memilih metode pembayaran online di halaman checkout.
-            Pastikan barcode QRIS jelas agar pembeli mudah memindai dan mentransfer.
+            Admin menggunakan QRIS toko ini untuk mencairkan saldo dompetmu.
+            Pastikan QRIS aktif dan dapat dipindai.
           </p>
 
           {mitra?.id_qris ? (
-            <div style={{ textAlign: 'center', padding: '12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-              <b style={{ display: 'block', marginBottom: 8, color: '#1e40af' }}>QRIS Toko Aktif Saat Ini</b>
+            <div style={{ textAlign: 'center', padding: '12px', background: 'var(--tint)', borderRadius: 8, border: '1px solid var(--line)' }}>
+              <b style={{ display: 'block', marginBottom: 8, color: 'var(--bl-d)' }}>QRIS Toko Aktif Saat Ini</b>
               <img
                 src={img(mitra.id_qris)}
                 alt="QRIS Toko"
-                style={{ maxWidth: 240, width: '100%', height: 'auto', borderRadius: 8, border: '2px solid #cbd5e1', padding: 6, background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
+                style={{ maxWidth: 240, width: '100%', height: 'auto', borderRadius: 8, border: '2px solid var(--line)', padding: 6, background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
               />
               <div style={{ marginTop: 12 }}>
                 <button
@@ -325,7 +329,7 @@ export default function Lapak() {
               </div>
             </div>
           ) : (
-            <div className="msg" style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e' }}>
+            <div className="msg" style={{ background: 'var(--tint)', border: '1px solid var(--ye)', color: 'var(--ink)' }}>
               ⚠️ Belum ada gambar QRIS toko. Unggah foto QRIS tokomu melalui formulir di bawah.
             </div>
           )}
@@ -347,7 +351,7 @@ export default function Lapak() {
                   <img
                     src={previewQris}
                     alt="Preview QRIS Baru"
-                    style={{ maxWidth: 200, maxHeight: 200, objectFit: 'contain', borderRadius: 8, border: '1px solid #93c5fd' }}
+                    style={{ maxWidth: 200, maxHeight: 200, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--bl)' }}
                   />
                 </div>
               )}

@@ -35,7 +35,7 @@ function Modal({ judul, pesan, withInput, inputLabel, onOk, onBatal, busy }) {
       <div onClick={(e) => e.stopPropagation()}
         style={{ background: '#fff', borderRadius: 12, padding: 24, maxWidth: 420, width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.25)' }}>
         <b style={{ fontSize: '1.05rem', display: 'block', marginBottom: 8 }}>{judul}</b>
-        {pesan && <p style={{ margin: '0 0 14px', color: '#374151', fontSize: '0.95rem', lineHeight: 1.5 }}>{pesan}</p>}
+        {pesan && <p style={{ margin: '0 0 14px', color: 'var(--ink)', fontSize: '0.95rem', lineHeight: 1.5 }}>{pesan}</p>}
         {withInput && (
           <div className="field" style={{ marginBottom: 14 }}>
             <label>{inputLabel || 'Keterangan'}</label>
@@ -91,10 +91,16 @@ export default function Pesanan({ uid, sebagai }) {
     const pr = pid.length ? await list('produk', [Query.equal('$id', pid)]) : [];
     if (versi !== versiMuat.current) return;
     const lapak = new Map(mitra.map((m) => [m.$id, m]));
-    setD(ps.map((p) => ({
+    const pembayaranPerPesanan = new Map(by.map((x) => [x.id_pesanan, x]));
+    const terlihat = ps.filter((p) => {
+      if (sebagai !== 'mitra') return true;
+      const pembayaran = pembayaranPerPesanan.get(p.$id);
+      return pembayaran?.metode !== 'QRIS' || ['BERHASIL', 'REFUND_DIAJUKAN', 'DIKEMBALIKAN'].includes(pembayaran.status_pembayaran);
+    });
+    setD(terlihat.map((p) => ({
       ...p,
       lapak: lapak.get(p.id_mitra),
-      bayar: by.find((x) => x.id_pesanan === p.$id),
+      bayar: pembayaranPerPesanan.get(p.$id),
       items: dt.filter((x) => x.id_pesanan === p.$id).map((x) => ({
         ...x,
         nama: pr.find((y) => y.$id === x.id_produk)?.nama || 'Produk dihapus',
@@ -153,9 +159,8 @@ export default function Pesanan({ uid, sebagai }) {
       if (aksi === 'tolak') return mintaKonfirmasi(p.$id, 'tolak', 'Tolak / Batalkan pesanan', 'Berikan alasan penolakan untuk pembeli.', true);
       if (aksi === 'batal') return mintaKonfirmasi(p.$id, 'batal', 'Batalkan pesanan?', 'Pesanan akan dibatalkan dan stok dikembalikan. Lanjutkan?');
       if (aksi === 'konfirmasi_bayar') {
-        const isOff = p.bayar?.metode === 'BAYAR_DI_TEMPAT';
         return mintaKonfirmasi(p.$id, 'konfirmasi_bayar', 'Konfirmasi pembayaran',
-          isOff ? 'Pembeli sudah membayar di tenant? Konfirmasi pembayaran sekaligus selesaikan pesanan.' : 'Konfirmasi bahwa bukti transfer QRIS valid dan dana sudah masuk ke rekening/QRIS tokomu?');
+          'Pembeli sudah membayar di tenant? Konfirmasi pembayaran sekaligus selesaikan pesanan.');
       }
       mintaKonfirmasi(p.$id, aksi, label, `Ubah status pesanan menjadi "${label}"?`);
     };
@@ -194,7 +199,6 @@ export default function Pesanan({ uid, sebagai }) {
 
       {(d || []).map((p) => {
         const isOffline = p.bayar?.metode === 'BAYAR_DI_TEMPAT';
-        const isQris = p.bayar?.metode === 'QRIS';
         const isMenungguBayar = p.bayar?.status_pembayaran === 'MENUNGGU';
         const isActiveOrder = ['MENUNGGU_KONFIRMASI', 'DIPROSES'].includes(p.status_pesanan);
 
@@ -219,7 +223,7 @@ export default function Pesanan({ uid, sebagai }) {
                 <span className="badge" data-s={p.status_pesanan}>{LABEL[p.status_pesanan] || p.status_pesanan}</span>
                 {p.bayar && (() => {
                   let teksBayar = p.bayar.status_pembayaran === 'MENUNGGU'
-                    ? (isOffline ? 'Belum bayar di tenant' : 'Verifikasi bukti transfer')
+                    ? (isOffline ? 'Belum bayar di tenant' : 'Menunggu verifikasi admin')
                     : (BAYAR[p.bayar.status_pembayaran] || p.bayar.status_pembayaran);
 
                   // Cegah duplikasi jika teks sama persis dengan status pesanan
@@ -243,20 +247,20 @@ export default function Pesanan({ uid, sebagai }) {
               ))}
             </ul>
 
-            <p className="muted" style={{ marginBottom: 8, fontSize: '0.85rem' }}>
+            {(sebagai !== 'pembeli' || !isOffline || tampilDenah) && <p className="muted" style={{ marginBottom: 8, fontSize: '0.85rem' }}>
               {adaNomor ? `Ambil di lapak: Tenant ${nomor}` : 'Nomor tenant belum ditetapkan'}
               {p.lapak?.nama_usaha && ` · ${p.lapak.nama_usaha}`}
               {p.alasan_pembatalan ? ` • Alasan batal: ${p.alasan_pembatalan}` : ''}
-            </p>
+            </p>}
 
             {/* PREVIEW BUKTI PEMBAYARAN (QRIS) */}
-            {p.bayar?.id_bukti && (
-              <div style={{ background: '#f8fafc', padding: 10, borderRadius: 8, border: '1px dashed #cbd5e1', marginBottom: 12 }}>
+            {sebagai === 'pembeli' && p.bayar?.id_bukti && (
+              <div style={{ background: 'var(--tint)', padding: 10, borderRadius: 8, border: '1px dashed var(--line)', marginBottom: 12 }}>
                 <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
                   <div className="row" style={{ alignItems: 'center', gap: 10 }}>
                     <img src={img(p.bayar.id_bukti)} alt="Thumbnail Bukti Transfer"
                       onClick={() => setModalGambar(img(p.bayar.id_bukti))}
-                      style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6, border: '1px solid #cbd5e1', cursor: 'pointer', background: '#fff' }} />
+                      style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--line)', cursor: 'pointer', background: '#fff' }} />
                     <div>
                       <b style={{ fontSize: '0.9rem' }}>Bukti Pembayaran Pembeli</b>
                       <div className="muted" style={{ fontSize: '0.8rem' }}>
@@ -277,7 +281,7 @@ export default function Pesanan({ uid, sebagai }) {
             {isOffline && isMenungguBayar && isActiveOrder && (
               <div style={{ marginBottom: 12 }}>
                 {!kedaluwarsa ? (
-                  <div className="msg" style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '8px 12px', fontSize: '0.85rem' }}>
+                  <div className="msg" style={{ background: 'var(--tint)', border: '1px solid var(--ye)', color: 'var(--ink)', padding: '8px 12px', fontSize: '0.85rem' }}>
                     ⏱️ Sisa waktu bayar di tenant <b>{sisaMenit} menit {String(sisaDetik).padStart(2, '0')} detik</b> dari batas 1 jam.
                   </div>
                 ) : (
@@ -297,14 +301,14 @@ export default function Pesanan({ uid, sebagai }) {
               </div>
 
               <span className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
-                {tampilDenah && adaNomor && <button type="button" className="btn sm sun" onClick={() => setIdDenah(p.$id)}>Lihat denah</button>}
+                {tampilDenah && adaNomor && <button type="button" className="btn sm sun" onClick={() => setIdDenah(p.$id)}>Cari tenant</button>}
                 {/* TOMBOL INVOICE: Muncul otomatis saat pembayaran sudah Lunas (BERHASIL) */}
                 {p.bayar?.status_pembayaran === 'BERHASIL' && (
                   <button
                     type="button"
                     className="btn sm out"
                     onClick={() => setModalInvoice(p)}
-                    style={{ borderColor: '#059669', color: '#047857', fontWeight: 700 }}
+                    style={{ borderColor: 'var(--bl-d)', color: 'var(--bl-d)', fontWeight: 700 }}
                   >
                     🧾 Lihat Invoice
                   </button>
@@ -318,11 +322,8 @@ export default function Pesanan({ uid, sebagai }) {
                 {/* MITRA ACTIONS */}
                 {sebagai === 'mitra' && (
                   <>
-                    {isMenungguBayar && (isQris || (isOffline && isActiveOrder && !kedaluwarsa)) && (
-                      isOffline
-                        ? tombol(p, 'konfirmasi_bayar', 'Konfirmasi bayar dan selesaikan', 'sun')
-                        : tombol(p, 'konfirmasi_bayar', '✓ Konfirmasi Pembayaran QRIS', 'sun')
-                    )}
+                    {isMenungguBayar && isOffline && isActiveOrder && !kedaluwarsa &&
+                      tombol(p, 'konfirmasi_bayar', 'Konfirmasi bayar dan selesaikan', 'sun')}
                     {p.status_pesanan === 'MENUNGGU_KONFIRMASI' && (
                       <>
                         {!isOffline && lunas && tombol(p, 'terima', 'Terima')}
@@ -378,7 +379,7 @@ export default function Pesanan({ uid, sebagai }) {
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <b style={{ fontSize: '1.05rem', color: '#1e3a8a' }}>Preview Bukti Pembayaran</b>
+              <b style={{ fontSize: '1.05rem', color: 'var(--bl-d)' }}>Preview Bukti Pembayaran</b>
               <button
                 type="button"
                 onClick={() => setModalGambar(null)}
@@ -395,8 +396,8 @@ export default function Pesanan({ uid, sebagai }) {
                 maxHeight: '65vh',
                 objectFit: 'contain',
                 borderRadius: 8,
-                border: '1px solid #e2e8f0',
-                background: '#f8fafc',
+                border: '1px solid var(--line)',
+                background: 'var(--tint)',
               }}
             />
             <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 10 }}>
@@ -450,7 +451,7 @@ export default function Pesanan({ uid, sebagai }) {
             }}
           >
             {/* Header Invoice */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #f1f5f9', paddingBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid var(--line)', paddingBottom: 14 }}>
               <div>
                 <h3 style={{ margin: 0, color: '#B8500A', fontSize: '1.4rem' }}>Lapa<b style={{ color: '#FF933E' }}>KWU</b></h3>
                 <small className="muted" style={{ fontWeight: 600 }}>INVOICE PEMBAYARAN RESMI</small>
@@ -459,7 +460,7 @@ export default function Pesanan({ uid, sebagai }) {
                 <span className="badge" data-s="BERHASIL" style={{ fontSize: '0.85rem' }}>
                   ✓ LUNAS
                 </span>
-                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 4 }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--mute)', marginTop: 4 }}>
                   No: <b>INV-{modalInvoice.$id.slice(-6).toUpperCase()}</b>
                 </div>
               </div>
@@ -473,7 +474,7 @@ export default function Pesanan({ uid, sebagai }) {
               </div>
               <div>
                 <span className="muted" style={{ display: 'block', fontSize: '0.78rem' }}>METODE PEMBAYARAN</span>
-                <b>{modalInvoice.bayar?.metode === 'QRIS' ? 'QRIS DANA (LapaKWU)' : 'Bayar di Lapak'}</b>
+                <b>{modalInvoice.bayar?.metode === 'QRIS' ? 'QRIS LapaKWU' : 'Bayar di Lapak'}</b>
               </div>
               <div>
                 <span className="muted" style={{ display: 'block', fontSize: '0.78rem' }}>LOKASI PENGAMBILAN</span>
@@ -481,13 +482,13 @@ export default function Pesanan({ uid, sebagai }) {
               </div>
               <div>
                 <span className="muted" style={{ display: 'block', fontSize: '0.78rem' }}>STATUS PESANAN</span>
-                <b style={{ color: '#047857' }}>{LABEL[modalInvoice.status_pesanan] || modalInvoice.status_pesanan}</b>
+                <b style={{ color: 'var(--bl-d)' }}>{LABEL[modalInvoice.status_pesanan] || modalInvoice.status_pesanan}</b>
               </div>
             </div>
 
             {/* Rincian Produk */}
-            <div style={{ borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', padding: '12px 0', margin: '14px 0' }}>
-              <b style={{ fontSize: '0.9rem', display: 'block', marginBottom: 8, color: '#334155' }}>Rincian Pembelian:</b>
+            <div style={{ borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)', padding: '12px 0', margin: '14px 0' }}>
+              <b style={{ fontSize: '0.9rem', display: 'block', marginBottom: 8, color: 'var(--ink)' }}>Rincian Pembelian:</b>
               <ul className="lines" style={{ margin: 0 }}>
                 {modalInvoice.items.map((i) => (
                   <li key={i.$id} style={{ padding: '6px 0', fontSize: '0.9rem' }}>
@@ -500,8 +501,8 @@ export default function Pesanan({ uid, sebagai }) {
 
             {/* Total Pembayaran */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '14px 0' }}>
-              <span style={{ fontWeight: 700, fontSize: '1.05rem', color: '#1e293b' }}>Total Dibayar</span>
-              <b style={{ fontSize: '1.3rem', color: '#047857' }}>{rp(modalInvoice.total_harga)}</b>
+              <span style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--ink)' }}>Total Dibayar</span>
+              <b style={{ fontSize: '1.3rem', color: 'var(--bl-d)' }}>{rp(modalInvoice.total_harga)}</b>
             </div>
 
             {/* Catatan footer */}

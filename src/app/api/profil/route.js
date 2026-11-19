@@ -1,7 +1,6 @@
 import { siapa, err, getRow, put, upd, baca, milik } from '@/lib/server';
 import { ubahNama, ubahEmail } from '@/lib/auth';
 import { normHp } from '@/lib/kirim';
-import { hapusFile } from '@/lib/backblaze';
 
 export const dynamic = 'force-dynamic';
 
@@ -115,27 +114,19 @@ export async function POST(req) {
         const d = {};
         if ('nama_usaha' in b) { if (!s(b.nama_usaha)) return err('Nama usaha tidak boleh kosong.'); d.nama_usaha = s(b.nama_usaha); }
         if ('alamat' in b) d.alamat_usaha = s(b.alamat);
-        if ('rekening' in b) d.rekening = s(b.rekening, 100);
         if ('id_qris' in b) {
           d.id_qris = b.id_qris ? s(b.id_qris, 36) : null;
         }
         await upd(null, 'mitra', u.$id, d);
-        if ('id_qris' in b && mt.id_qris && mt.id_qris !== d.id_qris) await hapusFile(mt.id_qris).catch(() => {});
       } else if (pb && 'alamat' in b) await upd(null, 'pembeli', u.$id, { alamat: s(b.alamat) });
       return Response.json({ ok: true });
     }
 
     if (b.aksi === 'hapus_qris') {
-      let mt = await getRow(null, 'mitra', u.$id).catch(() => null);
-      if (!mt) {
-        const pg0 = await getRow(null, 'pengguna', u.$id).catch(() => null);
-        await put(null, 'mitra', u.$id, { nama_usaha: pg0?.nama || u.name || 'Lapak', alamat_usaha: '-' }, []).catch(() => {});
-        mt = await getRow(null, 'mitra', u.$id).catch(() => null);
-      }
-      if (mt?.id_qris) {
-        await hapusFile(mt.id_qris).catch(() => {});
-        await upd(null, 'mitra', u.$id, { id_qris: null }).catch(() => {});
-      }
+      const mt = await getRow(null, 'mitra', u.$id).catch(() => null);
+      if (!mt) return err('Khusus mitra.', 403);
+      // Pengajuan yang sudah tercatat memakai gambar QRIS saat pengajuan dibuat.
+      await upd(null, 'mitra', u.$id, { id_qris: null });
       return Response.json({ ok: true });
     }
 
@@ -154,7 +145,7 @@ export async function POST(req) {
       if (await getRow(null, 'pembeli', u.$id).catch(() => null)) await upd(null, 'pembeli', u.$id, { alamat: s(b.alamat) });
       if (await getRow(null, 'mitra', u.$id).catch(() => null)) {
         if (!s(b.nama_usaha)) return err('Nama usaha tidak boleh kosong.');
-        await upd(null, 'mitra', u.$id, { nama_usaha: s(b.nama_usaha), alamat_usaha: s(b.alamat), rekening: s(b.rekening, 100) });
+        await upd(null, 'mitra', u.$id, { nama_usaha: s(b.nama_usaha), alamat_usaha: s(b.alamat) });
       }
       return Response.json({ ok: true });
     }

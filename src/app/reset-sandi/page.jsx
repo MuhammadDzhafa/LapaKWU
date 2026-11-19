@@ -57,7 +57,7 @@ function ResetForm() {
 
   if (!token || !userId) {
     return (
-      <main className="wrap" style={{ maxWidth: 480 }}>
+      <main className="wrap auth" style={{ maxWidth: 480 }}>
         <h2>Tautan Tidak Valid</h2>
         <div className="card pad" style={{ marginTop: 20 }}>
           <p className="msg err">Tautan reset kata sandi tidak valid atau parameter tidak lengkap.</p>
@@ -72,7 +72,7 @@ function ResetForm() {
 
   if (selesai) {
     return (
-      <main className="wrap" style={{ maxWidth: 480 }}>
+      <main className="wrap auth" style={{ maxWidth: 480 }}>
         <h2>Kata Sandi Berhasil Diperbarui!</h2>
         <div className="card pad" style={{ marginTop: 20 }}>
           <p className="msg ok">Kata sandi baru berhasil disimpan. Kamu akan dialihkan ke halaman Login dalam beberapa detik…</p>
@@ -85,7 +85,7 @@ function ResetForm() {
   }
 
   return (
-    <main className="wrap" style={{ maxWidth: 480 }}>
+    <main className="wrap auth" style={{ maxWidth: 480 }}>
       <h2>Buat Kata Sandi Baru</h2>
       <p className="muted">Masukkan kata sandi baru untuk akunmu. Minimal 8 karakter.</p>
       <form className="card pad" onSubmit={kirim} style={{ marginTop: 20 }}>

@@ -40,8 +40,14 @@ py -3.12 -m venv .venv-ocr
 
 Di Linux, gunakan `python3.12 -m venv .venv-ocr` dan jalankan perintah pip yang sama dengan `.venv-ocr/bin/python`. Di `.env.local`, isi `OCR_PYTHON` dengan path interpreter tersebut dan `OCR_NAMA_PENERIMA` dengan nama merchant persis seperti yang tercetak pada bukti QRIS. Jalankan skrip sekali dengan gambar contoh untuk mengunduh dan menyiapkan model sebelum menerima pesanan. PaddleOCR berjalan lokal tanpa API OCR berbayar. [Panduan PaddleOCR CPU](https://www.paddleocr.ai/v3.3.2/en/quick_start.html)
 
-Backend membandingkan hasil OCR dengan total checkout yang dihitung dari database, nama penerima yang dikonfigurasi, dan tanggal kalender Jakarta hari ini atau kemarin. Jika semua pemeriksaan cocok, pembayaran otomatis menjadi `BERHASIL` dan pesanan masuk `DIPROSES`. Bila OCR lambat, sedang dipakai, nama penerima belum dikonfigurasi, atau bukti tidak cocok, pembayaran tetap menunggu pemeriksaan manual.
+Backend membandingkan hasil OCR dengan total checkout yang dihitung dari database, nama penerima yang dikonfigurasi, dan tanggal kalender Jakarta hari ini atau kemarin. Hasil OCR ditampilkan di panel verifikasi. Admin mencocokkan dana yang masuk dan menyetujui transaksi sebelum invoice tersedia bagi pembeli dan mitra. Jika OCR gagal membaca bukti, admin dapat meninjaunya secara manual.
 
-PayHook opsional. Jika sudah dipakai, atur `PAYHOOK_SECRET` dan kirim nilainya melalui header `x-payhook-secret`. Konfirmasi otomatis membutuhkan nominal, referensi transaksi dari payload dana masuk, dan satu bukti OCR yang cocok. Ketika notifikasi DANA tidak menyediakan referensi yang juga tercetak di bukti, gunakan konfirmasi manual.
+PayHook opsional. Jika sudah dipakai, atur `PAYHOOK_SECRET` dan kirim nilainya melalui header `x-payhook-secret`. PayHook menandai dana masuk jika nominal dan referensi transaksi cocok dengan satu bukti OCR. Persetujuan pembayaran dilakukan oleh admin.
 
-Bukti baru berukuran maksimal 2 MB dan disimpan di Backblaze B2. Route bukti baru hanya melayani pemilik, mitra terkait, atau admin yang sudah masuk.
+Bukti baru berukuran maksimal 2 MB. Dokumen bukti dapat dibuka oleh pembeli yang mengunggahnya dan admin yang sudah masuk.
+
+## Dompet dan unggahan lokal
+
+Pembayaran QRIS yang disetujui tampil sebagai saldo pesanan berjalan. Saldo tersedia setelah pesanan selesai dan mitra bisa mengajukan pencairan mulai Rp10.000. Admin melihat QRIS yang dipakai saat pengajuan, membayar secara manual, lalu mengonfirmasi pencairan.
+
+Untuk pengujian dengan `npm run dev`, `LAPAKWU_STORAGE=local` menyimpan unggahan ke `data/unggahan-dev/`. Konfigurasi produksi menggunakan Backblaze B2.

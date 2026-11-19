@@ -9,7 +9,8 @@ import { JUMLAH_TENANT } from '@/lib/tenant';
 
 const TABS = [
   ['mitra', 'Verifikasi mitra'],
-  ['qris', 'Verifikasi QRIS DANA'],
+  ['qris', 'Verifikasi QRIS'],
+  ['pencairan', 'Pencairan Mitra'],
   ['pengguna', 'Pengguna dan peran'],
   ['produk', 'Produk'],
   ['rekap', 'Rekap Penjualan'],
@@ -20,6 +21,7 @@ export default function Admin() {
   const { akun, peran, memuat, toast } = useSaya();
   const [tab, setTab] = useState('mitra');
   const [d, setD] = useState({ u: [], m: [], pr: [], ad: [], pb: [], rf: [], qris: [] });
+  const [pencairan, setPencairan] = useState([]);
   const [f, setF] = useState({ peran: 'pembeli' });
   const [modalInfo, setModalInfo] = useState(null);
   const [busyModal, setBusyModal] = useState(false);
@@ -36,6 +38,19 @@ export default function Admin() {
     }
   }, [toast]);
   useEffect(() => { if (peran === 'admin') muat().catch((e) => toast(e.message, true)); }, [peran, muat, toast]);
+
+  const muatPencairan = useCallback(async () => {
+    const data = await api('/api/admin', { aksi: 'daftar_pencairan' });
+    setPencairan(data.pencairan);
+  }, []);
+
+  useEffect(() => {
+    if (peran !== 'admin') return;
+    const segarkan = () => muatPencairan().catch(() => {});
+    segarkan();
+    const timer = setInterval(segarkan, 15000);
+    return () => clearInterval(timer);
+  }, [peran, muatPencairan]);
 
   const act = async (aksi, id, extra = {}, ok = 'Tersimpan.') => {
     try { await api('/api/admin', { aksi, id, ...extra }); toast(ok); await muat(); return true; } catch (e) { toast(e.message, true); return false; }
@@ -161,22 +176,61 @@ export default function Admin() {
       <h2>Panel admin</h2>
       <div className="stats">
         <div className="stat"><small>Mitra menunggu</small><b>{d.m.filter((x) => pg(x.$id)?.status_akun !== 'AKTIF').length}</b></div>
-        <div className="stat"><small>QRIS DANA menunggu</small><b>{(d.qris || []).length}</b></div>
+        <div className="stat"><small>QRIS menunggu</small><b>{(d.qris || []).length}</b></div>
         <div className="stat"><small>Total pengguna</small><b>{d.u.length}</b></div>
         <div className="stat"><small>Refund menunggu</small><b>{d.rf.length}</b></div>
       </div>
-      <div className="tabs">{TABS.map(([k, t]) => <button key={k} className={'chip' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>{t}</button>)}</div>
+      <div className="tabs">{TABS.map(([k, t]) => (
+        <button key={k} className={'chip' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>
+          {t}{k === 'pencairan' && pencairan.length > 0 && ` (${pencairan.length}${pencairan.length === 50 ? '+' : ''})`}
+        </button>
+      ))}</div>
+
+      {tab === 'pencairan' && (
+        <section className="card pad stack">
+          <div className="row wallet-heading">
+            <h3>Pengajuan pencairan</h3>
+            <button className="btn sm out" type="button" onClick={() => muatPencairan().catch((e) => toast(e.message, true))}>Muat ulang</button>
+          </div>
+          <p className="muted">Pindai QRIS mitra untuk membayar sesuai nominal. Konfirmasi setelah pembayaran berhasil.</p>
+          {!pencairan.length && <p className="kosong">Belum ada pengajuan yang menunggu.</p>}
+          <div className="wallet-grid">
+            {pencairan.map((x) => (
+              <article className="card pad stack" key={x.id}>
+                <b>{x.nama_usaha} · {rp(x.nominal)}</b>
+                <small className="muted">{tgl(x.created_at)} · #{x.id.slice(-8)}</small>
+                <button className="wallet-qr" type="button" onClick={() => setModalGambar(img(x.id_qris))} aria-label={'Perbesar QRIS ' + x.nama_usaha}>
+                  <img src={img(x.id_qris)} alt={'QRIS pencairan ' + x.nama_usaha} />
+                </button>
+                <button className="btn sun sm" type="button" onClick={() => setModalInfo({
+                  judul: 'Konfirmasi pencairan',
+                  pesan: 'Pastikan pembayaran ' + rp(x.nominal) + ' ke QRIS ' + x.nama_usaha + ' sudah berhasil.',
+                  tombolOk: 'Sudah dibayar',
+                  onOk: async () => {
+                    setBusyModal(true);
+                    if (await act('konfirmasi_pencairan', x.id, {}, 'Pencairan berhasil dikonfirmasi.')) {
+                      setPencairan((items) => items.filter((item) => item.id !== x.id));
+                      setModalInfo(null);
+                    }
+                    setBusyModal(false);
+                  },
+                })}>Konfirmasi sudah dibayar</button>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       {tab === 'qris' && (
         <div className="stack">
-          <div className="card pad" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+          <div className="card pad" style={{ background: 'var(--bl-s)', border: '1px solid var(--bl)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: '1.4rem' }}>📲</span>
               <div>
-                <b style={{ color: '#14532d' }}>Verifikasi Pembayaran QRIS DANA (PayHook & Manual)</b>
+                <b style={{ color: 'var(--bl-d)' }}>Verifikasi pembayaran QRIS LapaKWU</b>
                 <p className="muted" style={{ margin: 0, fontSize: '0.88rem' }}>
-                  PayHook dapat mengonfirmasi dana masuk jika nominal dan referensi transaksi cocok dengan bukti yang lolos pemeriksaan OCR.
-                  Jika transfer belum otomatis terverifikasi (misal HP offline atau pembeli salah nominal), Admin bisa melakukan verifikasi manual di bawah ini.
+                  PayHook dapat menandai dana masuk jika nominal dan referensi transaksi cocok dengan hasil OCR.
+                  Cocokkan bukti dan nominal dengan dana yang benar-benar masuk sebelum menyetujui pembayaran.
                 </p>
               </div>
             </div>
@@ -207,7 +261,7 @@ export default function Admin() {
                         <small className="muted">{pembeliUser?.email}</small>
                       </td>
                       <td>{namaMitra}</td>
-                      <td><b style={{ color: '#047857' }}>{rp(x.jumlah)}</b></td>
+                      <td><b style={{ color: 'var(--bl-d)' }}>{rp(x.jumlah)}</b></td>
                       <td>
                         {x.id_bukti ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -215,7 +269,7 @@ export default function Admin() {
                               src={img(x.id_bukti)}
                               alt="Bukti Transfer"
                               onClick={() => setModalGambar(img(x.id_bukti))}
-                              style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6, cursor: 'pointer', border: '1px solid #cbd5e1' }}
+                              style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--line)' }}
                             />
                             <button
                               type="button"
@@ -233,6 +287,7 @@ export default function Admin() {
                           {x.status_ocr === 'COCOK' ? 'OCR cocok' : 'Perlu tinjauan manual'}
                           {x.hasil_ocr?.tanggal && ' · ' + tgl(x.hasil_ocr.tanggal)}
                         </small>}
+                        {x.dana_terdeteksi && <small className="muted">Dana masuk terdeteksi oleh PayHook.</small>}
                       </td>
                       <td>
                         <div className="row" style={{ gap: 6 }}>
@@ -244,7 +299,7 @@ export default function Admin() {
                           </button>
                           <button
                             className="btn sm red"
-                            onClick={() => act('tolak_qris', x.$id, { catatan: 'Bukti transfer tidak valid / dana tidak masuk ke DANA LapaKWU.' }, 'Pembayaran ditolak.')}
+                            onClick={() => act('tolak_qris', x.$id, { catatan: 'Bukti transfer tidak valid / dana tidak masuk ke QRIS LapaKWU.' }, 'Pembayaran ditolak.')}
                           >
                             Tolak
                           </button>
@@ -346,7 +401,7 @@ export default function Admin() {
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <b style={{ fontSize: '1.05rem', color: '#1e3a8a' }}>Preview Bukti Pembayaran QRIS</b>
+              <b style={{ fontSize: '1.05rem', color: 'var(--bl-d)' }}>Pratinjau gambar QRIS</b>
               <button
                 type="button"
                 onClick={() => setModalGambar(null)}
@@ -363,8 +418,8 @@ export default function Admin() {
                 maxHeight: '65vh',
                 objectFit: 'contain',
                 borderRadius: 8,
-                border: '1px solid #e2e8f0',
-                background: '#f8fafc',
+                border: '1px solid var(--line)',
+                background: 'var(--tint)',
               }}
             />
             <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 10 }}>

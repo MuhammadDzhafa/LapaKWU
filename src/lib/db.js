@@ -7,7 +7,7 @@ const transaksi = new AsyncLocalStorage();
 export const koleksiInti = [
   'users', 'pengguna', 'kode_verifikasi', 'notifikasi', 'pembeli', 'mitra', 'admin',
   'produk', 'keranjang', 'item_keranjang', 'pesanan', 'detail_pesanan', 'payment_gateway',
-  'pembayaran', 'rekap_penjualan', 'penjualan_offline',
+  'pembayaran', 'rekap_penjualan', 'penjualan_offline', 'pencairan_dompet',
 ];
 
 const indeks = {
@@ -23,6 +23,7 @@ const indeks = {
     { key: { metode: 1, status_pembayaran: 1, created_at: 1 } },
   ],
   bukti_checkout: [{ key: { referensi: 1, total: 1, status_ocr: 1, status_pembayaran: 1, created_at: -1 } }],
+  pencairan_dompet: [{ key: { id_mitra: 1, created_at: -1 } }, { key: { status: 1, created_at: 1 } }],
   rekap_penjualan: [{ key: { id_mitra: 1, periode: 1 } }],
   penjualan_offline: [{ key: { id_mitra: 1, id_produk: 1, periode: 1, waktu: -1 } }],
 };
@@ -103,6 +104,11 @@ export async function cariBanyak(tabel, filter, { sort, limit = 100, skip = 0 } 
   const [collection, options] = await akses(tabel);
   const rows = await collection.find(filter, { ...options, sort, limit, skip }).toArray();
   return rows.map(dokumen);
+}
+
+export async function agregasi(tabel, pipeline) {
+  const [collection, options] = await akses(tabel);
+  return collection.aggregate(pipeline, options).toArray();
 }
 
 export async function tulis(tabel, id, data) {

@@ -19,11 +19,8 @@ export async function POST(req) {
       return Response.json({ error: 'Nama file tidak valid.' }, { status: 400 });
     }
 
-    const [produk, mitra] = await Promise.all([
-      cariSatu('produk', { id_gambar: namaFile, id_mitra: u.$id }),
-      cariSatu('mitra', { _id: u.$id, id_qris: namaFile }),
-    ]);
-    if (!produk && !mitra) return Response.json({ error: 'File tidak ditemukan.' }, { status: 404 });
+    const produk = await cariSatu('produk', { id_gambar: namaFile, id_mitra: u.$id });
+    if (!produk) return Response.json({ error: 'File tidak ditemukan.' }, { status: 404 });
     await hapusFile(namaFile);
     return Response.json({ ok: true });
   } catch (e) {

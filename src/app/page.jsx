@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { list, Query, rp, img, tambahKeranjang } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
+import { PetaTenant } from '@/components/DenahTenant';
 import Lapak from '@/components/Lapak';
+import { Hitung, terbang } from '@/components/Motion';
 
 // Peragaan di hero: tiap tekan − stok turun dan rekap naik, sama seperti di dashboard mitra.
 function Live() {
@@ -39,7 +41,7 @@ function Panggung({ children }) {
 }
 
 const JUDUL = ['Belanja', 'di', 'lapak', 'teman', 'sekampus.'];
-const TICKER_ITEMS = ['Pesan antar', 'Ambil di lapak', 'QRIS', 'Virtual account', 'Bayar di tempat', 'Produk mitra KWU'];
+const TICKER_ITEMS = ['Pesan antar', 'Ambil di lapak', 'QRIS', 'Bayar di tempat', 'Produk mitra KWU'];
 
 export default function Beranda() {
   const { akun, peran, toast, keranjang, ubahItemKeranjang } = useSaya();
@@ -63,9 +65,10 @@ export default function Beranda() {
   const tampil = (p || []).filter((x) => (k === 'Semua' || x.kategori === k) && (!lapak || x.id_mitra === lapak) && x.nama.toLowerCase().includes(q.toLowerCase()));
   const keranjangMap = useMemo(() => Object.fromEntries((keranjang || []).map((i) => [i.id_produk, i.jumlah])), [keranjang]);
 
-  const handleUbah = (x, delta) => {
+  const handleUbah = (x, delta, dari) => {
     ubahItemKeranjang(x, delta);
     if (delta > 0) {
+      if (akun) terbang(dari);
       setBaru(x.$id);
       setTimeout(() => setBaru((v) => (v === x.$id ? null : v)), 800);
     }
@@ -74,6 +77,7 @@ export default function Beranda() {
   return (
     <>
       <section className="hero2">
+        <div className="aurora" aria-hidden="true"><i /><i /><i /><b /></div>
         <div className="awning" aria-hidden="true" />
         <div className="wrap">
           <div>
@@ -83,6 +87,13 @@ export default function Beranda() {
               <a href="#katalog" className="btn lg">Lihat produk</a>
               {peran !== 'mitra' && <Link href="/mitra/tata-cara" className="btn lg out">Buka lapakmu</Link>}
             </div>
+            {p && p.length > 0 && (
+              <ul className="hstats" aria-label="Isi katalog saat ini">
+                <li><b><Hitung ke={p.length} /></b> produk</li>
+                <li><b><Hitung ke={lapakAda.length} /></b> lapak mitra</li>
+                <li><b><Hitung ke={kat.length - 1} /></b> kategori</li>
+              </ul>
+            )}
           </div>
           <Panggung><Lapak /><Live /></Panggung>
         </div>
@@ -100,7 +111,10 @@ export default function Beranda() {
 
       <div className="wrap">
         <div className="searchcard" id="katalog">
-          <input type="search" aria-label="Cari produk" placeholder="Cari produk, misalnya keripik" value={q} onChange={(e) => setQ(e.target.value)} />
+          <div className="cari">
+            <input type="search" aria-label="Cari produk" placeholder="Cari produk, misalnya keripik" value={q} onChange={(e) => setQ(e.target.value)} />
+            {!q && <kbd aria-hidden="true">/</kbd>}
+          </div>
           <div className="chips">{kat.map((c) => <button key={c} className={'chip' + (c === k ? ' on' : '')} onClick={() => setK(c)}>{c}</button>)}</div>
         </div>
       </div>
@@ -119,14 +133,16 @@ export default function Beranda() {
       )}
 
       <section className="sec"><div className="wrap">
-        <h2>{lapak ? `Produk ${nama[lapak]}` : 'Semua produk'}</h2>
+        <h2>{lapak ? `Produk ${nama[lapak]}` : 'Semua produk'}{p && <span className="jml" aria-label={`${tampil.length} produk`}>{tampil.length}</span>}</h2>
         <div className="grid" aria-live="polite" style={{ marginTop: 18 }}>
           {p === null && Array.from({ length: 6 }, (_, i) => <div key={i} className="skel" />)}
           {tampil.map((x, n) => (
             <article key={x.$id} className="card prod" style={{ '--i': Math.min(n, 12) }}>
               <Link href={`/produk/${x.$id}`} className="ph" aria-label={x.nama}>
                 {x.id_gambar ? <img src={img(x.id_gambar)} alt="" loading="lazy" /> : <span>{x.nama[0]}</span>}
+                {x.kategori && <span className="kat">{x.kategori}</span>}
                 {x.stok < 1 && <em className="habis">Habis</em>}
+                {x.stok > 0 && x.stok <= 5 && <em className="sisa">Sisa {x.stok}</em>}
               </Link>
               <div className="pb">
                 <Link href={`/produk/${x.$id}`} className="nm">{x.nama}</Link>
@@ -140,7 +156,7 @@ export default function Beranda() {
                           type="button"
                           className="step-btn minus"
                           aria-label={`Kurangi ${x.nama}`}
-                          onClick={(e) => { e.preventDefault(); handleUbah(x, -1); }}
+                          onClick={(e) => { e.preventDefault(); handleUbah(x, -1, e.currentTarget); }}
                         >
                           −
                         </button>
@@ -150,7 +166,7 @@ export default function Beranda() {
                           className="step-btn plus-btn"
                           aria-label={`Tambah ${x.nama}`}
                           disabled={keranjangMap[x.$id] >= x.stok}
-                          onClick={(e) => { e.preventDefault(); handleUbah(x, 1); }}
+                          onClick={(e) => { e.preventDefault(); handleUbah(x, 1, e.currentTarget); }}
                         >
                           +
                         </button>
@@ -160,7 +176,7 @@ export default function Beranda() {
                         type="button"
                         className={'plus' + (baru === x.$id ? ' ok' : '')}
                         aria-label={`Tambah ${x.nama} ke keranjang`}
-                        onClick={(e) => { e.preventDefault(); handleUbah(x, 1); }}
+                        onClick={(e) => { e.preventDefault(); handleUbah(x, 1, e.currentTarget); }}
                       >
                         {baru === x.$id ? '✓' : '+'}
                       </button>
@@ -178,9 +194,15 @@ export default function Beranda() {
         <h2>Cara belanja</h2><p className="sub">Tiga langkah, dari katalog sampai barang di tanganmu.</p>
         <div className="steps">
           <div className="step"><i>1</i><h3>Pilih produk</h3><p className="muted">Cari di katalog, lalu masukkan ke keranjang atau langsung beli sekarang.</p></div>
-          <div className="step"><i>2</i><h3>Bayar dan pesan</h3><p className="muted">Pilih dikirim atau ambil sendiri, lalu bayar lewat QRIS, virtual account, atau di tempat.</p></div>
+          <div className="step"><i>2</i><h3>Bayar dan pesan</h3><p className="muted">Pilih dikirim atau ambil sendiri, lalu bayar lewat QRIS atau di tempat.</p></div>
           <div className="step"><i>3</i><h3>Terima atau ambil</h3><p className="muted">Pantau status pesananmu. Mitra mendapat kabar lewat email atau WhatsApp.</p></div>
         </div>
+        <section className="denah-beranda" id="denah" aria-labelledby="judul-denah">
+          <h2 id="judul-denah">Denah tenant</h2>
+          <div className="denah-scroll" tabIndex={0} aria-label="Denah lengkap, geser ke samping pada layar kecil">
+            <PetaTenant />
+          </div>
+        </section>
         {peran !== 'mitra' && (
           <div className="band">
             <div><h2>Punya usaha kecil? Buka lapakmu di sini.</h2><p>Kelola produk, stok, pesanan, dan saldo dalam satu tempat.</p></div>

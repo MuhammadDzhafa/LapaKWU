@@ -74,6 +74,9 @@ export async function POST(req) {
     if (!a) return err('Aksi tidak dikenal.');
     const by = (await rows(db, 'pembayaran', [Query.equal('id_pesanan', id)]))[0];
     const bayarDiTenant = by?.metode === 'BAYAR_DI_TEMPAT';
+    if (p.id_mitra === u.$id && by?.metode === 'QRIS' && by.status_pembayaran === 'MENUNGGU') {
+      return err('Pembayaran QRIS menunggu verifikasi admin.', 403);
+    }
     const selesaiTenantLama = aksi === 'selesai' && bayarDiTenant && ['MENUNGGU_KONFIRMASI', 'DIPROSES'].includes(p.status_pesanan);
     if (aksi === 'batal_kedaluwarsa' && bayarDiTenant && (by.status_pembayaran === 'BERHASIL' || p.status_pesanan === 'DIBATALKAN')) {
       return Response.json({ ok: true, status: p.status_pesanan });
@@ -98,30 +101,22 @@ export async function POST(req) {
       return Response.json({ ok: true, dibatalkan: true });
     }
 
-    // Aksi konfirmasi bayar oleh mitra (baik pembayaran online QRIS dengan bukti maupun bayar di tempat)
+    // Mitra mengonfirmasi pembayaran langsung di tenant.
     if (aksi === 'konfirmasi_bayar') {
       if (p.id_mitra !== u.$id) return err('Hanya mitra yang bisa mengonfirmasi pembayaran.', 403);
-      if (!by) return err('Data pembayaran tidak ditemukan.');
+      if (!bayarDiTenant) return err('Pembayaran QRIS diverifikasi oleh admin.', 403);
       if (by.status_pembayaran !== 'MENUNGGU') return err('Pembayaran tidak dalam status menunggu.');
 
-      if (bayarDiTenant && Date.now() >= tenggatBayarTenant(p)) {
+      if (Date.now() >= tenggatBayarTenant(p)) {
         return err('Batas waktu pembayaran di tempat (1 jam) telah kedaluwarsa.');
       }
 
       const now = new Date().toISOString();
       await upd(db, 'pembayaran', by.$id, { status_pembayaran: 'BERHASIL', waktu_bayar: now });
-      if (bayarDiTenant) {
-        await upd(db, 'pesanan', id, { status_pesanan: 'SELESAI' });
-        await catatRekap(db, p, by);
-        await notif(db, p.id_pembeli, 'Pesanan selesai', 'Pembayaran di lapak sudah dikonfirmasi. Terima kasih sudah belanja!', true);
-        return Response.json({ ok: true, status: 'SELESAI' });
-      }
-
-      if (p.status_pesanan === 'MENUNGGU_KONFIRMASI') {
-        await upd(db, 'pesanan', id, { status_pesanan: 'DIPROSES' });
-      }
-      await notif(db, p.id_pembeli, 'Pembayaran dikonfirmasi', 'Mitra telah mengonfirmasi pembayaran QRIS. Pesanan sedang diproses.', true);
-      return Response.json({ ok: true });
+      await upd(db, 'pesanan', id, { status_pesanan: 'SELESAI' });
+      await catatRekap(db, p, by);
+      await notif(db, p.id_pembeli, 'Pesanan selesai', 'Pembayaran di lapak sudah dikonfirmasi. Terima kasih sudah belanja!', true);
+      return Response.json({ ok: true, status: 'SELESAI' });
     }
 
     const data = { status_pesanan: a[1] };

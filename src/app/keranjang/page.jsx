@@ -21,6 +21,7 @@ export default function Keranjang() {
   }, [akun, keranjang]);
 
   const ganti = async (i, d) => {
+    if (!i.$id) return;
     // Guard: verifikasi kepemilikan item keranjang
     if (i.id_keranjang !== akun.$id) return setMsg('Item ini bukan milikmu.');
     const j = i.jumlah + d;
@@ -45,14 +46,14 @@ export default function Keranjang() {
       {it && !it.length && <p className="kosong">Keranjangmu kosong. <Link className="link" href="/">Lihat katalog</Link></p>}
       <div className="stack">
         {(it || []).map((i) => (
-          <div key={i.$id} className="card pad row" style={{ justifyContent: 'space-between' }}>
+          <div key={i.$id ?? ('produk:' + i.id_produk)} className="card pad row" style={{ justifyContent: 'space-between' }}>
             <div><b>{i.p?.nama || 'Produk dihapus'}</b><br /><small className="muted">{rp(i.p?.harga)} per item</small></div>
             <div className="row">
-              <button className="btn out sm" aria-label="Kurangi" onClick={() => ganti(i, -1)}>−</button>
+              <button className="btn out sm" aria-label="Kurangi" onClick={() => ganti(i, -1)} disabled={!i.$id}>−</button>
               <b>{i.jumlah}</b>
-              <button className="btn out sm" aria-label="Tambah" onClick={() => ganti(i, 1)} disabled={!i.p}>+</button>
+              <button className="btn out sm" aria-label="Tambah" onClick={() => ganti(i, 1)} disabled={!i.p || !i.$id}>+</button>
               <b style={{ minWidth: 100, textAlign: 'right' }}>{rp(i.subtotal)}</b>
-              <button className="link" onClick={() => ganti(i, -i.jumlah)}>Hapus</button>
+              <button className="link" onClick={() => ganti(i, -i.jumlah)} disabled={!i.$id}>Hapus</button>
             </div>
           </div>
         ))}

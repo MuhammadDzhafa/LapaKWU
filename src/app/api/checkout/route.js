@@ -54,7 +54,6 @@ export async function POST(req) {
       const now = new Date();
       const totalCheckout = items.reduce((sum, item) => sum + item.jumlah * Math.round(katalog.get(item.id_produk).harga * 100), 0) / 100;
       const verifikasi = upload ? periksaBukti(hasilOcr, totalCheckout, now) : null;
-      const otomatisTerkonfirmasi = Boolean(upload && verifikasi?.status === 'COCOK');
       if (upload) {
         if (await cariSatu('bukti_checkout', { _id: upload.sha256 })) {
           return { error: 'Bukti pembayaran ini sudah digunakan.', status: 409 };
@@ -62,8 +61,7 @@ export async function POST(req) {
         await put(null, 'bukti_checkout', upload.sha256, {
           id_pembeli: u.$id, id_bukti: upload.id, total: totalCheckout,
           status_ocr: verifikasi.status, referensi: verifikasi.referensi,
-          status_pembayaran: otomatisTerkonfirmasi ? 'BERHASIL' : 'MENUNGGU',
-          ...(otomatisTerkonfirmasi ? { waktu_bayar: now } : {}),
+          status_pembayaran: 'MENUNGGU',
         });
       }
       for (const item of items) await dec(null, 'produk', item.id_produk, 'stok', item.jumlah);
@@ -75,7 +73,7 @@ export async function POST(req) {
         await put(null, 'pesanan', pid, {
           id_pembeli: u.$id, id_mitra: mid, tanggal_pesanan: now,
           jenis_pemesanan: 'OFFLINE', total_harga: total,
-          status_pesanan: otomatisTerkonfirmasi ? 'DIPROSES' : 'MENUNGGU_KONFIRMASI',
+          status_pesanan: 'MENUNGGU_KONFIRMASI',
           lokasi_pengambilan: mt.alamat_usaha,
         });
         for (const { item, produk } of grup) {
@@ -86,23 +84,18 @@ export async function POST(req) {
         }
         await put(null, 'pembayaran', ID.unique(), {
           id_pesanan: pid, metode: b.metode, jumlah: total,
-          status_pembayaran: otomatisTerkonfirmasi ? 'BERHASIL' : 'MENUNGGU',
-          ...(otomatisTerkonfirmasi ? { waktu_bayar: now } : {}),
+          status_pembayaran: 'MENUNGGU',
           ...(upload ? { id_bukti: upload.id, id_bukti_checkout: upload.sha256, status_ocr: verifikasi.status, catatan_ocr: verifikasi.temuan } : {}),
           ...(verifikasi?.data ? { hasil_ocr: verifikasi.data } : {}),
         });
         const ringkas = grup.map(({ item, produk }) => produk.nama + ' x' + item.jumlah).join(', ');
         const label = upload ? 'QRIS' : 'Bayar di Lapak';
         const judul = 'Ada pesanan baru (' + label + ')';
-        const pesan = ringkas + '. Total Rp ' + total.toLocaleString('id-ID') + (upload
-          ? '. Bukti pembayaran sudah diunggah. Periksa di Lapak saya.'
-          : '. Pembeli akan datang bayar langsung di lapak dalam 1 jam.');
+        const pesan = ringkas + '. Total Rp ' + total.toLocaleString('id-ID') + '. Pembeli akan datang bayar langsung di lapak dalam 1 jam.';
         await notif(null, u.$id, 'Pesanan dibuat (' + label + ')', 'Pesanan ke ' + mt.nama_usaha + (upload
-          ? (otomatisTerkonfirmasi ? ' berhasil dibuat. Pembayaran otomatis terkonfirmasi dan pesanan sedang diproses.' : ' berhasil dibuat dan menunggu konfirmasi pembayaran.')
+          ? ' berhasil dibuat dan menunggu verifikasi admin.'
           : ' berhasil dibuat. Silakan bayar langsung di lapak dalam 1 jam.'));
-        await notif(null, mid, judul, otomatisTerkonfirmasi
-          ? ringkas + '. Pembayaran QRIS otomatis terkonfirmasi berdasarkan bukti yang cocok. Pesanan siap diproses.'
-          : pesan, true);
+        if (!upload) await notif(null, mid, judul, pesan, true);
       }
       for (const item of cart) await del(null, 'item_keranjang', item.$id);
       if (cart.length) await upd(null, 'keranjang', u.$id, { total_harga: 0 });

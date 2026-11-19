@@ -29,7 +29,7 @@ export default function LupaSandi() {
 
   if (terkirim) {
     return (
-      <main className="wrap" style={{ maxWidth: 480 }}>
+      <main className="wrap auth" style={{ maxWidth: 480 }}>
         <h2>Email Terkirim!</h2>
         <div className="card pad" style={{ marginTop: 20 }}>
           <p className="msg ok">
@@ -59,7 +59,7 @@ export default function LupaSandi() {
   }
 
   return (
-    <main className="wrap" style={{ maxWidth: 480 }}>
+    <main className="wrap auth" style={{ maxWidth: 480 }}>
       <div style={{ marginBottom: 20 }}>
         <Link href="/masuk" className="link" style={{ fontSize: '0.9rem' }}>
           ← Kembali ke Login

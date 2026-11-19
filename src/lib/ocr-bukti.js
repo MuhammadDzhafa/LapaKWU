@@ -17,7 +17,7 @@ export async function bacaBukti(buffer, originalName) {
     const path = join(folder, `bukti${extname(originalName || '.jpg') || '.jpg'}`);
     await writeFile(path, buffer);
     const { stdout } = await execFileAsync(python, [join(process.cwd(), 'scripts', 'ocr-bukti.py'), path], {
-      timeout: 60_000, maxBuffer: 512 * 1024, windowsHide: true,
+      timeout: 90_000, maxBuffer: 512 * 1024, windowsHide: true,
     });
     // Library native dapat menulis log ke stdout sebelum baris JSON.
     const result = JSON.parse(stdout.trim().split(/\r?\n/).at(-1));

@@ -1,4 +1,4 @@
-import { denganTransaksi } from '@/lib/db';
+import { cariBanyak, cariSatu, denganTransaksi, ubahData } from '@/lib/db';
 import { siapa, err, getRow, rows, put, upd, del, inc, notif, Query } from '@/lib/server';
 import { buatAkun, cariAkunByEmail, hapusAkun, ubahPassword } from '@/lib/auth';
 import { nanoid } from 'nanoid';
@@ -29,6 +29,11 @@ export async function POST(req) {
   const { aksi, id, catatan } = b;
   const PERAN = ['pembeli', 'mitra', 'admin'];
 
+  if (aksi === 'daftar_pencairan') {
+    const pencairan = await cariBanyak('pencairan_dompet', { status: 'DIAJUKAN' }, { sort: { created_at: 1 }, limit: 50 });
+    return Response.json({ pencairan });
+  }
+
   if (aksi === 'muat') {
     const [uRows, mRows, prRows, adRows, pbRows, rfRows] = await Promise.all([
       rows(null, 'pengguna', []),
@@ -48,7 +53,16 @@ export async function POST(req) {
     const rf = rfRows.filter((x) => x.status_pembayaran === 'REFUND_DIAJUKAN');
     const qrisPending = rfRows.filter((x) => x.metode === 'QRIS' && x.status_pembayaran === 'MENUNGGU');
     const qrisOrders = qrisPending.length ? await rows(null, 'pesanan', [Query.equal('id', qrisPending.map((q) => q.id_pesanan))]) : [];
-    const qris = qrisPending.map((by) => ({ ...by, pesanan: qrisOrders.find((p) => p.$id === by.id_pesanan) || null }));
+    const idsBukti = [...new Set(qrisPending.map((by) => by.id_bukti_checkout).filter(Boolean))];
+    const buktiCheckout = idsBukti.length
+      ? await cariBanyak('bukti_checkout', { _id: { $in: idsBukti } })
+      : [];
+    const buktiPerId = new Map(buktiCheckout.map((bukti) => [bukti.id, bukti]));
+    const qris = qrisPending.map((by) => ({
+      ...by,
+      pesanan: qrisOrders.find((p) => p.$id === by.id_pesanan) || null,
+      dana_terdeteksi: Boolean(buktiPerId.get(by.id_bukti_checkout)?.waktu_dana_masuk),
+    }));
 
     return Response.json({ u: uRows, m: validMitras, pr: prRows, ad: adRows, pb: validPembeli, rf, qris });
   }
@@ -98,11 +112,17 @@ export async function POST(req) {
       return Response.json({ ok: true });
     }
 
-    if (aksi === 'cair') {
-      const r = await getRow(null, 'rekap_penjualan', id).catch(() => null);
-      if (!r || r.status_pencairan !== 'DIAJUKAN') return err('Rekap tidak dalam status diajukan.');
-      await upd(null, 'rekap_penjualan', id, { status_pencairan: 'DICAIRKAN', tanggal_cair: new Date().toISOString(), catatan_cair: String(catatan || '').slice(0, 255) });
-      await notif(null, r.id_mitra, 'Saldo sudah dicairkan', `Pencairan periode ${r.periode} sebesar Rp ${(r.total_digital - r.total_komisi).toLocaleString('id-ID')} sudah ditransfer ke rekeningmu.`, true);
+    if (aksi === 'konfirmasi_pencairan') {
+      if (typeof id !== 'string') return err('ID pencairan tidak valid.');
+      const pengajuan = await cariSatu('pencairan_dompet', { _id: id });
+      if (!pengajuan) return err('Pengajuan tidak ditemukan.', 404);
+      if (pengajuan.status === 'DICAIRKAN') return Response.json({ ok: true });
+      if (pengajuan.status !== 'DIAJUKAN') return err('Pencairan tidak dalam status diajukan.', 409);
+      await ubahData('pencairan_dompet', { _id: id, status: 'DIAJUKAN' }, {
+        status: 'DICAIRKAN', tanggal_cair: new Date(), id_admin: u.$id,
+      });
+      await notif(null, pengajuan.id_mitra, 'Saldo sudah dicairkan',
+        'Admin sudah mengonfirmasi pembayaran QRIS sebesar Rp' + pengajuan.nominal.toLocaleString('id-ID') + '.');
       return Response.json({ ok: true });
     }
 

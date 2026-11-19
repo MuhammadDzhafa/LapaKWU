@@ -27,7 +27,7 @@ export default function TataCaraMitra() {
         <div className="steps" style={{ marginTop: 20 }}>
           {[
             { n: 1, judul: 'Baca Syarat & Ketentuan', isi: 'Pastikan kamu memenuhi persyaratan menjadi Mitra LapaKWU di bawah ini sebelum mendaftar.' },
-            { n: 2, judul: 'Siapkan Dokumen', isi: 'Siapkan KTP, foto lapak/produk, nomor WhatsApp aktif, dan nomor rekening/QRIS.' },
+            { n: 2, judul: 'Siapkan Dokumen', isi: 'Siapkan foto lapak atau produk, nomor WhatsApp aktif, dan QRIS untuk pencairan.' },
             { n: 3, judul: 'Konfirmasi via WhatsApp', isi: 'Tekan tombol di bawah untuk mengirim pesan ke Admin. Pesan sudah terisi otomatis, tinggal lengkapi data dalam kurung siku.' },
             { n: 4, judul: 'Verifikasi & Aktivasi', isi: 'Admin akan memverifikasi dan mengaktifkan akunmu sebagai Mitra dalam 1x24 jam kerja.' },
           ].map(({ n, judul, isi }) => (
@@ -45,23 +45,22 @@ export default function TataCaraMitra() {
         <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
           <li>Memiliki usaha/produk yang halal dan legal.</li>
           <li>Bersedia mengunggah foto produk yang jelas dan representatif.</li>
-          <li>Memiliki QRIS atau rekening bank aktif untuk menerima pembayaran.</li>
+          <li>Memiliki QRIS aktif untuk menerima pencairan.</li>
           <li>Aktif merespons pesanan masuk dalam waktu maksimal 1 jam.</li>
           <li>Bertanggung jawab atas kualitas dan ketersediaan produk yang dijual.</li>
           <li>Tidak menjual produk terlarang, berbahaya, atau melanggar hukum.</li>
         </ul>
       </section>
 
-      <section className="card pad" style={{ marginTop: 20, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-        <h3 style={{ marginBottom: 16, color: '#14532d' }}>Dokumen yang Perlu Disiapkan</h3>
+      <section className="card pad" style={{ marginTop: 20, background: 'var(--bl-s)', border: '1px solid var(--bl)' }}>
+        <h3 style={{ marginBottom: 16, color: 'var(--bl-d)' }}>Dokumen yang Perlu Disiapkan</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(190px,1fr))', gap: 16 }}>
           {[
-            { ikon: '🪪', label: 'KTP', desc: 'Kartu Tanda Penduduk yang masih berlaku' },
             { ikon: '🏪', label: 'Foto Lapak', desc: 'Foto lapak atau produk yang akan dijual' },
             { ikon: '📱', label: 'Nomor WhatsApp', desc: 'Nomor WA aktif untuk notifikasi pesanan' },
-            { ikon: '💳', label: 'Rekening/QRIS', desc: 'Nomor rekening bank atau barcode QRIS toko' },
+            { ikon: '💳', label: 'QRIS pencairan', desc: 'Gambar QRIS tujuan pencairan saldo' },
           ].map(({ ikon, label, desc }) => (
-            <div key={label} style={{ background: '#fff', borderRadius: 16, padding: 16, border: '1px solid #bbf7d0' }}>
+            <div key={label} style={{ background: '#fff', borderRadius: 16, padding: 16, border: '1px solid var(--bl)' }}>
               <div style={{ fontSize: '1.8rem', marginBottom: 8 }}>{ikon}</div>
               <b style={{ display: 'block', marginBottom: 4 }}>{label}</b>
               <small className="muted">{desc}</small>
@@ -71,7 +70,7 @@ export default function TataCaraMitra() {
       </section>
 
       <section style={{ marginTop: 40, textAlign: 'center' }}>
-        <div className="card pad" style={{ background: '#fffbeb', border: '2px solid #fde68a' }}>
+        <div className="card pad" style={{ background: 'var(--tint)', border: '2px solid var(--ye)' }}>
           <p style={{ fontSize: '1rem', marginBottom: 4 }}>
             <b>Tidak ada form online.</b> Pendaftaran Mitra dilakukan langsung melalui Admin.
           </p>

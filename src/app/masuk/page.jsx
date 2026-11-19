@@ -66,7 +66,7 @@ export default function Masuk() {
   };
 
   return (
-    <main className="wrap" style={{ maxWidth: 480 }}>
+    <main className="wrap auth" style={{ maxWidth: 480 }}>
       <h2>Masuk ke LapaKWU</h2>
       <form className="card pad" onSubmit={kirim}>
         <div className="field">

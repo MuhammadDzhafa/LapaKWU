@@ -7,7 +7,7 @@ export default function Lapak() {
       <rect x="66" y="60" width="12" height="322" fill="#22313F" />
       <rect x="362" y="60" width="12" height="322" fill="#22313F" />
       {Array.from({ length: 10 }, (_, i) => (
-        <g key={i} fill={warna(i)} stroke="#22313F" strokeWidth="3">
+        <g key={i} className="jumbai" style={{ '--k': i }} fill={warna(i)} stroke="#22313F" strokeWidth="3">
           <rect x={60 + 32 * i} y="36" width="32" height="68" stroke="none" />
           <circle cx={76 + 32 * i} cy="104" r="16" />
         </g>
@@ -27,9 +27,12 @@ export default function Lapak() {
       <rect x="50" y="260" width="340" height="18" rx="5" fill="#73A5CA" stroke="#22313F" strokeWidth="3" />
       <text x="220" y="338" textAnchor="middle" fontFamily="Bricolage Grotesque,sans-serif" fontWeight="800" fontSize="30" fill="#FFCB56">LapaKWU</text>
       <rect x="78" y="212" width="104" height="48" rx="4" fill="#FFCB56" stroke="#22313F" strokeWidth="3" />
-      {[100, 130, 160].map((cx, i) => <circle key={cx} cx={cx} cy={i % 2 ? 204 : 208} r="16" fill="#FF933E" stroke="#22313F" strokeWidth="2.5" />)}
+      {[100, 130, 160].map((cx, i) => <circle key={cx} className="buah" style={{ '--k': i }} cx={cx} cy={i % 2 ? 204 : 208} r="16" fill="#FF933E" stroke="#22313F" strokeWidth="2.5" />)}
       {[[206, '#FF933E'], [248, '#73A5CA'], [290, '#FFCB56']].map(([x, c]) => (
         <g key={x}><rect x={x} y="218" width="34" height="42" rx="7" fill="#FFF8E6" stroke="#22313F" strokeWidth="3" /><rect x={x - 2} y="208" width="38" height="12" rx="4" fill={c} stroke="#22313F" strokeWidth="2.5" /></g>
+      ))}
+      {[[40, 150, 1], [404, 118, 1.3], [392, 236, .8], [30, 262, .7]].map(([x, y, k], i) => (
+        <path key={i} className="kilau" style={{ '--k': i }} d={`M${x} ${y - 14 * k}Q${x + 2 * k} ${y - 2 * k} ${x + 14 * k} ${y}Q${x + 2 * k} ${y + 2 * k} ${x} ${y + 14 * k}Q${x - 2 * k} ${y + 2 * k} ${x - 14 * k} ${y}Q${x - 2 * k} ${y - 2 * k} ${x} ${y - 14 * k}Z`} fill={i % 2 ? '#FFF8E6' : '#FF933E'} stroke="#22313F" strokeWidth="2" />
       ))}
       <rect x="334" y="214" width="40" height="46" rx="6" fill="#FFE9A9" stroke="#22313F" strokeWidth="3" />
       <path d="M343 214c0-16 22-16 22 0" fill="none" stroke="#22313F" strokeWidth="3" />

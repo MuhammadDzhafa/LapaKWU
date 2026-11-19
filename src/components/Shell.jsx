@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { account, ambil, api, list, Query, rp, ubahJumlahKeranjang } from '@/lib/aw';
 import Footer from '@/components/Footer';
+import Motion from '@/components/Motion';
 import { bacaKeranjangLokal, simpanKeranjangLokal } from '@/lib/keranjang-lokal';
 
 const Ctx = createContext({});
@@ -15,6 +16,7 @@ export default function Shell({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [keranjang, setKeranjang] = useState([]);
   const versiKeranjang = useRef(0);
+  const pil = useRef(null);
   const timer = useRef();
   const pulih = useRef(false);
   const path = usePathname();
@@ -136,6 +138,16 @@ export default function Shell({ children }) {
     return () => window.removeEventListener('keydown', esc);
   }, [sidebarOpen]);
 
+  // pil yang meluncur mengikuti menu yang disorot di navbar desktop
+  const sorot = (e) => {
+    const a = e.target.closest?.('a:not(.btn):not(.me), button.link');
+    const p = pil.current;
+    if (!p) return;
+    if (!a) { p.style.opacity = 0; return; }
+    p.style.opacity = 1; p.style.width = `${a.offsetWidth}px`; p.style.transform = `translateX(${a.offsetLeft}px)`;
+  };
+  const redup = () => { if (pil.current) pil.current.style.opacity = 0; };
+
   const keluar = async () => { try { await account.deleteSession({ sessionId: 'current' }); } catch {} location.href = '/'; };
   const tutup = () => setSidebarOpen(false);
   const perlu = s.pengguna && !s.pengguna.kontak_terverifikasi;
@@ -200,12 +212,14 @@ export default function Shell({ children }) {
 
   return (
     <Ctx.Provider value={{ ...s, muat, toast, keluar, keranjang, totalKeranjang, jumlahKeranjang, ubahItemKeranjang, muatKeranjang, selesaiCheckout }}>
+      <Motion />
       {/* ── Desktop header ── */}
       <header className="top">
         <div className="wrap">
           <Link href="/" className="brand">Lapa<b>KWU</b></Link>
           {/* Nav desktop */}
-          <nav aria-label="Menu utama" className="nav-desktop">
+          <nav aria-label="Menu utama" className="nav-desktop" onPointerOver={sorot} onPointerLeave={redup} onFocus={sorot} onBlur={redup}>
+            <span className="nav-pill" ref={pil} aria-hidden="true" />
             <NavMenu />
             <NavUserDesktop />
           </nav>
@@ -219,6 +233,7 @@ export default function Shell({ children }) {
             <span /><span /><span />
           </button>
         </div>
+        {t && <div className={'toast' + (t.galat ? ' err' : '')} role="status">{t.teks}</div>}
       </header>
 
       {/* ── Mobile sidebar ── */}
@@ -250,11 +265,11 @@ export default function Shell({ children }) {
           <div className="cart-bar-left">
             <div className="cart-bar-icon-wrap">
               <span className="cart-bar-icon">🛍️</span>
-              <span className="cart-bar-badge">{jumlahKeranjang}</span>
+              <span key={jumlahKeranjang} className="cart-bar-badge">{jumlahKeranjang}</span>
             </div>
             <div className="cart-bar-info">
               <span className="cart-bar-qty">{jumlahKeranjang} item di keranjang</span>
-              <b className="cart-bar-total">{rp(totalKeranjang)}</b>
+              <b key={totalKeranjang} className="cart-bar-total">{rp(totalKeranjang)}</b>
             </div>
           </div>
           <div className="cart-bar-right">
@@ -266,7 +281,6 @@ export default function Shell({ children }) {
         </Link>
       )}
 
-      {t && <div className={'toast' + (t.galat ? ' err' : '')} role="status">{t.teks}</div>}
     </Ctx.Provider>
   );
 }

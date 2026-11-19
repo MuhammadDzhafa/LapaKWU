@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
-import { err, upd, notif } from '@/lib/server';
+import { err, upd } from '@/lib/server';
 import { cariBanyak, cariSatu, denganTransaksi, tulis } from '@/lib/db';
 import { rupiahDalamSen } from '@/lib/ocr-bukti';
 
@@ -66,23 +66,11 @@ export async function POST(req) {
       }
       const now = new Date();
       await tulis('payhook_event', referensi, { id_bukti_checkout: bukti.id });
-      await upd(null, 'bukti_checkout', bukti.id, { status_pembayaran: 'BERHASIL', waktu_bayar: now });
-      for (const [order, bayar] of orders) {
-        if (bayar.status_pembayaran === 'BERHASIL') continue;
-        await upd(null, 'pembayaran', bayar.id, { status_pembayaran: 'BERHASIL', waktu_bayar: now });
-        if (order.status_pesanan === 'MENUNGGU_KONFIRMASI') {
-          await upd(null, 'pesanan', order.id, { status_pesanan: 'DIPROSES' });
-        }
-        const judul = 'Pembayaran QRIS terverifikasi';
-        const pesan = 'Dana untuk pesanan #' + order.id.slice(-6) + ' telah diterima. Invoice tersedia di Riwayat Pesanan.';
-        for (const uid of [order.id_pembeli, order.id_mitra]) {
-          await notif(null, uid, judul, pesan, true);
-        }
-      }
+      await upd(null, 'bukti_checkout', bukti.id, { waktu_dana_masuk: now });
       return { ids: orders.map(([order]) => order.id) };
     });
     if (!hasil) return Response.json({ ok: true, terproses: false, nominal, pesan: 'Tidak ada bukti OCR yang cocok atau transaksi sudah diproses.' });
-    return Response.json({ ok: true, terproses: true, pesananId: hasil.ids[0], pesananIds: hasil.ids, nominal, pesan: 'Pembayaran berhasil diverifikasi.' });
+    return Response.json({ ok: true, terproses: true, pesananId: hasil.ids[0], pesananIds: hasil.ids, nominal, pesan: 'Dana masuk tercatat. Menunggu verifikasi admin.' });
   } catch (e) {
     if (e.code === 409) return Response.json({ ok: true, terproses: false, pesan: 'Transaksi sudah diproses.' });
     console.error('[payhook]', e?.message);

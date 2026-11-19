@@ -67,7 +67,7 @@ export default function Daftar() {
   };
 
   return (
-    <main className="wrap" style={{ maxWidth: 520 }}>
+    <main className="wrap auth" style={{ maxWidth: 520 }}>
       <h2>Buat akun LapaKWU</h2>
       {info && (
         <div style={{ background: 'var(--tint)', border: '1.5px solid var(--or)', borderRadius: '16px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
