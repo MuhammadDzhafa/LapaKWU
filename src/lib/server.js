@@ -1,4 +1,4 @@
-// Helper server untuk koleksi MongoDB LapaKWU.
+// Helper server untuk data PostgreSQL LapaKWU.
 // Semua fungsi helper DB yang dipakai API routes.
 import { cariSatu, cariBanyak, tulis, ubahData, hapusData, nilaiDb, denganTransaksi, sesudahCommit } from './db';
 import { cariAkunById } from './auth';

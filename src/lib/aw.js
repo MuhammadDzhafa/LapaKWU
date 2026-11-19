@@ -1,5 +1,4 @@
-// src/lib/aw.js — Pengganti Appwrite client SDK (browser-side)
-// Semua panggilan ke Appwrite diganti dengan fetch ke API routes Next.js sendiri.
+// Lapisan API sisi browser; data hanya diakses melalui route Next.js.
 
 export const EP = ''; // tidak dipakai lagi
 export const PID = '';
