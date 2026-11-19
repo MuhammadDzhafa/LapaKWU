@@ -4,6 +4,8 @@ node_modules
 .env.local
 .env.production
 .env.production.local
+.env.production.secrets
+.env.admin
 /data/bukti-pembayaran/
 /data/paddlex/
 /.venv-ocr/

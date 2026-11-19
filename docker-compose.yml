@@ -30,6 +30,7 @@ services:
     restart: unless-stopped
     env_file:
       - .env.production
+      - .env.production.secrets
     environment:
       NODE_ENV: production
       POSTGRES_URL: postgresql://${PG_USER:-lapakwu}:${PG_PASSWORD}@db:5432/${PG_DATABASE:-lapakwu}

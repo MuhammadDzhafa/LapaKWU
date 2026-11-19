@@ -13,8 +13,8 @@
 1. Arahkan DNS `lapakwu.bluepack.my.id` ke alamat publik VPS. Pastikan port TCP 80/443 dapat diakses dari internet.
 2. Pastikan Docker Compose, Nginx, dan Certbot tersedia. Jangan mengubah konfigurasi Nginx untuk aplikasi lain.
 3. Sebelum memakai port 3101, pastikan port tersebut kosong: `sudo ss -lntp | grep ':3101 '`. Jika sudah dipakai, ubah `LAPAKWU_PORT` di `.env.production` dan `proxy_pass` Nginx ke port kosong lain.
-4. Clone repository ke `/opt/lapukwu` (atau folder deploy khusus lain), lalu salin `.env.production.example` menjadi `.env.production`.
-5. Buat password DB acak yang hanya berisi hex, misalnya `openssl rand -hex 32`; isi `PG_PASSWORD`. Buat `JWT_SECRET` dengan `openssl rand -base64 48`. Isi tiga kredensial Backblaze B2 dan `OCR_NAMA_PENERIMA`. Jangan kirim atau commit file `.env.production`.
+4. Clone repository ke `/opt/lapukwu` (atau folder deploy khusus lain), lalu salin `.env.production.example` menjadi `.env.production` dan `.env.production.secrets.example` menjadi `.env.production.secrets`.
+5. Buat password DB acak yang hanya berisi hex, misalnya `openssl rand -hex 32`; isi `PG_PASSWORD`. Buat `JWT_SECRET` dengan `openssl rand -base64 48`. Isi tiga kredensial Backblaze B2 dan `OCR_NAMA_PENERIMA` di file `.env.production.secrets`. Jangan kirim atau commit kedua file `.env.production*` tersebut.
 
 ## Deploy dan setup database baru
 
