@@ -13,6 +13,7 @@ export const koleksiInti = [
 const indeks = {
   users: [{ key: { email: 1 }, unique: true }],
   notifikasi: [{ key: { id_pengguna: 1, created_at: -1 } }],
+  mitra: [{ key: { nomor_tenant: 1 }, unique: true, partialFilterExpression: { nomor_tenant: { $type: 'number' } } }],
   produk: [{ key: { id_mitra: 1 } }],
   item_keranjang: [{ key: { id_keranjang: 1 } }, { key: { id_produk: 1 } }],
   pesanan: [{ key: { id_pembeli: 1 } }, { key: { id_mitra: 1 } }, { key: { status_pesanan: 1, tanggal_pesanan: 1 } }],

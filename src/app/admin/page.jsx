@@ -5,6 +5,7 @@ import { list, hapus, api, Query, rp, img, tgl } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
 import Rekap from '@/components/Rekap';
 import Modal from '@/components/Modal';
+import { JUMLAH_TENANT } from '@/lib/tenant';
 
 const TABS = [
   ['mitra', 'Verifikasi mitra'],
@@ -23,6 +24,7 @@ export default function Admin() {
   const [modalInfo, setModalInfo] = useState(null);
   const [busyModal, setBusyModal] = useState(false);
   const [modalGambar, setModalGambar] = useState(null);
+  const [simpanTenant, setSimpanTenant] = useState(null);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   const muat = useCallback(async () => {
@@ -37,6 +39,13 @@ export default function Admin() {
 
   const act = async (aksi, id, extra = {}, ok = 'Tersimpan.') => {
     try { await api('/api/admin', { aksi, id, ...extra }); toast(ok); await muat(); return true; } catch (e) { toast(e.message, true); return false; }
+  };
+  const aturTenant = async (e, mitra) => {
+    e.preventDefault();
+    const nilai = new FormData(e.currentTarget).get('nomor_tenant');
+    setSimpanTenant(mitra.$id);
+    await act('atur_tenant', mitra.$id, { nomor_tenant: nilai === '' ? null : Number(nilai) }, 'Nomor tenant diperbarui.');
+    setSimpanTenant(null);
   };
   const tolak = (x) => {
     setModalInfo({
@@ -257,9 +266,18 @@ export default function Admin() {
         </div>
       )}
 
-      {tab === 'mitra' && <div className="scroll"><table><thead><tr><th>Usaha</th><th>Alamat</th><th>Kontak</th><th>Status</th><th>Tindakan</th></tr></thead><tbody>
+      {tab === 'mitra' && <div className="scroll"><table><thead><tr><th>Usaha</th><th>Alamat</th><th>Nomor tenant</th><th>Kontak</th><th>Status</th><th>Tindakan</th></tr></thead><tbody>
         {d.m.map((x) => { const u = pg(x.$id); return (
           <tr key={x.$id}><td><b>{x.nama_usaha}</b></td><td>{x.alamat_usaha}</td>
+            <td><form className="row" onSubmit={(e) => aturTenant(e, x)} style={{ flexWrap: 'nowrap' }}>
+              <select key={x.nomor_tenant ?? 'kosong'} name="nomor_tenant" aria-label={`Nomor tenant ${x.nama_usaha}`} defaultValue={x.nomor_tenant ?? ''} disabled={simpanTenant !== null}>
+                <option value="">Belum ditetapkan</option>
+                {Array.from({ length: JUMLAH_TENANT }, (_, i) => i + 1).map((nomor) => (
+                  <option key={nomor} value={nomor} disabled={d.m.some((m) => m.$id !== x.$id && m.nomor_tenant === nomor)}>{nomor}</option>
+                ))}
+              </select>
+              <button className="btn sm" disabled={simpanTenant !== null}>Simpan</button>
+            </form></td>
             <td><span className="badge" data-s={u?.kontak_terverifikasi ? 'AKTIF' : 'MENUNGGU'}>{u?.kanal === 'WHATSAPP' ? 'WA' : 'Email'} {u?.kontak_terverifikasi ? 'valid' : 'belum valid'}</span></td>
             <td><span className="badge" data-s={u?.status_akun}>{u?.status_akun || 'MENUNGGU_VERIFIKASI'}</span></td>
             <td><div className="row">
@@ -267,7 +285,7 @@ export default function Admin() {
               <button className="btn sm out" onClick={() => tolak(x)}>Minta perbaikan</button>
               <button className="btn sm red" onClick={() => konfirmasiHapusMitra(x)}>Hapus</button>
             </div></td></tr>); })}
-        {!d.m.length && <tr><td colSpan="5" className="muted">Belum ada mitra mendaftar.</td></tr>}</tbody></table></div>}
+        {!d.m.length && <tr><td colSpan="6" className="muted">Belum ada mitra mendaftar.</td></tr>}</tbody></table></div>}
 
       {tab === 'pengguna' && <div className="stack">
         <form className="card pad" onSubmit={tambah}><h3>Tambah pengguna</h3>

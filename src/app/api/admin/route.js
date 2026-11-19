@@ -2,6 +2,7 @@ import { denganTransaksi } from '@/lib/db';
 import { siapa, err, getRow, rows, put, upd, del, inc, notif, Query } from '@/lib/server';
 import { buatAkun, cariAkunByEmail, hapusAkun, ubahPassword } from '@/lib/auth';
 import { nanoid } from 'nanoid';
+import { nomorTenantValid } from '@/lib/tenant';
 export const dynamic = 'force-dynamic';
 
 async function setPeran(id, peran, info = {}) {
@@ -50,6 +51,23 @@ export async function POST(req) {
     const qris = qrisPending.map((by) => ({ ...by, pesanan: qrisOrders.find((p) => p.$id === by.id_pesanan) || null }));
 
     return Response.json({ u: uRows, m: validMitras, pr: prRows, ad: adRows, pb: validPembeli, rf, qris });
+  }
+
+  if (aksi === 'atur_tenant') {
+    const { nomor_tenant } = b;
+    if (nomor_tenant !== null && !nomorTenantValid(nomor_tenant)) return err('Nomor tenant harus antara 1 dan 90.');
+    const mitra = await getRow(null, 'mitra', id).catch((error) => {
+      if (error.code === 404) return null;
+      throw error;
+    });
+    if (!mitra) return err('Mitra tidak ditemukan.', 404);
+    try {
+      await upd(null, 'mitra', mitra.$id, { nomor_tenant });
+    } catch (error) {
+      if (error.code === 11000) return err('Nomor tenant sudah digunakan mitra lain.', 409);
+      throw error;
+    }
+    return Response.json({ ok: true });
   }
 
   return await denganTransaksi(async () => {

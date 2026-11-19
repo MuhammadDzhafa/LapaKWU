@@ -1,6 +1,13 @@
 'use client';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { list, Query, rp, tgl, api, img } from '@/lib/aw';
+import { tenggatBayarTenant } from '@/lib/pembayaran-tenant';
+import { bolehLihatDenah, nomorTenantValid } from '@/lib/tenant';
+import DenahTenant from '@/components/DenahTenant';
+
+const waktuPesanan = new Intl.DateTimeFormat('id-ID', {
+  dateStyle: 'medium', timeStyle: 'medium', timeZone: 'Asia/Jakarta', hourCycle: 'h23',
+});
 
 const BAYAR = {
   BERHASIL: 'Lunas',
@@ -51,10 +58,12 @@ export default function Pesanan({ uid, sebagai }) {
   const [msg, setMsg] = useState('');
   const [modalGambar, setModalGambar] = useState(null);
   const [modalInvoice, setModalInvoice] = useState(null);
+  const [idDenah, setIdDenah] = useState(null);
   const [modalAksi, setModalAksi] = useState(null); // { id, aksi, judul, pesan, withInput }
   const [busyAksi, setBusyAksi] = useState(false);
   const [sekarang, setSekarang] = useState(Date.now());
-  const cancellingRef = useRef(new Set());
+  const percobaanBatal = useRef(new Map());
+  const versiMuat = useRef(0);
 
   useEffect(() => {
     const timer = setInterval(() => setSekarang(Date.now()), 1000);
@@ -62,20 +71,29 @@ export default function Pesanan({ uid, sebagai }) {
   }, []);
 
   const muat = useCallback(async () => {
+    const versi = ++versiMuat.current;
     const ps = await list('pesanan', [
       Query.equal(sebagai === 'mitra' ? 'id_mitra' : 'id_pembeli', uid),
-      Query.orderDesc('$createdAt'),
+      Query.orderDesc('tanggal_pesanan'),
     ]);
-    if (!ps.length) return setD([]);
+    if (!ps.length) {
+      if (versi === versiMuat.current) setD([]);
+      return;
+    }
     const ids = ps.map((p) => p.$id);
-    const [dt, by] = await Promise.all([
+    const mitraIds = [...new Set(ps.map((p) => p.id_mitra))];
+    const [dt, by, mitra] = await Promise.all([
       list('detail_pesanan', [Query.equal('id_pesanan', ids)]),
       list('pembayaran', [Query.equal('id_pesanan', ids)]),
+      list('mitra', [Query.equal('$id', mitraIds)]),
     ]);
     const pid = [...new Set(dt.map((x) => x.id_produk))];
     const pr = pid.length ? await list('produk', [Query.equal('$id', pid)]) : [];
+    if (versi !== versiMuat.current) return;
+    const lapak = new Map(mitra.map((m) => [m.$id, m]));
     setD(ps.map((p) => ({
       ...p,
+      lapak: lapak.get(p.id_mitra),
       bayar: by.find((x) => x.id_pesanan === p.$id),
       items: dt.filter((x) => x.id_pesanan === p.$id).map((x) => ({
         ...x,
@@ -84,9 +102,16 @@ export default function Pesanan({ uid, sebagai }) {
     })));
   }, [uid, sebagai]);
 
-  useEffect(() => { muat().catch((e) => setMsg(e.message)); }, [muat]);
+  useEffect(() => {
+    let aktif = true;
+    muat().catch((e) => { if (aktif) setMsg(e.message); });
+    const timer = setInterval(() => {
+      if (!document.hidden) muat().catch(() => {});
+    }, 15000);
+    return () => { aktif = false; versiMuat.current++; clearInterval(timer); };
+  }, [muat]);
 
-  // Auto-cancel pesanan offline > 30 menit
+  // Periksa pesanan bayar di tempat ketika hitung mundur habis.
   useEffect(() => {
     if (!d || !d.length) return;
     d.forEach((p) => {
@@ -94,9 +119,8 @@ export default function Pesanan({ uid, sebagai }) {
       const isMenunggu = p.bayar?.status_pembayaran === 'MENUNGGU';
       const isActive = ['MENUNGGU_KONFIRMASI', 'DIPROSES'].includes(p.status_pesanan);
       if (isOffline && isMenunggu && isActive) {
-        const orderTime = new Date(p.tanggal_pesanan || p.$createdAt).getTime();
-        if (orderTime + 30 * 60 * 1000 - sekarang <= 0 && !cancellingRef.current.has(p.$id)) {
-          cancellingRef.current.add(p.$id);
+        if (sekarang >= tenggatBayarTenant(p) && sekarang >= (percobaanBatal.current.get(p.$id) || 0)) {
+          percobaanBatal.current.set(p.$id, sekarang + 15000);
           api('/api/pesanan', { id: p.$id, aksi: 'batal_kedaluwarsa' }).then(() => muat()).catch(() => {});
         }
       }
@@ -131,15 +155,23 @@ export default function Pesanan({ uid, sebagai }) {
       if (aksi === 'konfirmasi_bayar') {
         const isOff = p.bayar?.metode === 'BAYAR_DI_TEMPAT';
         return mintaKonfirmasi(p.$id, 'konfirmasi_bayar', 'Konfirmasi pembayaran',
-          isOff ? 'Konfirmasi bahwa pembeli telah membayar langsung di tenant/lapak?' : 'Konfirmasi bahwa bukti transfer QRIS valid dan dana sudah masuk ke rekening/QRIS tokomu?');
+          isOff ? 'Pembeli sudah membayar di tenant? Konfirmasi pembayaran sekaligus selesaikan pesanan.' : 'Konfirmasi bahwa bukti transfer QRIS valid dan dana sudah masuk ke rekening/QRIS tokomu?');
       }
       mintaKonfirmasi(p.$id, aksi, label, `Ubah status pesanan menjadi "${label}"?`);
     };
     return <button key={aksi} className={`btn sm ${cls}`} onClick={onClick}>{label}</button>;
   };
 
+  const pesananDenah = d?.find((p) => p.$id === idDenah);
+  const denahAktif = sebagai === 'pembeli' && pesananDenah
+    && nomorTenantValid(pesananDenah.lapak?.nomor_tenant) && bolehLihatDenah(pesananDenah, sekarang);
+  useEffect(() => {
+    if (idDenah && !denahAktif) setIdDenah(null);
+  }, [idDenah, denahAktif]);
+
   return (
     <div className="stack">
+      {denahAktif && <DenahTenant nomor={pesananDenah.lapak.nomor_tenant} nama={pesananDenah.lapak.nama_usaha} onClose={() => setIdDenah(null)} />}
       {/* Modal konfirmasi aksi */}
       {modalAksi && (
         <Modal
@@ -166,18 +198,23 @@ export default function Pesanan({ uid, sebagai }) {
         const isMenungguBayar = p.bayar?.status_pembayaran === 'MENUNGGU';
         const isActiveOrder = ['MENUNGGU_KONFIRMASI', 'DIPROSES'].includes(p.status_pesanan);
 
-        let sisaMenit = 0, sisaDetik = 0, sudahLewat30Menit = false;
-        if (isOffline && isMenungguBayar) {
-          const orderTime = new Date(p.tanggal_pesanan || p.$createdAt).getTime();
-          const sisaMs = orderTime + 30 * 60 * 1000 - sekarang;
-          if (sisaMs > 0) { sisaMenit = Math.floor(sisaMs / 60000); sisaDetik = Math.floor((sisaMs % 60000) / 1000); }
-          else sudahLewat30Menit = true;
-        }
+        const waktu = new Date(p.tanggal_pesanan || p.$createdAt);
+        const sisaMs = tenggatBayarTenant(p) - sekarang;
+        const sisaTotalDetik = Math.max(0, Math.ceil(sisaMs / 1000));
+        const sisaMenit = Math.floor(sisaTotalDetik / 60);
+        const sisaDetik = sisaTotalDetik % 60;
+        const kedaluwarsa = sisaMs <= 0;
+        const lunas = p.bayar?.status_pembayaran === 'BERHASIL';
+        const nomor = p.lapak?.nomor_tenant;
+        const adaNomor = nomorTenantValid(nomor);
+        const tampilDenah = sebagai === 'pembeli' && bolehLihatDenah(p, sekarang);
 
         return (
           <article key={p.$id} className="card pad">
             <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <b>Pesanan {p.$id.slice(-6)} • {tgl(p.tanggal_pesanan)}</b>
+              <b>Pesanan {p.$id.slice(-6)} {Number.isFinite(waktu.getTime()) && (
+                <>• <time dateTime={waktu.toISOString()}>{waktuPesanan.format(waktu)} WIB</time></>
+              )}</b>
               <div className="row" style={{ gap: 6 }}>
                 <span className="badge" data-s={p.status_pesanan}>{LABEL[p.status_pesanan] || p.status_pesanan}</span>
                 {p.bayar && (() => {
@@ -207,7 +244,8 @@ export default function Pesanan({ uid, sebagai }) {
             </ul>
 
             <p className="muted" style={{ marginBottom: 8, fontSize: '0.85rem' }}>
-              {`Ambil di lapak: ${p.lokasi_pengambilan || '-'}`}
+              {adaNomor ? `Ambil di lapak: Tenant ${nomor}` : 'Nomor tenant belum ditetapkan'}
+              {p.lapak?.nama_usaha && ` · ${p.lapak.nama_usaha}`}
               {p.alasan_pembatalan ? ` • Alasan batal: ${p.alasan_pembatalan}` : ''}
             </p>
 
@@ -236,16 +274,15 @@ export default function Pesanan({ uid, sebagai }) {
               </div>
             )}
 
-            {/* COUNTDOWN 30 MENIT — hanya untuk pembayaran di tempat */}
             {isOffline && isMenungguBayar && isActiveOrder && (
               <div style={{ marginBottom: 12 }}>
-                {!sudahLewat30Menit ? (
+                {!kedaluwarsa ? (
                   <div className="msg" style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '8px 12px', fontSize: '0.85rem' }}>
-                    ⏱️ Batas waktu pembayaran di tenant: <b>{sisaMenit} menit {sisaDetik < 10 ? '0' + sisaDetik : sisaDetik} detik</b> (maksimal 30 menit dari checkout).
+                    ⏱️ Sisa waktu bayar di tenant <b>{sisaMenit} menit {String(sisaDetik).padStart(2, '0')} detik</b> dari batas 1 jam.
                   </div>
                 ) : (
                   <div className="msg err" style={{ padding: '8px 12px', fontSize: '0.85rem' }}>
-                    ⚠️ Batas waktu 30 menit pembayaran di tenant telah kedaluwarsa. Pesanan dibatalkan.
+                    ⚠️ Batas pembayaran 1 jam sudah habis. Pembatalan sedang diproses.
                   </div>
                 )}
               </div>
@@ -255,11 +292,12 @@ export default function Pesanan({ uid, sebagai }) {
               <div>
                 <b>{rp(p.total_harga)}</b>
                 <span className="muted" style={{ marginLeft: 6, fontSize: '0.85rem' }}>
-                  ({isOffline ? 'Bayar di tenant' : 'QRIS Mitra'})
+                  ({isOffline ? 'Bayar di tenant' : 'QRIS'})
                 </span>
               </div>
 
               <span className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
+                {tampilDenah && adaNomor && <button type="button" className="btn sm sun" onClick={() => setIdDenah(p.$id)}>Lihat denah</button>}
                 {/* TOMBOL INVOICE: Muncul otomatis saat pembayaran sudah Lunas (BERHASIL) */}
                 {p.bayar?.status_pembayaran === 'BERHASIL' && (
                   <button
@@ -280,24 +318,24 @@ export default function Pesanan({ uid, sebagai }) {
                 {/* MITRA ACTIONS */}
                 {sebagai === 'mitra' && (
                   <>
-                    {p.bayar?.status_pembayaran === 'MENUNGGU' && (isQris || !sudahLewat30Menit) && (
+                    {isMenungguBayar && (isQris || (isOffline && isActiveOrder && !kedaluwarsa)) && (
                       isOffline
-                        ? tombol(p, 'konfirmasi_bayar', '✓ Konfirmasi Bayar di Tenant', 'sun')
+                        ? tombol(p, 'konfirmasi_bayar', 'Konfirmasi bayar dan selesaikan', 'sun')
                         : tombol(p, 'konfirmasi_bayar', '✓ Konfirmasi Pembayaran QRIS', 'sun')
                     )}
                     {p.status_pesanan === 'MENUNGGU_KONFIRMASI' && (
                       <>
-                        {p.bayar?.status_pembayaran === 'BERHASIL' && tombol(p, 'terima', 'Terima')}
+                        {!isOffline && lunas && tombol(p, 'terima', 'Terima')}
                         {tombol(p, 'tolak', 'Tolak', 'red')}
                       </>
                     )}
                     {p.status_pesanan === 'DIPROSES' && (
                       <>
-                        {tombol(p, 'siap', 'Siap diambil')}
+                        {!isOffline && lunas && tombol(p, 'siap', 'Siap diambil')}
                         {tombol(p, 'tolak', 'Batalkan', 'red')}
                       </>
                     )}
-                    {['DIKIRIM', 'SIAP_DIAMBIL'].includes(p.status_pesanan) && (
+                    {lunas && (['DIKIRIM', 'SIAP_DIAMBIL'].includes(p.status_pesanan) || (isOffline && isActiveOrder)) && (
                       tombol(p, 'selesai', 'Selesaikan pesanan', 'sun')
                     )}
                   </>
@@ -439,7 +477,7 @@ export default function Pesanan({ uid, sebagai }) {
               </div>
               <div>
                 <span className="muted" style={{ display: 'block', fontSize: '0.78rem' }}>LOKASI PENGAMBILAN</span>
-                <b>{modalInvoice.lokasi_pengambilan || 'Tenant Lapak Mitra'}</b>
+                <b>{nomorTenantValid(modalInvoice.lapak?.nomor_tenant) ? `Tenant ${modalInvoice.lapak.nomor_tenant}` : 'Nomor tenant belum ditetapkan'}</b>
               </div>
               <div>
                 <span className="muted" style={{ display: 'block', fontSize: '0.78rem' }}>STATUS PESANAN</span>

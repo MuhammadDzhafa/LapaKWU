@@ -96,10 +96,10 @@ export async function POST(req) {
         const judul = 'Ada pesanan baru (' + label + ')';
         const pesan = ringkas + '. Total Rp ' + total.toLocaleString('id-ID') + (upload
           ? '. Bukti pembayaran sudah diunggah. Periksa di Lapak saya.'
-          : '. Pembeli akan datang bayar langsung di lapak dalam 30 menit.');
+          : '. Pembeli akan datang bayar langsung di lapak dalam 1 jam.');
         await notif(null, u.$id, 'Pesanan dibuat (' + label + ')', 'Pesanan ke ' + mt.nama_usaha + (upload
           ? (otomatisTerkonfirmasi ? ' berhasil dibuat. Pembayaran otomatis terkonfirmasi dan pesanan sedang diproses.' : ' berhasil dibuat dan menunggu konfirmasi pembayaran.')
-          : ' berhasil dibuat. Silakan bayar langsung di lapak dalam 30 menit.'));
+          : ' berhasil dibuat. Silakan bayar langsung di lapak dalam 1 jam.'));
         await notif(null, mid, judul, otomatisTerkonfirmasi
           ? ringkas + '. Pembayaran QRIS otomatis terkonfirmasi berdasarkan bukti yang cocok. Pesanan siap diproses.'
           : pesan, true);

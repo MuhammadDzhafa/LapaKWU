@@ -237,7 +237,7 @@ export default function Checkout() {
           </div>
         )}
 
-        {/* INFO WAKTU 30 MENIT (OFFLINE) */}
+        {/* INFO WAKTU 1 jam (OFFLINE) */}
         {f.metode === 'BAYAR_DI_TEMPAT' && (
           <div className="card pad" style={{ border: '2px solid #f59e0b', background: '#fffbeb', borderRadius: 10 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -247,8 +247,8 @@ export default function Checkout() {
                   Ketentuan Pembayaran Offline di Lapak / Tenant
                 </b>
                 <p style={{ margin: 0, fontSize: '0.875rem', color: '#78350f', lineHeight: 1.5 }}>
-                  Setelah checkout, kamu diberikan <b>waktu 30 menit</b> untuk datang dan membayar langsung di tenant/lapak mitra.
-                  Jika melebihi 30 menit dan pembayaran belum dikonfirmasi oleh mitra, pesanan akan <b>otomatis dibatalkan</b> oleh sistem.
+                  Setelah checkout, kamu diberikan <b>waktu 1 jam</b> untuk datang dan membayar langsung di tenant/lapak mitra.
+                  Jika melebihi 1 jam dan pembayaran belum dikonfirmasi oleh mitra, pesanan akan <b>otomatis dibatalkan</b> oleh sistem.
                 </p>
               </div>
             </div>

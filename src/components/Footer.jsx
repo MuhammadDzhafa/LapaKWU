@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 const WA = process.env.NEXT_PUBLIC_KONTAK_WA;
-const EM = process.env.NEXT_PUBLIC_KONTAK_EMAIL;
+const EM = process.env.NEXT_PUBLIC_KONTAK_EMAIL?.trim() || 'lapakwu@gmail.com';
 
 export default function Footer() {
   return (
@@ -27,8 +27,7 @@ export default function Footer() {
         <div>
           <h4>Hubungi kami</h4>
           {WA && <a href={`https://wa.me/${WA}`} target="_blank" rel="noreferrer">WhatsApp +{WA}</a>}
-          {EM && <a href={`mailto:${EM}`}>{EM}</a>}
-          {!WA && !EM && <p>Hubungi admin lewat menu masuk.</p>}
+          <a href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(EM)}`} target="_blank" rel="noopener noreferrer">{EM}</a>
           <p style={{ marginTop: 8 }}><small>Kampus UPI di Cibiru, Bandung</small></p>
         </div>
       </div>

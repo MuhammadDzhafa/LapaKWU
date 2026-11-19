@@ -576,3 +576,18 @@ tbody tr:last-child td{border-bottom:0}tfoot th{background:var(--tint);color:var
   }
 }
 
+.denah-modal{width:min(94vw,760px);max-height:90dvh;margin:auto;padding:clamp(12px,3vw,24px);border:1px solid var(--line);border-radius:18px;background:#fff;color:var(--ink);overflow:auto}
+.denah-modal::backdrop{background:rgb(23 32 41 / .65)}
+.denah-header{justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}
+.denah-header h3,.denah-header p{margin:0}
+.denah-scroll{overflow:auto;border:1px solid #d6dce2;border-radius:12px}
+.denah-svg{display:block;width:100%;min-width:530px;height:auto}
+.denah-zona{fill:#f7f8fa;stroke:#c6cdd4}
+.denah-jalan{fill:#eef1f4;stroke:#84919d;stroke-dasharray:5 4}
+.denah-label{font-size:12px;font-weight:700;fill:currentColor}
+.denah-stand rect{fill:#fff;stroke:#85939f}
+.denah-stand text{fill:var(--ink);font-size:13px;font-weight:700}
+.denah-stand-aktif{transform:translateY(-5px);filter:drop-shadow(0 4px 2px rgb(60 45 10 / .34));transition:transform .2s}
+.denah-stand-aktif rect{fill:var(--sun);stroke:var(--or-d);stroke-width:2}
+.denah-stand-aktif:hover{transform:translateY(-9px)}
+@media(prefers-reduced-motion:reduce){.denah-stand-aktif{transition:none}}

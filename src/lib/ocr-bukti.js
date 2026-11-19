@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { extname, join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -10,9 +11,10 @@ export async function bacaBukti(buffer, originalName) {
   const python = process.env.OCR_PYTHON;
   if (!python || sedangMembaca) return null;
   sedangMembaca = true;
-  const folder = await mkdtemp(join(process.env.TMPDIR || '/tmp', 'lapakwu-ocr-'));
-  const path = join(folder, `bukti${extname(originalName || '.jpg') || '.jpg'}`);
+  let folder;
   try {
+    folder = await mkdtemp(join(tmpdir(), 'lapakwu-ocr-'));
+    const path = join(folder, `bukti${extname(originalName || '.jpg') || '.jpg'}`);
     await writeFile(path, buffer);
     const { stdout } = await execFileAsync(python, [join(process.cwd(), 'scripts', 'ocr-bukti.py'), path], {
       timeout: 60_000, maxBuffer: 512 * 1024, windowsHide: true,
@@ -20,11 +22,12 @@ export async function bacaBukti(buffer, originalName) {
     // Library native dapat menulis log ke stdout sebelum baris JSON.
     const result = JSON.parse(stdout.trim().split(/\r?\n/).at(-1));
     return Array.isArray(result) && result.every((line) => typeof line === 'string') ? result : null;
-  } catch {
-    console.warn('[ocr] Bukti tidak dapat dibaca. Diteruskan ke pemeriksaan manual.');
+  } catch (error) {
+    const sebab = error.killed ? 'timeout' : (error.code || error.name);
+    console.warn('[ocr] Bukti diteruskan ke pemeriksaan manual.', sebab);
     return null;
   } finally {
-    await rm(folder, { recursive: true, force: true }).catch(() => {});
+    if (folder) await rm(folder, { recursive: true, force: true }).catch(() => {});
     sedangMembaca = false;
   }
 }
