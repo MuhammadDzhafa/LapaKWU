@@ -1,4 +1,4 @@
-import { cariBanyak, cariSatu, denganTransaksi, tulis, ubahData } from '@/lib/db';
+import { cariBanyak, cariSatu, denganTransaksi, queryDatabase, tulis } from '@/lib/db';
 import { err, notif, siapa } from '@/lib/server';
 import { MINIMAL_PENARIKAN, saldoDompet } from '@/lib/dompet';
 
@@ -24,15 +24,13 @@ export async function POST(req) {
     if (typeof b.permintaan !== 'string' || !/^[0-9a-f-]{36}$/.test(b.permintaan)) return err('ID pengajuan tidak valid.');
 
     return await denganTransaksi(async () => {
-      // Tulis pada dokumen mitra agar dua permintaan serentak tidak bisa memakai saldo yang sama.
-      const kunci = await ubahData('mitra', { _id: u.$id }, {}, { inc: { versi_dompet: 1 } });
-      if (!kunci.matchedCount) return err('Khusus mitra.', 403);
+      const { rows: [mitra] } = await queryDatabase('SELECT nama_usaha, id_qris FROM mitra WHERE id = $1 FOR UPDATE', [u.$id]);
+      if (!mitra) return err('Khusus mitra.', 403);
       const id = u.$id + '_' + b.permintaan;
       const lama = await cariSatu('pencairan_dompet', { _id: id });
       if (lama) return lama.nominal === b.nominal
         ? Response.json({ ok: true })
         : err('Nominal pengajuan sudah tercatat.', 409);
-      const mitra = await cariSatu('mitra', { _id: u.$id });
       const pengguna = await cariSatu('pengguna', { _id: u.$id });
       if (pengguna?.status_akun !== 'AKTIF') return err('Akun mitra belum aktif.', 403);
       if (!mitra.id_qris) return err('Unggah QRIS pencairan di menu QRIS Toko.');

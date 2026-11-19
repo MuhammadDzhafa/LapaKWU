@@ -1,53 +1,34 @@
 # LapaKWU
 
-Aplikasi Next.js (Node.js 22+) dengan autentikasi JWT, MongoDB Atlas Free (M0), dan PaddleOCR yang berjalan di CPU server sendiri. Checkout QRIS tetap dapat diperiksa manual saat OCR tidak tersedia.
+Aplikasi marketplace berbasis Next.js. Website dan API dijalankan oleh Node.js; PostgreSQL menyimpan akun, produk, keranjang, pesanan, pembayaran, serta catatan operasional; Backblaze B2 menyimpan gambar dan bukti pembayaran. Pemeriksaan bukti QRIS memakai PaddleOCR lokal di server. Pembeli tetap dapat memilih tunai di lapak atau transfer/QRIS.
 
-## MongoDB Atlas
+## Menjalankan di komputer pengembangan
 
-1. Buat cluster [Atlas Free (M0)](https://www.mongodb.com/docs/atlas/tutorial/deploy-free-tier-cluster/). Buat database user dengan akses baca dan tulis pada database aplikasi, lalu izinkan IP server aplikasi.
-2. Isi `MONGODB_URI` dan `MONGODB_DB` di `.env.local`. Pada instalasi baru, gunakan `.env.example` sebagai acuan dan buat `JWT_SECRET` acak. Untuk migrasi, pertahankan `JWT_SECRET` lama agar sesi yang masih berlaku tetap dapat dibaca.
-3. Jalankan `npm ci` lalu `npm run setup` untuk membuat koleksi, indeks, dan data awal. Setelah database siap, jalankan `npm run dev`. Untuk produksi, jalankan `npm run build` dan `npm start` di server dengan disk persisten.
-4. Untuk membuat admin pertama, isi `MONGODB_ADMIN_PASSWORD` sementara dalam lingkungan terminal lalu jalankan `npm run admin -- admin@example.com "Admin LapaKWU"`. Hapus variabel setelah selesai.
+1. Siapkan PostgreSQL 15 atau lebih baru dan buat database serta pengguna khusus aplikasi.
+2. Salin `.env.example` menjadi `.env.local`, lalu isi `POSTGRES_URL` dan `JWT_SECRET` acak minimal 32 karakter.
+3. Jalankan `npm ci` dan `npm run db:setup` untuk membuat tabel, indeks, serta data awal.
+4. Jalankan `npm run dev` dan buka `http://localhost:3000`.
 
-## MongoDB lokal untuk pengembangan
+Untuk membuat admin pertama, isi `INITIAL_ADMIN_PASSWORD` dengan password sementara minimal 12 karakter, lalu jalankan `npm run admin -- admin@example.com "Admin Lapak"`. Hapus nilai sementara setelah akun dibuat. Pendaftaran pengguna biasa tetap tersedia di aplikasi.
 
-Atur `MONGODB_URI=mongodb://127.0.0.1:27029/?replicaSet=lapakwuDev` dan `MONGODB_DB=lapakwu` di `.env.local`. Jalankan `npm run mongodb:local` sebelum setup atau migrasi. Perintah ini memakai `data/mongodb-dev/mongod.exe` atau executable dari `MONGOD_PATH`, menyimpan data di `data/mongodb-dev/db`, dan membuka koneksi hanya di komputer ini. `npm run dev` menjalankannya otomatis jika URI lokal tersebut aktif.
+## File dan pemeriksaan pembayaran
 
-## Backblaze B2 storage
+Isi `Backblaze_keyID`, `Backblaze_app_key`, dan `Backblaze_bucketName` untuk mengaktifkan foto produk, QRIS mitra, dan unggahan bukti pembayaran. Siapkan Python 3.11 atau 3.12, pasang dependensi dari `scripts/requirements-ocr.txt`, dan isi `OCR_PYTHON` dengan path interpreter virtual environment serta `OCR_NAMA_PENERIMA` sesuai nama merchant di bukti QRIS. Admin menerima hasil OCR sebagai bantuan dan memeriksa dana masuk sebelum menyetujui pembayaran. Bukti dapat dibuka oleh pembeli yang mengunggahnya dan admin.
 
-Isi tiga variabel berikut di `.env.local`. Product photos, store QRIS images, and payment proofs are stored in the configured B2 bucket.
+`EMAIL_USER` dan `EMAIL_PASS` mengaktifkan email; `FONNTE_TOKEN` mengaktifkan WhatsApp; `PAYHOOK_SECRET` mengaktifkan endpoint konfirmasi dana masuk bila layanan webhook yang dipercaya tersedia. Fitur ini opsional.
 
-```env
-Backblaze_keyID=
-Backblaze_app_key=
-Backblaze_bucketName=
-```
+## Deploy di VPS
 
-## Memindahkan data dari MySQL
+Panduan deploy yang dapat diulang ada di `deploy/README.md`. Ringkasnya, aplikasi berjalan di container Docker terpisah pada port lokal khusus, PostgreSQL memakai jaringan Docker privat tanpa port database publik, dan Nginx meneruskan domain HTTPS ke aplikasi. Data PostgreSQL disimpan pada volume persisten. Isi rahasia hanya di `.env.production` pada server dan jangan commit file tersebut.
 
-Cadangkan sumber dan hentikan penulisan ke MySQL selama transfer akhir. Gunakan database MongoDB tujuan yang kosong untuk migrasi pertama. Atur `MYSQL_SOURCE_URL` di `.env.local` atau gunakan `DATABASE_URL` lama, lalu jalankan `npm run migrate:mysql` dan `npm run setup`. Skrip memindahkan 16 tabel dengan ID, hash kata sandi, tanggal, dan relasi yang sama. Skrip dapat diulang setelah terputus. ID yang sudah ada dilewati, sehingga perubahan lanjutan pada baris yang sudah dipindah tidak akan tersalin. Aplikasi berjalan dengan MongoDB dan driver MySQL hanya diperlukan untuk menjalankan skrip migrasi.
+Periksa koneksi database dengan `npm run db:check`. Pengujian transaksi PostgreSQL yang aman hanya menerima database dengan nama mengandung `test`; jalankan `npm run db:test` setelah mengatur `POSTGRES_URL` ke database test. Cadangkan PostgreSQL sebelum setiap pembaruan aplikasi dan secara berkala.
 
-Bandingkan jumlah baris yang dilaporkan, lalu periksa login, katalog, riwayat pesanan, dan akses bukti lama sebelum mengarahkan trafik ke MongoDB. File media disimpan di Backblaze B2, sementara database menyimpan ID-nya.
+## Catatan perubahan database
 
-## PaddleOCR untuk bukti QRIS
-
-Buat virtual environment Python 3.11 atau 3.12 di server aplikasi. Di Windows, jalankan:
-
-```powershell
-py -3.12 -m venv .venv-ocr
-.\.venv-ocr\Scripts\python.exe -m pip install -r scripts/requirements-ocr.txt --extra-index-url https://www.paddlepaddle.org.cn/packages/stable/cpu/
-```
-
-Di Linux, gunakan `python3.12 -m venv .venv-ocr` dan jalankan perintah pip yang sama dengan `.venv-ocr/bin/python`. Di `.env.local`, isi `OCR_PYTHON` dengan path interpreter tersebut dan `OCR_NAMA_PENERIMA` dengan nama merchant persis seperti yang tercetak pada bukti QRIS. Jalankan skrip sekali dengan gambar contoh untuk mengunduh dan menyiapkan model sebelum menerima pesanan. PaddleOCR berjalan lokal tanpa API OCR berbayar. [Panduan PaddleOCR CPU](https://www.paddleocr.ai/v3.3.2/en/quick_start.html)
-
-Backend membandingkan hasil OCR dengan total checkout yang dihitung dari database, nama penerima yang dikonfigurasi, dan tanggal kalender Jakarta hari ini atau kemarin. Hasil OCR ditampilkan di panel verifikasi. Admin mencocokkan dana yang masuk dan menyetujui transaksi sebelum invoice tersedia bagi pembeli dan mitra. Jika OCR gagal membaca bukti, admin dapat meninjaunya secara manual.
-
-PayHook opsional. Jika sudah dipakai, atur `PAYHOOK_SECRET` dan kirim nilainya melalui header `x-payhook-secret`. PayHook menandai dana masuk jika nominal dan referensi transaksi cocok dengan satu bukti OCR. Persetujuan pembayaran dilakukan oleh admin.
-
-Bukti baru berukuran maksimal 2 MB. Dokumen bukti dapat dibuka oleh pembeli yang mengunggahnya dan admin yang sudah masuk.
+Aplikasi menggunakan PostgreSQL untuk penyimpanan baru. Data MongoDB lama tidak dipindahkan sesuai keputusan proyek. Skrip MongoDB, MySQL, dan Appwrite yang sebelumnya dipakai saat tahap lama sudah dihapus dari jalur operasional.
 
 ## Dompet dan unggahan lokal
 
-Pembayaran QRIS yang disetujui tampil sebagai saldo pesanan berjalan. Saldo tersedia setelah pesanan selesai dan mitra bisa mengajukan pencairan mulai Rp10.000. Admin melihat QRIS yang dipakai saat pengajuan, membayar secara manual, lalu mengonfirmasi pencairan.
+Admin menyetujui pembayaran QRIS sebelum saldo dicatat. Saldo bisa ditarik setelah pesanan selesai, dengan minimal penarikan Rp10.000. Admin membayar secara manual ke QRIS yang tercatat saat pengajuan lalu mengonfirmasi pencairan.
 
-Untuk pengujian dengan `npm run dev`, `LAPAKWU_STORAGE=local` menyimpan unggahan ke `data/unggahan-dev/`. Konfigurasi produksi menggunakan Backblaze B2.
+Untuk pengujian dengan `npm run dev`, `LAPAKWU_STORAGE=local` menyimpan unggahan baru ke `data/unggahan-dev/`. Produksi menggunakan Backblaze B2.

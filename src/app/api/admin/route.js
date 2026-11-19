@@ -118,9 +118,10 @@ export async function POST(req) {
       if (!pengajuan) return err('Pengajuan tidak ditemukan.', 404);
       if (pengajuan.status === 'DICAIRKAN') return Response.json({ ok: true });
       if (pengajuan.status !== 'DIAJUKAN') return err('Pencairan tidak dalam status diajukan.', 409);
-      await ubahData('pencairan_dompet', { _id: id, status: 'DIAJUKAN' }, {
+      const perubahan = await ubahData('pencairan_dompet', { _id: id, status: 'DIAJUKAN' }, {
         status: 'DICAIRKAN', tanggal_cair: new Date(), id_admin: u.$id,
       });
+      if (!perubahan.matchedCount) return Response.json({ ok: true });
       await notif(null, pengajuan.id_mitra, 'Saldo sudah dicairkan',
         'Admin sudah mengonfirmasi pembayaran QRIS sebesar Rp' + pengajuan.nominal.toLocaleString('id-ID') + '.');
       return Response.json({ ok: true });
