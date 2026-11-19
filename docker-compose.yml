@@ -36,6 +36,7 @@ services:
       POSTGRES_URL: postgresql://${PG_USER:-lapakwu}:${PG_PASSWORD}@db:5432/${PG_DATABASE:-lapakwu}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET di .env.production}
       OCR_PYTHON: /opt/paddle/bin/python
+      PADDLE_PDX_CACHE_HOME: /home/node/.paddlex
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://lapakwu.bluepack.my.id}
     ports:
       - "127.0.0.1:${LAPAKWU_PORT:-3101}:3000"
