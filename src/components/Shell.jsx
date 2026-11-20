@@ -6,6 +6,7 @@ import { account, list, Query, rp, ubahJumlahKeranjang } from '@/lib/aw';
 import Footer from '@/components/Footer';
 import Motion from '@/components/Motion';
 import Ikon from '@/components/Ikon';
+import Notifikasi from '@/components/Notifikasi';
 import { bacaKeranjangLokal, simpanKeranjangLokal } from '@/lib/keranjang-lokal';
 
 const Ctx = createContext({});
@@ -14,7 +15,6 @@ export const useSaya = () => useContext(Ctx);
 export default function Shell({ children }) {
   const [s, setS] = useState({ memuat: true });
   const [t, setT] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [keranjang, setKeranjang] = useState([]);
   const versiKeranjang = useRef(0);
   const pil = useRef(null);
@@ -125,21 +125,6 @@ export default function Shell({ children }) {
   const totalKeranjang = keranjang.reduce((a, i) => a + (i.subtotal || 0), 0);
   const jumlahKeranjang = keranjang.reduce((a, i) => a + (i.jumlah || 0), 0);
 
-  // Tutup sidebar saat layar melebar ke desktop
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 700px)');
-    const handler = (e) => { if (e.matches) setSidebarOpen(false); };
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-
-  useEffect(() => {
-    document.body.style.overflow = sidebarOpen ? 'hidden' : '';
-    const esc = (e) => e.key === 'Escape' && setSidebarOpen(false);
-    window.addEventListener('keydown', esc);
-    return () => window.removeEventListener('keydown', esc);
-  }, [sidebarOpen]);
-
   // pil yang meluncur mengikuti menu yang disorot di navbar desktop
   const sorot = (e) => {
     const a = e.target.closest?.('a:not(.btn):not(.me), button.link');
@@ -151,7 +136,6 @@ export default function Shell({ children }) {
   const redup = () => { if (pil.current) pil.current.style.opacity = 0; };
 
   const keluar = async () => { try { await account.deleteSession({ sessionId: 'current' }); } catch {} location.href = '/'; };
-  const tutup = () => setSidebarOpen(false);
   const perlu = s.pengguna && !s.pengguna.kontak_terverifikasi;
 
   const nama = s.pengguna?.nama || s.akun?.name || s.akun?.email || '';
@@ -168,27 +152,27 @@ export default function Shell({ children }) {
   ] : [['/', 'Katalog', 'home'], ['/masuk', 'Masuk', 'login']];
   const menuCepat = dock.filter(([href]) => href !== '/' || path !== '/');
 
-  const NavMenu = ({ onClick }) => (
+  const NavMenu = () => (
     <>
-      {path !== '/' && <Link href="/" onClick={onClick}>Katalog</Link>}
+      {path !== '/' && <Link href="/">Katalog</Link>}
       {s.peran === 'pembeli' && (
         <>
-          <Link href="/keranjang" onClick={onClick} aria-current={aktif('/keranjang')}>Keranjang</Link>
-          <Link href="/pesanan" onClick={onClick} aria-current={aktif('/pesanan')}>Pesanan</Link>
+          <Link href="/keranjang" aria-current={aktif('/keranjang')}>Keranjang</Link>
+          <Link href="/pesanan" aria-current={aktif('/pesanan')}>Pesanan</Link>
         </>
       )}
       {s.peran === 'mitra' && (
         <>
-          <Link href="/mitra" onClick={onClick} aria-current={aktif('/mitra')}>Lapak saya</Link>
-          <Link href="/keranjang" onClick={onClick} aria-current={aktif('/keranjang')}>Keranjang</Link>
-          <Link href="/pesanan" onClick={onClick} aria-current={aktif('/pesanan')}>Pesanan</Link>
+          <Link href="/mitra" aria-current={aktif('/mitra')}>Lapak saya</Link>
+          <Link href="/keranjang" aria-current={aktif('/keranjang')}>Keranjang</Link>
+          <Link href="/pesanan" aria-current={aktif('/pesanan')}>Pesanan</Link>
         </>
       )}
       {s.peran === 'admin' && (
         <>
-          <Link href="/admin" onClick={onClick} aria-current={aktif('/admin')}>Admin</Link>
-          <Link href="/keranjang" onClick={onClick} aria-current={aktif('/keranjang')}>Keranjang</Link>
-          <Link href="/pesanan" onClick={onClick} aria-current={aktif('/pesanan')}>Pesanan</Link>
+          <Link href="/admin" aria-current={aktif('/admin')}>Admin</Link>
+          <Link href="/keranjang" aria-current={aktif('/keranjang')}>Keranjang</Link>
+          <Link href="/pesanan" aria-current={aktif('/pesanan')}>Pesanan</Link>
         </>
       )}
     </>
@@ -201,24 +185,6 @@ export default function Shell({ children }) {
       </Link>
     ) : !s.memuat && path !== '/masuk' ? (
       <Link href="/masuk" className="btn sm">Masuk</Link>
-    ) : null
-  );
-
-  const NavUserMobile = ({ onClick }) => (
-    s.akun ? (
-      <Link href="/profil" className="nav-user-card" onClick={onClick} aria-current={aktif('/profil')}>
-        <i className="user-avatar" aria-hidden="true">{awal}</i>
-        <div className="user-info">
-          <b className="user-name">{nama}</b>
-          <span className="user-role">
-            {s.peran === 'mitra' ? 'Mitra Lapak' : s.peran === 'admin' ? 'Administrator' : 'Akun Pembeli'} • Profil →
-          </span>
-        </div>
-      </Link>
-    ) : !s.memuat && path !== '/masuk' ? (
-      <Link href="/masuk" className="btn sm" onClick={onClick} style={{ width: '100%', textAlign: 'center' }}>
-        Masuk / Daftar Akun
-      </Link>
     ) : null
   );
 
@@ -235,33 +201,11 @@ export default function Shell({ children }) {
             <NavMenu />
             <NavUserDesktop />
           </nav>
-          {/* Tombol hamburger mobile */}
-          <button
-            className="nav-hamburger"
-            aria-label="Buka menu"
-            aria-expanded={sidebarOpen}
-            onClick={() => setSidebarOpen(true)}
-          >
-            <span /><span /><span />
-          </button>
+          {s.akun && <Notifikasi key={s.akun.$id} uid={s.akun.$id} peran={s.peran} />}
         </div>
         {t && <div className={'toast' + (t.galat ? ' err' : '')} role="status">{t.teks}</div>}
       </header>
 
-      {/* ── Mobile sidebar ── */}
-      <div className={`nav-overlay${sidebarOpen ? ' open' : ''}`} onClick={tutup} aria-hidden="true" />
-      <aside className={`nav-sidebar${sidebarOpen ? ' open' : ''}`} aria-label="Menu navigasi">
-        <div className="nav-sidebar-head">
-          <Link href="/" className="brand" onClick={tutup}>Lapa<b>KWU</b></Link>
-          <button className="nav-close" aria-label="Tutup menu" onClick={tutup}>✕</button>
-        </div>
-        <nav className="nav-sidebar-body">
-          <NavMenu onClick={tutup} />
-        </nav>
-        {(s.akun || (!s.memuat && path !== '/masuk')) && <div className="nav-sidebar-foot">
-          <NavUserMobile onClick={tutup} />
-        </div>}
-      </aside>
       {perlu && (
         <div className="banner"><div className="wrap">
           <span>Akunmu belum diverifikasi lewat {s.pengguna.kanal === 'WHATSAPP' ? 'WhatsApp' : 'email'}.</span>

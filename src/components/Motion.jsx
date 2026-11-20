@@ -107,7 +107,7 @@ export default function Motion() {
         y > 24 ? html.setAttribute('data-scrolled', '') : html.removeAttribute('data-scrolled');
         const turun = y > y0 + 6, naik = y < y0 - 6;
         if (y < 220 || naik) html.removeAttribute('data-nav');
-        else if (turun && !document.querySelector('.nav-sidebar.open')) html.setAttribute('data-nav', 'hide');
+        else if (turun) html.setAttribute('data-nav', 'hide');
         if (turun || naik) y0 = y;
       });
     };

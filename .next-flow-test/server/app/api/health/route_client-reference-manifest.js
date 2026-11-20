@@ -1,0 +1,1 @@
+globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});globalThis.__RSC_MANIFEST["/api/health/route"]={"moduleLoading":{"prefix":"/_next/"},"ssrModuleMapping":{},"edgeSSRModuleMapping":{},"clientModules":{},"entryCSSFiles":{"D:\\lpk\\LapaKWU-main\\src\\":[],"D:\\lpk\\LapaKWU-main\\src\\app\\api\\health\\route":[]},"rscModuleMapping":{},"edgeRscModuleMapping":{}}

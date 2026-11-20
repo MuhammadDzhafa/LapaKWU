@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { list, ubah, api, storage, ID, Query, BUCKET, rp, img } from '@/lib/aw';
+import { list, api, storage, ID, Query, BUCKET, rp, img } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
 import { periodeJakarta } from '@/lib/waktu';
 import Pesanan from '@/components/Pesanan';
@@ -22,7 +22,6 @@ export default function Lapak() {
   const [st, setSt] = useState(null);
   const [off, setOff] = useState(null);
   const [edit, setEdit] = useState({});
-  const [notifikasi, setNotifikasi] = useState([]);
   const [layanan, setLayanan] = useState(null);
   const [simpanLayanan, setSimpanLayanan] = useState(false);
 
@@ -48,22 +47,12 @@ export default function Lapak() {
 const bln = () => periodeJakarta();
   const muatOff = useCallback(() => list('penjualan_offline', [Query.equal('id_mitra', akun.$id), Query.equal('periode', bln()), Query.limit(500)]).then(setOff).catch(() => setOff([])), [akun]);
   useEffect(() => { if (akun && peran === 'mitra' && tab === 'offline') muatOff(); }, [akun, peran, tab, muatOff]);
-  const uid = akun?.$id;
   useEffect(() => {
-    if (!uid || peran !== 'mitra') return;
-    let aktif = true;
-    const periksa = async () => {
-      if (document.hidden) return;
-      try {
-        const hasil = await list('notifikasi', [Query.equal('id_pengguna', uid), Query.equal('sudah_dibaca', false), Query.orderDesc('$createdAt'), Query.limit(10)]);
-        if (aktif) setNotifikasi(hasil);
-      } catch {}
-    };
-    periksa();
-    const timer = setInterval(periksa, 5000);
-    window.addEventListener('focus', periksa);
-    return () => { aktif = false; clearInterval(timer); window.removeEventListener('focus', periksa); };
-  }, [uid, peran]);
+    const bukaPesanan = () => { if (location.hash === '#pesanan') setTab('pesanan'); };
+    bukaPesanan();
+    window.addEventListener('hashchange', bukaPesanan);
+    return () => window.removeEventListener('hashchange', bukaPesanan);
+  }, []);
   if (memuat) return <main className="wrap" />;
   if (peran !== 'mitra') return <main className="wrap"><p className="kosong">Halaman ini khusus mitra. <Link className="link" href="/masuk">Masuk atau daftar sebagai mitra</Link></p></main>;
   if (pengguna?.status_akun !== 'AKTIF') return (
@@ -216,7 +205,7 @@ const bln = () => periodeJakarta();
     setBusyQris(true);
     setMsg('');
     try {
-      const res = await storage.createFile({ bucketId: BUCKET, fileId: ID.unique(), file: fileQris });
+      const res = await storage.createFile({ bucketId: BUCKET, fileId: ID.unique(), file: fileQris, jenis: 'qris' });
       await api('/api/profil', { aksi: 'detail', id_qris: res.$id });
       setFileQris(null);
       setPreviewQris(null);
@@ -295,7 +284,10 @@ const bln = () => periodeJakarta();
           ['dompet', 'Dompet Mitra', 'wallet'],
           ['rekap', 'Rekap Penjualan', 'chart'],
         ].map(([k, t, ic]) => (
-          <button key={k} role="tab" aria-selected={tab === k} className={'chip' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>
+          <button key={k} role="tab" aria-selected={tab === k} className={'chip' + (tab === k ? ' on' : '')} onClick={() => {
+            if (k !== 'pesanan' && location.hash === '#pesanan') history.replaceState(null, '', location.pathname + location.search);
+            setTab(k);
+          }}>
             <Ikon n={ic} size={16} />{t}
           </button>
         ))}
@@ -303,19 +295,6 @@ const bln = () => periodeJakarta();
 
       {msg && <p className="msg" role="status">{msg}</p>}
 
-      {!!notifikasi.length && <section className="card pad stack" aria-live="polite">
-        <h3>Notifikasi lapak</h3>
-        {notifikasi.map((n) => <div key={n.$id}>
-          <b>{n.judul}</b><p style={{ overflowWrap: 'anywhere' }}>{n.pesan}</p>
-          <button type="button" className="btn sm out" onClick={async () => {
-            setTab('pesanan');
-            try {
-              await ubah('notifikasi', n.$id, { sudah_dibaca: true });
-              setNotifikasi((items) => items.filter((item) => item.$id !== n.$id));
-            } catch (error) { toast(error.message, true); }
-          }}>Lihat pesanan</button>
-        </div>)}
-      </section>}
       {tab === 'produk' && <form className="card pad stack" onSubmit={simpanPengantaran}>
         <h3>Pengantaran pesanan</h3>
         <label className="row"><input type="checkbox" role="switch" style={{ width: 'auto' }}

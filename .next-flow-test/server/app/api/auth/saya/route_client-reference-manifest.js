@@ -1,0 +1,1 @@
+globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});globalThis.__RSC_MANIFEST["/api/auth/saya/route"]={"moduleLoading":{"prefix":"/_next/"},"ssrModuleMapping":{},"edgeSSRModuleMapping":{},"clientModules":{},"entryCSSFiles":{"D:\\lpk\\LapaKWU-main\\src\\":[],"D:\\lpk\\LapaKWU-main\\src\\app\\api\\auth\\saya\\route":[]},"rscModuleMapping":{},"edgeRscModuleMapping":{}}

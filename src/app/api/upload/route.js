@@ -5,6 +5,7 @@ import { siapa } from '@/lib/server';
 import { MAKS_BUKTI_PEMBAYARAN, PESAN_UKURAN_BUKTI } from '@/lib/bukti-pembayaran';
 import { tulis, denganTransaksi, queryDatabase } from '@/lib/db';
 import { hapusFile, unggahFile } from '@/lib/backblaze';
+import { kompresGambar } from '@/lib/kompres-gambar';
 export const dynamic = 'force-dynamic';
 
 const ALLOWED_MIME = ['image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -40,7 +41,8 @@ export async function POST(req) {
 
     const form = await req.formData();
     const file = form.get('file');
-    const buktiPembayaran = form.get('jenis') === 'bukti-pembayaran';
+    const jenis = form.get('jenis');
+    const buktiPembayaran = jenis === 'bukti-pembayaran';
 
     if (!file || typeof file === 'string' || !(file instanceof Blob)) {
       return Response.json({ error: 'File gambar tidak ditemukan atau tidak valid.' }, { status: 400 });
@@ -58,25 +60,21 @@ export async function POST(req) {
       return Response.json({ error: buktiPembayaran ? PESAN_UKURAN_BUKTI : 'Ukuran file terlalu besar. Maksimal 10 MB.' }, { status: 400 });
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    if (buktiPembayaran) {
-      const ekstensi = buffer.subarray(0, 3).equals(Buffer.from([255, 216, 255])) ? 'jpg'
-        : buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ? 'png'
-        : buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP' ? 'webp' : null;
-      if (!ekstensi) return Response.json({ error: 'Format bukti pembayaran harus JPG, PNG, atau WebP.' }, { status: 400 });
-      const nama = `bukti-${nanoid()}.${ekstensi}`;
-      const tersimpan = await simpanFile(u.$id, nama, buffer, 'bukti-pembayaran', file.type || `image/${ekstensi}`, async () => {
-        await tulis('unggahan_bukti', nama, {
-          id_pembeli: u.$id, ukuran: buffer.length, sha256: createHash('sha256').update(buffer).digest('hex'),
-        });
-      });
-      if (!tersimpan) return Response.json({ error: 'Batas unggahan harian tercapai. Coba lagi besok.' }, { status: 429 });
-      return Response.json({ $id: nama, ok: true });
+    const asli = Buffer.from(await file.arrayBuffer());
+    const jenisGambar = buktiPembayaran || jenis === 'qris' ? jenis : 'gambar';
+    let gambar;
+    try {
+      gambar = await kompresGambar(asli, jenisGambar);
+    } catch {
+      return Response.json({ error: 'Gambar tidak dapat diproses. Gunakan file gambar yang valid dengan resolusi lebih kecil.' }, { status: 400 });
     }
-
-    const cleanExt = (isExtOk ? extFromName : (file.type?.split('/')[1] || 'jpg')).replace('jpeg', 'jpg');
-    const nama = `${nanoid()}.${cleanExt}`;
-    const tersimpan = await simpanFile(u.$id, nama, buffer, 'gambar', file.type || `image/${cleanExt}`);
+    const { buffer, ekstensi, tipe } = gambar;
+    const nama = `${buktiPembayaran ? 'bukti-' : ''}${nanoid()}.${ekstensi}`;
+    const simpanBukti = buktiPembayaran ? () => tulis('unggahan_bukti', nama, {
+      // Pemeriksaan bukti ganda tetap menggunakan sidik jari file asli.
+      id_pembeli: u.$id, ukuran: buffer.length, sha256: createHash('sha256').update(asli).digest('hex'),
+    }) : null;
+    const tersimpan = await simpanFile(u.$id, nama, buffer, buktiPembayaran ? jenis : 'gambar', tipe, simpanBukti);
     if (!tersimpan) return Response.json({ error: 'Batas unggahan harian tercapai. Coba lagi besok.' }, { status: 429 });
 
     return Response.json({ $id: nama, ok: true });
