@@ -41,7 +41,7 @@ function Panggung({ children }) {
 }
 
 const JUDUL = ['Belanja', 'di', 'lapak', 'teman', 'sekampus.'];
-const TICKER_ITEMS = ['Ambil di lapak', 'QRIS', 'Bayar di tempat', 'Produk mitra KWU'];
+const TICKER_ITEMS = Array.from({ length: 6 }, () => ['Ambil di lapak', 'QRIS', 'Bayar di tempat', 'Produk mitra KWU']).flat();
 
 export default function Beranda() {
   const { akun, peran, toast, keranjang, ubahItemKeranjang } = useSaya();

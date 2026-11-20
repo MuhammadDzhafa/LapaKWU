@@ -1,4 +1,4 @@
-import { cariBanyak, cariSatu, denganTransaksi, kunciPesanan, ubahData } from '@/lib/db';
+import { cariBanyak, cariSatu, denganTransaksi, kunciPesanan, queryDatabase, ubahData } from '@/lib/db';
 import { siapa, err, getRow, rows, put, upd, del, inc, notif, Query } from '@/lib/server';
 import { buatAkun, cariAkunByEmail, hapusAkun } from '@/lib/auth';
 import { nanoid } from 'nanoid';
@@ -46,11 +46,15 @@ export async function POST(req) {
       rows(null, 'pembayaran', [Query.equal('status_pembayaran', ['MENUNGGU', 'REFUND_DIAJUKAN']), ...halaman('pembayaran')]),
     ]);
 
-    const idsPeran = [...new Set([...mRows, ...pbRows].map((row) => row.$id))];
-    const penggunaPeran = await cariBanyak('pengguna', { _id: { $in: idsPeran } }, { limit: 5000 });
-    const validUserIds = new Set(penggunaPeran.map((row) => row.$id));
-    const validMitras = mRows.filter((row) => validUserIds.has(row.$id));
-    const validPembeli = pbRows.filter((row) => validUserIds.has(row.$id));
+    const { rows: peranPengguna } = await queryDatabase(
+      `SELECT p.id, CASE WHEN m.id IS NOT NULL THEN 'mitra'
+                         WHEN a.id IS NOT NULL THEN 'admin'
+                         ELSE 'pembeli' END AS peran
+       FROM pengguna p LEFT JOIN mitra m ON m.id = p.id LEFT JOIN admin a ON a.id = p.id
+       WHERE p.id = ANY($1::text[])`,
+      [uRows.map((row) => row.$id)]
+    );
+    const peran = Object.fromEntries(peranPengguna.map(({ id, peran }) => [id, peran]));
 
     const rf = rfRows.filter((x) => x.status_pembayaran === 'REFUND_DIAJUKAN');
     const qrisPending = rfRows.filter((x) => x.metode === 'QRIS' && x.status_pembayaran === 'MENUNGGU');
@@ -66,7 +70,7 @@ export async function POST(req) {
       dana_terdeteksi: Boolean(buktiPerId.get(by.id_bukti_checkout)?.waktu_dana_masuk),
     }));
 
-    return Response.json({ u: uRows, m: validMitras, pr: prRows, ad: adRows, pb: validPembeli, rf, qris,
+    return Response.json({ u: uRows, m: mRows, pr: prRows, ad: adRows, pb: pbRows, peran, rf, qris,
       hasMore: [uRows, mRows, prRows, adRows, pbRows, rfRows].some((page) => page.length === 500), offset });
   }
 

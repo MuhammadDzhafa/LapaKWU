@@ -46,7 +46,6 @@ export default function Daftar() {
     setMsg('');
     try {
       await account.create({ userId: ID.unique(), email: f.email, password: f.password, name: f.nama });
-      await account.createEmailPasswordSession({ email: f.email, password: f.password });
       // Always register as pembeli
       await api('/api/profil', { aksi: 'daftar', peran: 'pembeli', kanal: f.kanal, no_telepon: f.telp, alamat: f.alamat });
 

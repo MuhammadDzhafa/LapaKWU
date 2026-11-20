@@ -104,7 +104,7 @@ main.wrap>h2{margin-bottom:1.1rem}
 .nm{font-weight:700;font-size:1.04rem;line-height:1.3}.nm:hover{color:var(--or-d)}
 .pf{display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:14px;gap:8px}
 .tag{font:700 .92rem var(--f-disp);letter-spacing:-.03em;background:var(--sun-s);color:var(--ink);padding:5px 13px;border-radius:99px;display:inline-block}
-.plus{width:42px;height:42px;border-radius:50%;border:0;background:var(--or);font:600 1.5rem/1 var(--f-body);cursor:pointer;color:var(--ink);flex:none;position:relative;transition:transform .3s var(--ease),background .2s}
+.plus{width:42px;height:42px;border-radius:50%;border:0;background:var(--or);font:600 1.5rem/1 var(--f-body);cursor:pointer;color:var(--ink);flex:none;position:relative;transition:transform 110ms var(--ease),background 120ms}
 .plus:hover{background:var(--ink);color:var(--ye);transform:rotate(90deg)}.plus:active{transform:rotate(90deg) scale(.85)}
 .habis{position:absolute;left:10px;bottom:10px;background:var(--ink);color:#fff;padding:3px 12px;border-radius:99px;font-size:.78rem;font-weight:700;font-style:normal}
 .skel{aspect-ratio:3/4;border-radius:24px;background:linear-gradient(100deg,#FFF0C9 30%,#FFF8E6 50%,#FFF0C9 70%) 0 0/300% 100%;animation:sh 1.3s linear infinite}
@@ -234,21 +234,21 @@ html[data-nav=hide] .top:has(.panel-notifikasi){transform:none}
 .hero2::after{content:"";position:absolute;width:340px;height:340px;right:-90px;top:-120px;border-radius:50%;border:44px solid rgba(255,147,62,.16);animation:spin 40s linear infinite;pointer-events:none}
 @keyframes spin{to{transform:rotate(360deg)}}
 .ticker{position:absolute;left:0;right:0;bottom:92px;overflow:hidden;white-space:nowrap;pointer-events:none;opacity:.9;-webkit-mask:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
-.ticker .ticker-track{display:inline-flex;width:max-content;animation:marq 28s linear infinite;will-change:transform}
-.ticker .ticker-group{display:inline-flex;align-items:center;font:700 .9rem var(--f-disp);letter-spacing:.02em;color:var(--ink)}
+.ticker .ticker-track{display:flex;width:max-content;min-width:200%;animation:marq 72s linear infinite;will-change:transform}
+.ticker .ticker-group{display:flex;flex:1 0 auto;justify-content:space-around;align-items:center;font:700 .9rem var(--f-disp);letter-spacing:.02em;color:var(--ink)}
 .ticker span{margin:0 22px;display:inline-flex;align-items:center}.ticker span::before{content:"\2605";margin-right:22px;color:var(--or-d)}
 @keyframes marq{0%{transform:translate3d(0,0,0)}100%{transform:translate3d(-50%,0,0)}}
 .tagswing{transform-box:fill-box;transform-origin:50% 0;animation:swing 3s ease-in-out infinite alternate}
 @keyframes swing{from{transform:rotate(-7deg)}to{transform:rotate(7deg)}}
 .btn{position:relative;overflow:hidden}
 .btn::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.4) 50%,transparent 70%);transform:translateX(-120%)}
-.btn:hover:not(:disabled)::after{transform:translateX(120%);transition:transform .7s var(--ease)}
+.btn:hover:not(:disabled)::after{transform:translateX(120%);transition:transform .2s var(--ease)}
 
 .toast{overflow:hidden}.toast::after{content:"";position:absolute;left:0;bottom:0;height:3px;width:100%;background:var(--or);animation:bar 3.2s linear forwards}
 @keyframes bar{to{width:0}}
 .card.pad,.stat,.step{transition:transform .3s var(--ease),box-shadow .3s var(--ease)}
 .stat:hover,.step:hover{transform:translateY(-4px)}
-.tabs .chip{transition:background .25s,color .25s,box-shadow .25s,transform .15s}
+.tabs .chip{transition:background 120ms,color 120ms,box-shadow 120ms,transform 100ms}
 @media(prefers-reduced-motion:reduce){.ticker{display:none}.stage .art,.stage::before,.live{transition:none}}
 /* grid dua kolom tanpa inline style supaya bisa jadi 1 kolom di HP */
 .split.s1{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr)}.split.s2{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
@@ -636,9 +636,10 @@ html[data-scrolled] .top .wrap{min-height:52px;background:rgba(255,253,248,.9);b
 @keyframes flap{from{transform:rotate(-.9deg)}to{transform:rotate(.9deg)}}
 
 /* ---------- tombol terasa "ditekan" ---------- */
-.btn{box-shadow:0 4px 0 var(--or-d);transition:transform .25s var(--ease),box-shadow .25s var(--ease),background .2s,color .2s}
+.btn{box-shadow:0 4px 0 var(--or-d);transition:transform 110ms var(--ease),box-shadow 110ms var(--ease),background 120ms,color 120ms}
 .btn:hover{transform:translateY(-2px);box-shadow:0 6px 0 var(--or-d),0 18px 24px -14px rgba(184,80,10,.75)}
 .btn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--or-d)}
+:is(button,.dock-i):active:not(:disabled){transition-duration:0ms}
 .btn.sun,.btn.sun:hover{box-shadow:0 4px 0 var(--or-d)}.btn.sun:hover{box-shadow:0 6px 0 var(--or-d),0 18px 24px -14px rgba(184,80,10,.75)}
 .btn.sun:active{box-shadow:0 1px 0 var(--or-d)}
 .btn.out,.btn.out:hover,.btn.out:active{box-shadow:none}
@@ -651,7 +652,7 @@ html[data-scrolled] .top .wrap{min-height:52px;background:rgba(255,253,248,.9);b
 .hero2 .btn:not(.sun):not(.out):hover{box-shadow:0 6px 0 var(--or),0 18px 26px -14px rgba(34,49,63,.8)}
 .hero2 .btn:not(.sun):not(.out):active{box-shadow:0 1px 0 var(--or)}
 .btn.lg{will-change:translate}
-.btn.lg:not(:hover){transition:transform .25s var(--ease),box-shadow .25s var(--ease),background .2s,color .2s,translate .5s var(--ease)}
+.btn.lg:not(:hover){transition:transform 110ms var(--ease),box-shadow 110ms var(--ease),background 120ms,color 120ms,translate 140ms var(--ease)}
 .chip,.step-btn,.qb,.br-btn,.plus{position:relative;overflow:hidden}
 .riak{position:absolute;border-radius:50%;background:currentColor;opacity:.22;transform:scale(0);animation:riak .6s var(--ease) forwards;pointer-events:none}
 @keyframes riak{to{transform:scale(1);opacity:0}}
@@ -779,8 +780,8 @@ html[data-nav=hide] .top:has(.toast){transform:none}
 .wallet-heading{justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
 .wallet-heading h3{margin:0}
 .wallet-form{max-width:420px}
-.wallet-qr{display:grid;place-items:center;padding:8px;background:#fff;border:1px solid var(--line);border-radius:12px;cursor:zoom-in}
-.wallet-qr img{display:block;width:auto;height:auto;max-height:205px;max-width:100%;object-fit:contain}
+.wallet-qr{display:grid;place-items:center;width:min(100%,360px);padding:8px;background:#fff;border:1px solid var(--line);border-radius:12px;cursor:zoom-in}
+.wallet-qr img{display:block;width:100%;height:auto;max-height:460px;object-fit:contain}
 .rekap-toolbar{justify-content:flex-end;flex-wrap:wrap}
 .rekap-grafik{margin:0 0 18px;padding:clamp(12px,3vw,20px);background:var(--card);border:1px solid var(--line);border-radius:16px}
 .rekap-baris{display:grid;grid-template-columns:auto minmax(20px,1fr) auto;align-items:center;gap:clamp(6px,2vw,12px);margin-top:8px;font-size:.85rem;font-variant-numeric:tabular-nums}
@@ -803,7 +804,7 @@ html[data-nav=hide] .top:has(.toast){transform:none}
 .dock{display:none}
 @media(max-width:699px){
   .dock{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:2px;position:fixed;z-index:36;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));padding:6px;border-radius:26px;background:rgba(255,253,248,.88);-webkit-backdrop-filter:saturate(1.6) blur(16px);backdrop-filter:saturate(1.6) blur(16px);border:1px solid rgba(34,49,63,.1);box-shadow:0 18px 40px -14px rgba(34,49,63,.55);animation:dockin .7s .35s var(--ease) both}
-  .dock-i{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px 7px;border-radius:20px;color:var(--mute);font:700 .68rem/1.1 var(--f-body);transition:background .3s var(--ease),color .25s,transform .2s var(--ease)}
+  .dock-i{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px 7px;border-radius:20px;color:var(--mute);font:700 .68rem/1.1 var(--f-body);transition:background 120ms var(--ease),color 120ms,transform 100ms var(--ease)}
   .dock-i:active{transform:scale(.92)}
   .dock-ic{position:relative;display:grid;place-items:center;transition:transform .45s var(--ease)}
   .dock-i[aria-current=page]{background:var(--ink);color:var(--cr)}
@@ -910,6 +911,8 @@ input[type=file]:hover::file-selector-button{background:var(--ye)}
 .modal-box.lightbox{max-width:540px;max-height:92dvh;overflow:auto;text-align:center}
 .lightbox .modal-head{align-items:center;text-align:left}
 .lightbox img{display:block;width:100%;max-height:62dvh;object-fit:contain;border-radius:16px;border:1px solid var(--line);background:var(--tint)}
+.modal-box.lightbox-qris{max-width:680px}
+.lightbox-qris img{max-height:72dvh;background:#fff}
 .lightbox .modal-aksi{justify-content:center;flex-wrap:wrap}
 @media(max-width:560px){.modal-box{padding:20px;border-radius:24px}.modal-aksi>.btn{flex:1 1 auto}}
 
@@ -947,7 +950,7 @@ html[data-hold] .hero2 *,html[data-hold] .hero2 *::after,html[data-hold] .hero2:
 
 /* ---------- pegas di tempat yang menjawab tindakan ---------- */
 [data-rv]{transition:opacity .6s ease var(--d,0ms),transform 1.05s var(--spring) var(--d,0ms),filter .7s ease var(--d,0ms)}
-.modal-box,.denah-modal[open]{animation:modalpop .7s var(--spring)}
+.modal-box,.denah-modal[open]{animation:modalpop 180ms var(--ease)}
 @keyframes modalpop{from{opacity:0;transform:translateY(40px) scale(.9)}}
 .toast{animation:toastin .7s var(--spring)}
 @keyframes toastin{from{transform:translate(-50%,-24px) scale(.9);opacity:0}}
@@ -956,7 +959,7 @@ html[data-hold] .hero2 *,html[data-hold] .hero2 *::after,html[data-hold] .hero2:
 @media(max-width:699px){.top .toast{animation:toastin .7s var(--spring)}}
 .floating-cart-bar{animation:floatUp .8s var(--spring) both}
 .dock{animation-timing-function:var(--spring)}
-.plus.ok{animation:okpop .6s var(--spring)}
+.plus.ok{animation:okpop 180ms var(--ease)}
 .stepper-card{animation:okpop .55s var(--spring)}
 @keyframes okpop{35%{transform:scale(1.28) rotate(-6deg)}}
 .cart-bar-icon-wrap::after{content:"";position:absolute;inset:0;border-radius:50%;animation:napas 2.8s ease-out infinite;pointer-events:none}
@@ -1003,7 +1006,7 @@ html[data-hold] .hero2 *,html[data-hold] .hero2 *::after,html[data-hold] .hero2:
 
 /* ---------- indikator meluncur (tab dashboard + dock HP) ---------- */
 .glide{position:absolute;left:0;top:0;z-index:0;width:0;height:0;background:var(--ink);pointer-events:none;opacity:0;box-shadow:0 8px 18px -8px rgba(34,49,63,.7)}
-.glide.siap{transition:transform .55s var(--spring),width .55s var(--spring),height .55s var(--spring),opacity .25s}
+.glide.siap{transition:transform 160ms var(--ease),width 160ms var(--ease),height 160ms var(--ease),opacity 120ms}
 .tabs .glide{border-radius:99px}
 .dock .glide{border-radius:20px}
 .tabs[data-glide] .chip,.dock[data-glide] .dock-i{position:relative;z-index:1}

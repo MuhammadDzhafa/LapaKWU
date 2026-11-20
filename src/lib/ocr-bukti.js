@@ -1,35 +1,29 @@
-import { execFile } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, join } from 'node:path';
-import { promisify } from 'node:util';
-
-const execFileAsync = promisify(execFile);
-let sedangMembaca = false;
+import sharp from 'sharp';
+import { denganPekerjaOcr } from './pekerja-ocr.js';
 
 export async function bacaBukti(buffer, originalName) {
-  const python = process.env.OCR_PYTHON;
-  if (!python || sedangMembaca) return null;
-  sedangMembaca = true;
-  let folder;
-  try {
-    folder = await mkdtemp(join(tmpdir(), 'lapakwu-ocr-'));
-    const path = join(folder, `bukti${extname(originalName || '.jpg') || '.jpg'}`);
-    await writeFile(path, buffer);
-    const { stdout } = await execFileAsync(python, [join(process.cwd(), 'scripts', 'ocr-bukti.py'), path], {
-      timeout: 90_000, maxBuffer: 512 * 1024, windowsHide: true,
-    });
-    // Library native dapat menulis log ke stdout sebelum baris JSON.
-    const result = JSON.parse(stdout.trim().split(/\r?\n/).at(-1));
-    return Array.isArray(result) && result.every((line) => typeof line === 'string') ? result : null;
-  } catch (error) {
-    const sebab = error.killed ? 'timeout' : (error.code || error.name);
-    console.warn('[ocr] Bukti diteruskan ke pemeriksaan manual.', sebab);
-    return null;
-  } finally {
-    if (folder) await rm(folder, { recursive: true, force: true }).catch(() => {});
-    sedangMembaca = false;
-  }
+  return denganPekerjaOcr(async (baca) => {
+    let folder;
+    try {
+      folder = await mkdtemp(join(tmpdir(), 'lapakwu-ocr-'));
+      const ekstensi = extname(originalName || '.jpg') || '.jpg';
+      // PaddleOCR lebih konsisten membaca bukti WebP setelah didekode ke PNG.
+      const webp = ekstensi.toLowerCase() === '.webp';
+      const path = join(folder, `bukti${webp ? '.png' : ekstensi}`);
+      const gambar = webp ? await sharp(buffer, { limitInputPixels: 12_000_000 }).png().toBuffer() : buffer;
+      await writeFile(path, gambar);
+      const hasil = await baca(path);
+      return Array.isArray(hasil) && hasil.every((line) => typeof line === 'string') ? hasil : null;
+    } catch (error) {
+      console.warn('[ocr] Pemeriksaan bukti gagal:', error.code || error.message);
+      return null;
+    } finally {
+      if (folder) await rm(folder, { recursive: true, force: true }).catch(() => {});
+    }
+  });
 }
 
 const normal = (text) => text.normalize('NFKC').toUpperCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
@@ -59,7 +53,7 @@ function tanggalBukti(lines) {
 }
 
 export function periksaBukti(lines, total, now = new Date(), penerima = process.env.OCR_NAMA_PENERIMA || '') {
-  if (!lines?.length) return { status: 'PERLU_TINJAUAN', temuan: ['OCR tidak tersedia atau gambar tidak terbaca.'] };
+  if (!lines?.length) return { status: 'DITOLAK', temuan: ['Bukti tidak terbaca. Unggah gambar yang menampilkan nominal, nama merchant, tanggal, dan jam transaksi.'] };
   const teks = lines.join('\n');
   const jumlahTransfer = /^(?:nominal|jumlah|total)(?:\s+(?:transfer|pembayaran|transaksi))?\b/i;
   const berlabel = lines.flatMap((line, i) => {
@@ -72,30 +66,37 @@ export function periksaBukti(lines, total, now = new Date(), penerima = process.
   const nominal = [...new Set(nominalBerlabel.length
     ? nominalBerlabel
     : angka(lines.filter((line) => !/\b(?:biaya|saldo)\b/i.test(line)).join('\n')))];
-  const nominalCocok = nominal.includes(Math.round(total * 100));
+  const nominalCocok = nominal.length === 1 && nominal[0] === Math.round(total * 100);
   const nama = normal(penerima);
-  const labelPenerima = /^(?:nama (?:penerima|merchant)|penerima|tujuan|kepada|dibayar ke|transfer ke)(?:\s*:\s*|\s+|$)/i;
+  const labelPenerima = /^(?:merchant name|nama (?:penerima|merchant|toko)|merchant|toko|penerima|tujuan|kepada|dibayar ke|transfer ke)(?:\s*:\s*|\s+|$)/i;
   const penerimaTerbaca = lines.flatMap((line, i) => {
     const label = line.match(labelPenerima);
     if (!label) return [];
     const inline = line.slice(label[0].length).trim();
-    return [inline, lines[i + 1] || '', lines[i - 1] || ''];
+    return [inline || lines[i + 1] || ''];
   });
   const penerimaCocok = Boolean(nama && (penerimaTerbaca.length ? penerimaTerbaca : lines)
     .some((line) => normal(line) === nama));
   const tanggal = tanggalBukti(teks);
   const tanggalJakarta = (date) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Jakarta' }).format(date);
   const hariIni = tanggalJakarta(now);
-  const kemarin = tanggalJakarta(new Date(now.getTime() - 86_400_000));
+  const jam = teks.match(/(?<![\w.:])([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?(?![\d.:])/)
+    || lines.filter((line) => tanggalBukti(line) || /\b(?:jam|waktu|pukul|WIB|WITA|WIT)\b/i.test(line))
+      .join('\n').match(/(?<![\w.:])([01]?\d|2[0-3])\.([0-5]\d)(?:\.([0-5]\d))?(?![\d.:])/);
+  const waktu = jam ? [jam[1].padStart(2, '0'), jam[2], jam[3]].filter(Boolean).join(':') : null;
   const temuan = [];
-  if (!nominalCocok) temuan.push('Nominal checkout belum ditemukan pada bukti.');
-  if (!penerimaCocok) temuan.push('Nama penerima QRIS belum cocok atau belum dikonfigurasi.');
-  if (!tanggal || tanggal < kemarin || tanggal > hariIni) temuan.push('Tanggal transaksi belum terbaca atau di luar rentang pemeriksaan.');
+  if (!nominal.length) temuan.push('Nominal pembayaran tidak ditemukan.');
+  else if (nominal.length > 1) temuan.push('Nominal pembayaran tidak dapat dipastikan karena ada beberapa jumlah berbeda.');
+  else if (!nominalCocok) temuan.push('Nominal pembayaran tidak sama dengan total pesanan.');
+  if (!penerimaCocok) temuan.push('Nama merchant tidak terbaca atau tidak cocok dengan penerima QRIS.');
+  if (!tanggal) temuan.push('Tanggal transaksi tidak ditemukan atau tidak valid.');
+  else if (tanggal !== hariIni) temuan.push('Tanggal transaksi harus sama dengan tanggal pemesanan (WIB).');
+  if (!waktu) temuan.push('Jam transaksi tidak ditemukan atau tidak valid.');
   const referensi = teks.match(/(?:no\.?[ \t]*)?(?:referensi|reference|ref\.?|id transaksi)[ \t]*[:#]?[ \t]*(?:\r?\n)?[ \t]*([A-Z0-9-]{8,64})\b/i)?.[1]?.toUpperCase();
   return {
-    status: temuan.length ? 'PERLU_TINJAUAN' : 'COCOK',
+    status: temuan.length ? 'DITOLAK' : 'COCOK',
     temuan,
-    data: { nominal: nominalCocok ? total : (nominal.length === 1 ? nominal[0] / 100 : null), penerima_cocok: penerimaCocok, tanggal },
+    data: { nominal: nominalCocok ? total : (nominal.length === 1 ? nominal[0] / 100 : null), penerima_cocok: penerimaCocok, tanggal, waktu },
     ...(referensi ? { referensi } : {}),
   };
 }

@@ -4,6 +4,7 @@ import { cariSatu, cariBanyak, tulis, ubahData, hapusData, nilaiDb, denganTransa
 import { cariAkunById } from './auth';
 import { kabari } from './kirim';
 import { nanoid } from 'nanoid';
+import { after } from 'next/server';
 export const ID = Object.assign(() => nanoid(), {
   unique: () => nanoid(),
   custom: (id) => id,
@@ -157,7 +158,7 @@ export async function kirimNotifLuar(uid, judul, pesan) {
 
 export async function notif(_, uid, judul, pesan, luar = false) {
   await put(null, 'notifikasi', nanoid(), { id_pengguna: uid, judul, pesan, waktu_kirim: new Date() });
-  if (luar) await sesudahCommit(() => kirimNotifLuar(uid, judul, pesan));
+  if (luar) await sesudahCommit(() => after(() => kirimNotifLuar(uid, judul, pesan)));
 }
 
 // Helper kueri data.

@@ -24,12 +24,7 @@ export default function Masuk() {
     setBusy(true);
     setMsg('');
     try {
-      await account.createEmailPasswordSession({ email: f.email, password: f.password });
-
-      // Determine role and redirect accordingly
-      const me = await account.get();
-
-      if (!me) throw new Error('Sesi masuk belum tersedia. Silakan coba lagi.');
+      const me = await account.createEmailPasswordSession({ email: f.email, password: f.password });
       if (me.peran === 'mitra') { location.href = '/mitra'; return; }
       if (me.peran === 'admin') {
         location.href = '/admin';

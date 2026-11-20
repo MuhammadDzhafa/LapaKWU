@@ -25,6 +25,7 @@ export default function Admin() {
   const [d, setD] = useState({ u: [], m: [], pr: [], ad: [], pb: [], rf: [], qris: [] });
   const [muatLanjutan, setMuatLanjutan] = useState(false);
   const [pencairan, setPencairan] = useState([]);
+  const [menambah, setMenambah] = useState(false);
   const [f, setF] = useState({ peran: 'pembeli' });
   const [modalInfo, setModalInfo] = useState(null);
   const [busyModal, setBusyModal] = useState(false);
@@ -36,7 +37,7 @@ export default function Admin() {
     try {
       const data = await api('/api/admin', { aksi: 'muat', offset });
       setD((sebelumnya) => append
-        ? Object.fromEntries(['u', 'm', 'pr', 'ad', 'pb', 'rf', 'qris'].map((key) => [key, [...(sebelumnya[key] || []), ...(data[key] || [])]]).concat([['hasMore', data.hasMore], ['offset', data.offset]]))
+        ? Object.fromEntries(['u', 'm', 'pr', 'ad', 'pb', 'rf', 'qris'].map((key) => [key, [...(sebelumnya[key] || []), ...(data[key] || [])]]).concat([['hasMore', data.hasMore], ['offset', data.offset], ['peran', { ...sebelumnya.peran, ...data.peran }]]))
         : data);
     } catch (e) {
       toast(e.message, true);
@@ -58,7 +59,7 @@ export default function Admin() {
   }, [peran, muatPencairan]);
 
   const act = async (aksi, id, extra = {}, ok = 'Tersimpan.') => {
-    try { await api('/api/admin', { aksi, id, ...extra }); toast(ok); await muat(); return true; } catch (e) { toast(e.message, true); return false; }
+    try { await api('/api/admin', { aksi, id, ...extra }); toast(ok); void muat(); return true; } catch (e) { toast(e.message, true); return false; }
   };
   const aturTenant = async (e, mitra) => {
     e.preventDefault();
@@ -162,8 +163,21 @@ export default function Admin() {
 
   const nama = Object.fromEntries(d.m.map((x) => [x.$id, x.nama_usaha]));
   const pg = (id) => d.u.find((x) => x.$id === id);
-  const peranDari = (id) => (d.ad.some((x) => x.$id === id) ? 'admin' : d.m.some((x) => x.$id === id) ? 'mitra' : 'pembeli');
-  const tambah = async (e) => { e.preventDefault(); if (await act('tambah', undefined, f, 'Pengguna ditambahkan.')) { setF({ peran: 'pembeli' }); e.target.reset(); } };
+  const tambah = async (e) => {
+    e.preventDefault();
+    if (menambah) return;
+    const form = e.currentTarget;
+    const nilai = Object.fromEntries(new FormData(form));
+    setMenambah(true);
+    try {
+      if (await act('tambah', undefined, nilai, 'Pengguna ditambahkan.')) {
+        form.reset();
+        setF({ peran: 'pembeli' });
+      }
+    } finally {
+      setMenambah(false);
+    }
+  };
 
   if (memuat) return <main className="wrap" />;
   if (peran !== 'admin') return <main className="wrap"><p className="kosong">Halaman ini khusus admin. <Link className="link" href="/masuk">Masuk</Link></p></main>;
@@ -223,7 +237,7 @@ export default function Admin() {
               <article className="card pad stack" key={x.id}>
                 <b>{x.nama_usaha} · {rp(x.nominal)}</b>
                 <small className="muted">{tgl(x.created_at)} · #{x.id.slice(-8)}</small>
-                <button className="wallet-qr" type="button" onClick={() => setModalGambar(img(x.id_qris))} aria-label={'Perbesar QRIS ' + x.nama_usaha}>
+                <button className="wallet-qr" type="button" onClick={() => setModalGambar({ src: img(x.id_qris), judul: 'QRIS pencairan ' + x.nama_usaha, qris: true })} aria-label={'Perbesar QRIS ' + x.nama_usaha}>
                   <img src={img(x.id_qris)} alt={'QRIS pencairan ' + x.nama_usaha} />
                 </button>
                 <button className="btn sun sm" type="button" onClick={() => setModalInfo({
@@ -292,14 +306,14 @@ export default function Admin() {
                             <img
                               src={img(x.id_bukti)}
                               alt="Bukti Transfer"
-                              onClick={() => setModalGambar(img(x.id_bukti))}
+                              onClick={() => setModalGambar({ src: img(x.id_bukti), judul: 'Bukti transfer' })}
                               style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--line)' }}
                             />
                             <button
                               type="button"
                               className="link"
                               style={{ fontSize: '0.8rem' }}
-                              onClick={() => setModalGambar(img(x.id_bukti))}
+                              onClick={() => setModalGambar({ src: img(x.id_bukti), judul: 'Bukti transfer' })}
                             >
                               Lihat Bukti
                             </button>
@@ -368,16 +382,16 @@ export default function Admin() {
 
       {tab === 'pengguna' && <div className="stack">
         <form className="card pad" onSubmit={tambah}><h3>Tambah pengguna</h3>
-          <div className="two"><div className="field"><label htmlFor="an">Nama</label><input id="an" required onChange={set('nama')} /></div>
-            <div className="field"><label htmlFor="ae">Email</label><input id="ae" type="email" required onChange={set('email')} /></div></div>
-          <div className="two"><div className="field"><label htmlFor="ap">Kata sandi sementara</label><input id="ap" type="text" minLength={8} required onChange={set('password')} /></div>
-            <div className="field"><label htmlFor="ar">Peran</label><select id="ar" value={f.peran} onChange={set('peran')}><option value="pembeli">Pembeli</option><option value="mitra">Mitra</option><option value="admin">Admin</option></select></div></div>
-          {f.peran === 'mitra' && <div className="field"><label htmlFor="au">Nama usaha</label><input id="au" required onChange={set('nama_usaha')} /></div>}
-          <button className="btn">Tambah pengguna</button></form>
+          <div className="two"><div className="field"><label htmlFor="an">Nama</label><input id="an" name="nama" required /></div>
+            <div className="field"><label htmlFor="ae">Email</label><input id="ae" name="email" type="email" required /></div></div>
+          <div className="two"><div className="field"><label htmlFor="ap">Kata sandi sementara</label><input id="ap" name="password" type="password" autoComplete="new-password" minLength={8} required /></div>
+            <div className="field"><label htmlFor="ar">Peran</label><select id="ar" name="peran" value={f.peran} onChange={set('peran')}><option value="pembeli">Pembeli</option><option value="mitra">Mitra</option><option value="admin">Admin</option></select></div></div>
+          {f.peran === 'mitra' && <div className="field"><label htmlFor="au">Nama usaha</label><input id="au" name="nama_usaha" required /></div>}
+          <button className="btn" disabled={menambah} aria-busy={menambah}>{menambah ? 'Menambahkan…' : 'Tambah pengguna'}</button></form>
         <div className="scroll"><table><thead><tr><th>Nama</th><th>Email</th><th>Peran</th><th>Status</th><th>Tindakan</th></tr></thead><tbody>
           {d.u.map((x) => (
             <tr key={x.$id}><td>{x.nama}</td><td>{x.email}</td>
-              <td>{x.$id === akun.$id ? 'admin (kamu)' : <select aria-label={`Peran ${x.nama}`} value={peranDari(x.$id)} onChange={(e) => konfirmasiUbahPeran(x, e.target.value)}><option value="pembeli">pembeli</option><option value="mitra">mitra</option><option value="admin">admin</option></select>}</td>
+              <td>{x.$id === akun.$id ? 'admin (kamu)' : <select aria-label={`Peran ${x.nama}`} value={d.peran?.[x.$id] ?? 'pembeli'} onChange={(e) => konfirmasiUbahPeran(x, e.target.value)}><option value="pembeli">pembeli</option><option value="mitra">mitra</option><option value="admin">admin</option></select>}</td>
               <td><span className="badge" data-s={x.status_akun}>{x.status_akun}</span></td>
               <td>{x.$id !== akun.$id && <div className="row">{x.status_akun === 'DIBLOKIR' ? <button className="btn sm" onClick={() => act('aktifkan', x.$id)}>Aktifkan</button> : <button className="btn sm out" onClick={() => act('blokir', x.$id)}>Blokir</button>}
                 <button className="btn sm red" onClick={() => konfirmasiHapusPengguna(x)}>Hapus</button></div>}</td></tr>))}</tbody></table></div></div>}
@@ -397,15 +411,15 @@ export default function Admin() {
 
       {/* MODAL PREVIEW BUKTI TRANSFER */}
       {modalGambar && (
-        <div className="modal-back" role="dialog" aria-modal="true" aria-label="Pratinjau gambar" onClick={() => setModalGambar(null)}>
-          <div className="modal-box lightbox" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-back" role="dialog" aria-modal="true" aria-label={modalGambar.judul} onClick={() => setModalGambar(null)}>
+          <div className={modalGambar.qris ? "modal-box lightbox lightbox-qris" : "modal-box lightbox"} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
-              <b>Pratinjau gambar</b>
+              <b>{modalGambar.judul}</b>
               <button type="button" className="modal-x" aria-label="Tutup pratinjau" onClick={() => setModalGambar(null)}>✕</button>
             </div>
-            <img src={modalGambar} alt="Gambar penuh" />
+            <img src={modalGambar.src} alt={modalGambar.judul} />
             <div className="modal-aksi">
-              <a href={modalGambar} target="_blank" rel="noopener noreferrer" className="btn sm">Buka di tab baru ↗</a>
+              <a href={modalGambar.src} target="_blank" rel="noopener noreferrer" className="btn sm">Buka di tab baru ↗</a>
               <button type="button" className="btn sm out" onClick={() => setModalGambar(null)}>Tutup</button>
             </div>
           </div>

@@ -24,8 +24,12 @@ export async function POST(req) {
     if (pg?.status_akun !== 'AKTIF') return err('Akun belum aktif. Verifikasi akunmu dulu.', 403);
 
     let upload = null;
-    let hasilOcr = null;
+    let teksBukti = null;
     if (b.metode === 'QRIS') {
+      const { rows: [tersimpan] } = await queryDatabase('SELECT id_pembeli, response FROM checkout_request WHERE id = $1', [b.request_id]);
+      if (tersimpan?.id_pembeli === u.$id && tersimpan.response) return Response.json({ ok: true, ...tersimpan.response });
+      if (tersimpan && tersimpan.id_pembeli !== u.$id) return err('ID checkout sudah digunakan.', 409);
+      if (!process.env.OCR_NAMA_PENERIMA?.trim()) return err('Bukti pembayaran belum dapat diperiksa. Hubungi admin.', 503);
       if (typeof b.id_bukti !== 'string' || !FORMAT_ID_BUKTI.test(b.id_bukti)) {
         return err('Harap unggah bukti pembayaran dalam format JPG, PNG, atau WebP.');
       }
@@ -34,7 +38,8 @@ export async function POST(req) {
       if (!buffer) return err('Bukti pembayaran tidak ditemukan. Unggah kembali.');
       if (buffer.length > MAKS_BUKTI_PEMBAYARAN) return err(PESAN_UKURAN_BUKTI);
       if (buffer.length !== upload.ukuran) return err('File bukti pembayaran berubah. Unggah kembali.');
-      hasilOcr = await bacaBukti(buffer, upload.id);
+      teksBukti = await bacaBukti(buffer, upload.id);
+      if (teksBukti === null) return err('Bukti pembayaran belum dapat diperiksa. Coba lagi sebentar.', 503);
     }
 
     const langsung = b.langsung?.id ? { id_produk: b.langsung.id, jumlah: Number(b.langsung.jumlah ?? 1) } : null;
@@ -81,7 +86,9 @@ export async function POST(req) {
         return { error: 'Harga atau ongkir berubah. Muat ulang checkout sebelum membayar.', status: 409 };
       }
       const totalCheckout = totalSen / 100;
-      const verifikasi = upload ? periksaBukti(hasilOcr, totalCheckout, now) : null;
+      const verifikasi = upload ? periksaBukti(teksBukti, totalCheckout, now) : null;
+      if (verifikasi?.status === 'DITOLAK') return { error: 'Bukti pembayaran tidak valid. Unggah bukti lain dan coba lagi.', status: 422 };
+      const statusOcr = verifikasi?.status;
       if (upload) {
         if (await cariSatu('bukti_checkout', { _id: upload.sha256 })) {
           return { error: 'Bukti pembayaran ini sudah digunakan.', status: 409 };
@@ -99,7 +106,7 @@ export async function POST(req) {
       }
       if (upload) await put(null, 'bukti_checkout', upload.sha256, {
         id_pembeli: u.$id, id_bukti: upload.id, total: totalCheckout,
-        status_ocr: verifikasi.status, referensi: verifikasi.referensi,
+        status_ocr: statusOcr, referensi: verifikasi.referensi,
         status_pembayaran: 'MENUNGGU',
       });
       for (const item of items) await dec(null, 'produk', item.id_produk, 'stok', item.jumlah);
@@ -123,8 +130,7 @@ export async function POST(req) {
         await put(null, 'pembayaran', ID.unique(), {
           id_pesanan: pid, metode: b.metode, jumlah: total,
           status_pembayaran: 'MENUNGGU',
-          ...(upload ? { id_bukti: upload.id, id_bukti_checkout: upload.sha256, status_ocr: verifikasi.status, catatan_ocr: verifikasi.temuan } : {}),
-          ...(verifikasi?.data ? { hasil_ocr: verifikasi.data } : {}),
+          ...(upload ? { id_bukti: upload.id, id_bukti_checkout: upload.sha256, status_ocr: statusOcr, catatan_ocr: verifikasi.temuan, hasil_ocr: verifikasi.data } : {}),
         });
         const ringkas = grup.map(({ item, produk }) => produk.nama + ' x' + item.jumlah).join(', ');
         const label = upload ? 'QRIS' : 'Bayar di Lapak';
@@ -138,7 +144,7 @@ export async function POST(req) {
       for (const item of cart) await del(null, 'item_keranjang', item.$id);
       if (cart.length) await upd(null, 'keranjang', u.$id, { total_harga: 0 });
 
-      const response = { jumlah: perMitra.size, itemTerpesan: cart.map((item) => item.$id), statusOcr: verifikasi?.status };
+      const response = { jumlah: perMitra.size, itemTerpesan: cart.map((item) => item.$id), statusOcr };
       await queryDatabase('UPDATE checkout_request SET response = $1::jsonb WHERE id = $2', [JSON.stringify(response), b.request_id]);
       return response;
     });

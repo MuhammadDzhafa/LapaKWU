@@ -16,7 +16,8 @@ export default function Checkout() {
   const [previewBukti, setPreviewBukti] = useState(null);
   const [qrisError, setQrisError] = useState(false);
   const [msg, setMsg] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState('');
+  const mengirim = useRef(false);
   const checkoutId = useRef(null);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
@@ -78,7 +79,9 @@ export default function Checkout() {
 
   const pesan = async (e) => {
     e.preventDefault();
-    setBusy(true);
+    if (mengirim.current) return;
+    mengirim.current = true;
+    setBusy(f.metode === 'QRIS' ? 'Mengunggah bukti…' : 'Membuat pesanan…');
     setMsg('');
 
     let id_bukti = null;
@@ -87,7 +90,8 @@ export default function Checkout() {
     if (isQris) {
       if (!fileBukti) {
         setMsg('Wajib mengunggah bukti pembayaran untuk metode QRIS.');
-        setBusy(false);
+        mengirim.current = false;
+        setBusy('');
         return;
       }
       try {
@@ -95,11 +99,13 @@ export default function Checkout() {
         id_bukti = fileRes.$id;
       } catch (errUpload) {
         setMsg('Gagal mengunggah bukti pembayaran: ' + errUpload.message);
-        setBusy(false);
+        mengirim.current = false;
+        setBusy('');
         return;
       }
     }
 
+    setBusy(isQris ? 'Memeriksa bukti pembayaran…' : 'Membuat pesanan…');
     try {
       checkoutId.current ||= sessionStorage.getItem('lapakwu_checkout_request') || crypto.randomUUID();
       sessionStorage.setItem('lapakwu_checkout_request', checkoutId.current);
@@ -112,7 +118,8 @@ export default function Checkout() {
     } catch (er) {
       setMsg(er.message);
     }
-    setBusy(false);
+    mengirim.current = false;
+    setBusy('');
   };
 
   if (!akun) {
@@ -213,7 +220,7 @@ export default function Checkout() {
               )}
 
               <p className="muted" style={{ fontSize: '0.82rem', margin: '12px 0 0', lineHeight: 1.5 }}>
-                Unggah bukti yang menampilkan nominal, nama penerima, dan tanggal transaksi. Invoice terbit setelah dana masuk dikonfirmasi.
+                Unggah bukti pembayaran QRIS. Invoice terbit setelah dana masuk dikonfirmasi.
               </p>
             </div>
 
@@ -267,7 +274,7 @@ export default function Checkout() {
 
         {msg && <p className="msg err" role="alert">{msg}</p>}
         <button className="btn sun" disabled={busy || !it?.length || pengguna?.status_akun !== 'AKTIF' || (antar && !bisaAntar)}>
-          {busy ? 'Memproses…' : `Bayar dan pesan ${rp(total)}`}
+          {busy || `Bayar dan pesan ${rp(total)}`}
         </button>
       </form>
 

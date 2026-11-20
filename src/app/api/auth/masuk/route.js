@@ -34,8 +34,13 @@ export async function POST(req) {
       return Response.json({ error: 'Email atau kata sandi salah.' }, { status: 401 });
     }
 
+    const [mitra, admin] = await Promise.all([
+      cariSatu('mitra', { _id: user.id }),
+      cariSatu('admin', { _id: user.id }),
+    ]);
+    const peran = mitra ? 'mitra' : admin ? 'admin' : 'pembeli';
     await setSesiCookie(user.id);
-    return Response.json({ ok: true, $id: user.id, name: user.nama, email: user.email });
+    return Response.json({ ok: true, $id: user.id, name: user.nama, email: user.email, peran });
   } catch (e) {
     console.error('[/api/auth/masuk]', e?.code || e?.name);
     if (databaseTidakTersedia(e)) return Response.json({ error: 'Database belum dapat dihubungi. Coba lagi sebentar.' }, { status: 503 });
