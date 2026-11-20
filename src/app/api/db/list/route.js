@@ -1,5 +1,5 @@
 import { rows, siapa, err } from '@/lib/server';
-import { TABEL_PUBLIK, TABEL_PRIVAT, batasAkses } from '@/lib/akses-data';
+import { TABEL_PUBLIK, TABEL_PRIVAT, batasAkses, sanitasiPublik } from '@/lib/akses-data';
 import { databaseTidakTersedia } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +16,8 @@ export async function POST(req) {
       akses = await batasAkses(tabel, u.$id, queries);
     }
 
-    return Response.json({ rows: await rows(null, tabel, [...queries, ...akses]) });
+    const hasil = await rows(null, tabel, [...queries, ...akses]);
+    return Response.json({ rows: TABEL_PUBLIK.includes(tabel) ? hasil.map((row) => sanitasiPublik(tabel, row)) : hasil });
   } catch (e) {
     if (databaseTidakTersedia(e)) return err('Database belum dapat dihubungi. Coba lagi sebentar.', 503);
     console.error('[/api/db/list]', e?.message);

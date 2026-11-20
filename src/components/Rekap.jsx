@@ -44,8 +44,18 @@ function cetakPdf(laporan) {
 // Mode mitra: rekap penjualan milik sendiri. Mode admin (tanpa mitraId): semua mitra.
 export default function Rekap({ mitraId, nama = {} }) {
   const [d, setD] = useState(null);
+  const [halaman, setHalaman] = useState(0);
+  const [adaLanjutan, setAdaLanjutan] = useState(true);
+  const [muatLanjutan, setMuatLanjutan] = useState(false);
   const laporan = useRef(null);
-  const muat = useCallback(() => list('rekap_penjualan', [...(mitraId ? [Query.equal('id_mitra', mitraId)] : []), Query.orderDesc('periode'), Query.limit(0x7fffffff)]).then(setD).catch(() => setD([])), [mitraId]);
+  const muat = useCallback(async (offset = 0, append = false) => {
+    try {
+      const hasil = await list('rekap_penjualan', [...(mitraId ? [Query.equal('id_mitra', mitraId)] : []), Query.orderDesc('periode'), Query.limit(500), Query.offset(offset)]);
+      setD((sebelumnya) => append ? [...(sebelumnya || []), ...hasil] : hasil);
+      setAdaLanjutan(hasil.length === 500);
+      setHalaman(offset);
+    } catch { setD((sebelumnya) => sebelumnya || []); }
+  }, [mitraId]);
   useEffect(() => { muat(); }, [muat]);
 
   if (!d) return <p className="kosong">Memuat rekap…</p>;
@@ -57,9 +67,9 @@ export default function Rekap({ mitraId, nama = {} }) {
   const bulanTerakhir = [...perBulan].slice(0, 12).reverse();
   const puncak = bulanTerakhir.reduce((max, [, total]) => Math.max(max, total), 1);
   const eksporCsv = () => unduhCsv([
-    [...(!mitraId ? ['Mitra'] : []), 'Periode', 'Transaksi', 'Total Penjualan (Rp)', 'Penjualan Offline (Rp)', 'Jumlah Offline (pcs)'],
-    ...d.map((r) => [...(!mitraId ? [namaMitra(r.id_mitra)] : []), r.periode, r.jumlah_transaksi ?? 0, r.total_penjualan ?? 0, r.total_offline ?? 0, r.jumlah_offline ?? 0]),
-    [...(!mitraId ? [''] : []), 'Total', sum('jumlah_transaksi'), sum('total_penjualan'), sum('total_offline'), sum('jumlah_offline')],
+    [...(!mitraId ? ['Mitra'] : []), 'Periode', 'Transaksi', 'Total Penjualan (Rp)', 'Komisi Platform (Rp)', 'Penjualan Offline (Rp)', 'Jumlah Offline (pcs)'],
+    ...d.map((r) => [...(!mitraId ? [namaMitra(r.id_mitra)] : []), r.periode, r.jumlah_transaksi ?? 0, r.total_penjualan ?? 0, r.total_komisi ?? 0, r.total_offline ?? 0, r.jumlah_offline ?? 0]),
+    [...(!mitraId ? [''] : []), 'Total', sum('jumlah_transaksi'), sum('total_penjualan'), sum('total_komisi'), sum('total_offline'), sum('jumlah_offline')],
   ]);
   return (<section className="stack">
     <div className="row rekap-toolbar">
@@ -78,15 +88,16 @@ export default function Rekap({ mitraId, nama = {} }) {
         ))}
       </figure>
       <div className="scroll"><table>
-        <thead><tr>{!mitraId && <th>Mitra</th>}<th>Periode</th><th>Transaksi</th><th>Total Penjualan</th><th>Dari offline</th></tr></thead>
+        <thead><tr>{!mitraId && <th>Mitra</th>}<th>Periode</th><th>Transaksi</th><th>Total Penjualan</th><th>Komisi platform</th><th>Dari offline</th></tr></thead>
         <tbody>{d.map((r) => (
           <tr key={r.$id}>{!mitraId && <td>{namaMitra(r.id_mitra)}</td>}
-            <td>{r.periode}</td><td>{r.jumlah_transaksi}</td><td>{rp(r.total_penjualan)}</td>
+            <td>{r.periode}</td><td>{r.jumlah_transaksi}</td><td>{rp(r.total_penjualan)}</td><td>{rp(r.total_komisi)}</td>
             <td>{rp(r.total_offline)} <small className="muted">({r.jumlah_offline || 0} pcs)</small></td>
           </tr>))}</tbody>
-        <tfoot><tr><th colSpan={mitraId ? 1 : 2}>Total</th><th>{sum('jumlah_transaksi')}</th><th>{rp(sum('total_penjualan'))}</th><th>{rp(sum('total_offline'))}</th></tr></tfoot>
+        <tfoot><tr><th colSpan={mitraId ? 1 : 2}>Total</th><th>{sum('jumlah_transaksi')}</th><th>{rp(sum('total_penjualan'))}</th><th>{rp(sum('total_komisi'))}</th><th>{rp(sum('total_offline'))}</th></tr></tfoot>
       </table></div>
     </div>
     <p className="muted" style={{ marginTop: 10 }}><small>Penjualan offline (tombol − di Produk dan stok) ikut menambah total penjualan dan jumlah transaksi.</small></p>
+    {adaLanjutan && d.length > 0 && d.length % 500 === 0 && <div className="row" style={{ justifyContent: 'center' }}><button type="button" className="btn sm out" disabled={muatLanjutan} onClick={async () => { setMuatLanjutan(true); await muat(halaman + 500, true); setMuatLanjutan(false); }}>{muatLanjutan ? 'Memuat…' : 'Muat rekap berikutnya'}</button></div>}
   </section>);
 }

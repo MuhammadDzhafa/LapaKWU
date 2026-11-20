@@ -1,6 +1,7 @@
 import { randomBytes, createHash } from 'node:crypto';
-import { err, getRow, put, upd } from '@/lib/server';
+import { err, getRow, put, upd, originValid } from '@/lib/server';
 import { sendResetPasswordEmail } from '@/lib/kirim';
+import { alamatKlien, batasiLaju } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,10 +10,16 @@ const hashToken = (tok, uid) =>
 
 export async function POST(req) {
   try {
+    if (!originValid(req)) return err('Sumber permintaan tidak diizinkan.', 403);
     const { email } = await req.json();
     if (!email || typeof email !== 'string') return err('Email wajib diisi.');
 
     const cleanEmail = email.trim().toLowerCase();
+    const allowed = await Promise.all([
+      batasiLaju(`reset-ip:${alamatKlien(req)}`, 10, 3600),
+      batasiLaju(`reset-email:${cleanEmail}`, 3, 3600),
+    ]);
+    if (allowed.includes(false)) return Response.json({ ok: true });
     const { db } = { db: null };
 
     // Cari user berdasarkan email

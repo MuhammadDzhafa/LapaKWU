@@ -5,9 +5,11 @@ import { cookies } from 'next/headers';
 import { cariSatu, tulis, ubahData } from './db';
 import bcrypt from 'bcryptjs';
 
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'ganti-dengan-secret-panjang-acak-minimal-32-karakter'
-);
+export function getJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (typeof secret !== 'string' || secret.length < 32) throw new Error('JWT_SECRET harus berisi minimal 32 karakter acak.');
+  return new TextEncoder().encode(secret);
+}
 const COOKIE = 'lapakwu_sess';
 const TTL = 60 * 60 * 24 * 30; // 30 hari
 
@@ -17,12 +19,12 @@ export async function signToken(payload) {
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(`${TTL}s`)
-    .sign(SECRET);
+    .sign(getJwtSecret());
 }
 
 export async function verifyToken(token) {
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, getJwtSecret());
     return payload;
   } catch {
     return null;
@@ -31,7 +33,9 @@ export async function verifyToken(token) {
 
 // ── Cookie sesi ────────────────────────────────────────────
 export async function setSesiCookie(userId) {
-  const token = await signToken({ sub: userId });
+  const akun = await cariAkunById(userId);
+  if (!akun) throw new Error('Akun tidak ditemukan.');
+  const token = await signToken({ sub: userId, sv: akun.session_version || 0 });
   const jar = await cookies();
   jar.set(COOKIE, token, {
     httpOnly: true,
@@ -54,7 +58,12 @@ export async function getUserIdDariCookie() {
   const token = jar.get(COOKIE)?.value;
   if (!token) return null;
   const payload = await verifyToken(token);
-  return payload?.sub ?? null;
+  if (!payload?.sub) return null;
+  const akun = await cariAkunById(payload.sub);
+  if (!akun || (payload.sv ?? 0) !== (akun.session_version || 0)) return null;
+  const profil = await cariSatu('pengguna', { _id: payload.sub });
+  if (!profil || profil.status_akun === 'DIBLOKIR') return null;
+  return payload.sub;
 }
 
 // ── Operasi akun di tabel `users` ─────────────────────────
@@ -74,13 +83,13 @@ export async function cariAkunById(id) {
   if (typeof id !== 'string') return null;
   const user = await cariSatu('users', { _id: id });
   if (!user) return null;
-  const { nama, email, created_at } = user;
-  return { id, nama, email, created_at };
+  const { nama, email, created_at, session_version = 0 } = user;
+  return { id, nama, email, created_at, session_version };
 }
 
 export async function ubahPassword(userId, passwordBaru) {
   const hash = await bcrypt.hash(passwordBaru, 12);
-  await ubahData('users', { _id: userId }, { password_hash: hash });
+  await ubahData('users', { _id: userId }, { password_hash: hash }, { inc: { session_version: 1 } });
 }
 
 export async function ubahNama(userId, nama) {

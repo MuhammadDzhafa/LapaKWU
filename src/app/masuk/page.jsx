@@ -1,6 +1,5 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { account } from '@/lib/aw';
 
@@ -14,7 +13,6 @@ const EyeIcon = ({ show }) => (
 );
 
 export default function Masuk() {
-  const r = useRouter();
   const [f, setF] = useState({ email: '', password: '' });
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
@@ -47,19 +45,6 @@ export default function Masuk() {
       location.href = '/';
     } catch (er) {
       const errMsg = er.message || '';
-      const isNotFound =
-        er.notFound === true ||
-        er.code === 404 ||
-        er.type === 'user_not_found' ||
-        errMsg.toLowerCase().includes('belum terdaftar') ||
-        errMsg.toLowerCase().includes('user with the requested id could not be found');
-
-      if (isNotFound) {
-        sessionStorage.setItem('lapakwu_prefill', JSON.stringify({ email: f.email, password: f.password, dariLogin: true }));
-        r.push('/daftar');
-        return;
-      }
-
       setMsg(errMsg || 'Login gagal. Periksa kembali email dan kata sandi.');
       setBusy(false);
     }
@@ -106,7 +91,7 @@ export default function Masuk() {
           href="/daftar"
           onClick={() => {
             if (f.email || f.password) {
-              sessionStorage.setItem('lapakwu_prefill', JSON.stringify({ email: f.email, password: f.password }));
+              sessionStorage.setItem('lapakwu_prefill', JSON.stringify({ email: f.email }));
             }
           }}
         >

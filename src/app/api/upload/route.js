@@ -3,13 +3,36 @@ import { createHash } from 'node:crypto';
 import { nanoid } from 'nanoid';
 import { siapa } from '@/lib/server';
 import { MAKS_BUKTI_PEMBAYARAN, PESAN_UKURAN_BUKTI } from '@/lib/bukti-pembayaran';
-import { tulis } from '@/lib/db';
+import { tulis, denganTransaksi, queryDatabase } from '@/lib/db';
 import { hapusFile, unggahFile } from '@/lib/backblaze';
 export const dynamic = 'force-dynamic';
 
 const ALLOWED_MIME = ['image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/webp', 'image/gif'];
 const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
 const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+const MAKS_UNGGAHAN_24_JAM = 20;
+
+async function simpanFile(uploaderId, nama, buffer, jenis, contentType, simpanTambahan) {
+  let tersimpanDiB2 = false;
+  try {
+    return await denganTransaksi(async () => {
+      await queryDatabase('SELECT pg_advisory_xact_lock(hashtext($1))', [uploaderId]);
+      const { rows: [hitung] } = await queryDatabase(
+        "SELECT COUNT(*)::int AS jumlah FROM unggahan_file WHERE id_pengguna = $1 AND created_at > NOW() - INTERVAL '24 hours'",
+        [uploaderId]
+      );
+      if (hitung.jumlah >= MAKS_UNGGAHAN_24_JAM) return false;
+      await unggahFile(nama, buffer, contentType);
+      tersimpanDiB2 = true;
+      await tulis('unggahan_file', nama, { id_pengguna: uploaderId, ukuran: buffer.length, jenis });
+      if (simpanTambahan) await simpanTambahan();
+      return true;
+    });
+  } catch (error) {
+    if (tersimpanDiB2) await hapusFile(nama).catch(() => {});
+    throw error;
+  }
+}
 export async function POST(req) {
   try {
     const u = await siapa(req);
@@ -42,21 +65,19 @@ export async function POST(req) {
         : buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP' ? 'webp' : null;
       if (!ekstensi) return Response.json({ error: 'Format bukti pembayaran harus JPG, PNG, atau WebP.' }, { status: 400 });
       const nama = `bukti-${nanoid()}.${ekstensi}`;
-      await unggahFile(nama, buffer, file.type || `image/${ekstensi}`);
-      try {
+      const tersimpan = await simpanFile(u.$id, nama, buffer, 'bukti-pembayaran', file.type || `image/${ekstensi}`, async () => {
         await tulis('unggahan_bukti', nama, {
           id_pembeli: u.$id, ukuran: buffer.length, sha256: createHash('sha256').update(buffer).digest('hex'),
         });
-      } catch (error) {
-        await hapusFile(nama).catch(() => {});
-        throw error;
-      }
+      });
+      if (!tersimpan) return Response.json({ error: 'Batas unggahan harian tercapai. Coba lagi besok.' }, { status: 429 });
       return Response.json({ $id: nama, ok: true });
     }
 
     const cleanExt = (isExtOk ? extFromName : (file.type?.split('/')[1] || 'jpg')).replace('jpeg', 'jpg');
     const nama = `${nanoid()}.${cleanExt}`;
-    await unggahFile(nama, buffer, file.type || `image/${cleanExt}`);
+    const tersimpan = await simpanFile(u.$id, nama, buffer, 'gambar', file.type || `image/${cleanExt}`);
+    if (!tersimpan) return Response.json({ error: 'Batas unggahan harian tercapai. Coba lagi besok.' }, { status: 429 });
 
     return Response.json({ $id: nama, ok: true });
   } catch (e) {

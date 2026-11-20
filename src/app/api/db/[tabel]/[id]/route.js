@@ -1,5 +1,5 @@
 import { rows, siapa, err, Query } from '@/lib/server';
-import { TABEL_PUBLIK, TABEL_PRIVAT, batasAkses } from '@/lib/akses-data';
+import { TABEL_PUBLIK, TABEL_PRIVAT, batasAkses, sanitasiPublik } from '@/lib/akses-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +14,7 @@ export async function GET(req, { params }) {
       queries.push(...await batasAkses(tabel, u.$id, queries));
     }
     const [row] = await rows(null, tabel, queries);
-    return row ? Response.json(row) : err('Data tidak ditemukan.', 404);
+    return row ? Response.json(TABEL_PUBLIK.includes(tabel) ? sanitasiPublik(tabel, row) : row) : err('Data tidak ditemukan.', 404);
   } catch (e) {
     console.error('[/api/db/detail]', e?.message);
     return err('Gagal ambil data.', 500);

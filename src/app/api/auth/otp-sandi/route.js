@@ -1,15 +1,17 @@
 // POST /api/auth/otp-sandi — Kirim dan verifikasi OTP ganti kata sandi
 import { createHash, randomInt } from 'node:crypto';
-import { getUserIdDariCookie, cariAkunById, ubahPassword } from '@/lib/auth';
+import { getUserIdDariCookie, cariAkunById, ubahPassword, getJwtSecret } from '@/lib/auth';
 import { cariSatu, ubahData, hapusData, denganTransaksi } from '@/lib/db';
 import { sendOtpPasswordEmail } from '@/lib/kirim';
+import { originValid } from '@/lib/server';
 export const dynamic = 'force-dynamic';
 
 const hashOtp = (kode, uid) =>
-  createHash('sha256').update(`${kode}:${uid}:${process.env.JWT_SECRET || 'lapakwu'}`).digest('hex');
+  createHash('sha256').update(`${kode}:${uid}:${new TextDecoder().decode(getJwtSecret())}`).digest('hex');
 
 export async function POST(req) {
   try {
+    if (!originValid(req)) return Response.json({ error: 'Sumber permintaan tidak diizinkan.' }, { status: 403 });
     const uid = await getUserIdDariCookie();
     if (!uid) return Response.json({ error: 'Belum masuk.' }, { status: 401 });
 
@@ -44,13 +46,12 @@ export async function POST(req) {
 
       // Kirim email OTP
       const ok = await sendOtpPasswordEmail(user.email, otp);
+      if (!ok) return Response.json({ error: 'Email kode verifikasi gagal dikirim. Coba lagi setelah satu menit.' }, { status: 503 });
 
       return Response.json({
         ok: true,
         email: user.email,
         pesan: `Kode OTP telah dikirim ke email ${user.email}`,
-        // Jika SMTP lokal/offline, sediakan bantuan kode di response untuk testing
-        ...(ok ? {} : { bantuanOtp: otp }),
       });
     }
 

@@ -8,6 +8,8 @@
 - Volume `postgres-data` menyimpan isi PostgreSQL saat container diperbarui.
 - Foto produk dan bukti pembayaran memakai Backblaze B2.
 
+TLS dihentikan di Nginx pada blok HTTPS di bawah. Security response headers juga dipasang di Nginx, jadi tetap dikirim dari origin ketika Cloudflare bertindak sebagai proxy. Hindari menetapkan nilai header berbeda di Cloudflare agar tidak terjadi nilai ganda atau bertentangan.
+
 ## Persiapan satu kali
 
 1. Arahkan DNS `lapakwu.bluepack.my.id` ke alamat publik VPS. Pastikan port TCP 80/443 dapat diakses dari internet.
@@ -65,6 +67,7 @@ Sebelum pembaruan, buat backup lalu build dan ganti container web. Jangan mengha
 docker compose --env-file .env.production exec -T db sh -c \
   'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > "backup-lapakwu-$(date +%F-%H%M).sql"
 docker compose --env-file .env.production build web
+docker compose --env-file .env.production run --rm web npm run db:setup
 docker compose --env-file .env.production up -d web
 ```
 

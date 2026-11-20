@@ -27,6 +27,21 @@ export async function batasAkses(tabel, uid, queries) {
   const records = await cariBanyak('pesanan', {
     ...aksesPesanan,
     ...(filterPesanan ? { _id: { $in: ids } } : {}),
-  }, { limit: 2147483647 });
+  }, { limit: 5000 });
   return [Query.equal(tabel === 'pesanan' ? '$id' : 'id_pesanan', records.map((row) => row.id))];
+}
+
+// Row mitra memuat rekening, QRIS, dan catatan verifikasi. Hanya kirim
+// kolom yang memang dipakai katalog publik.
+export function sanitasiPublik(tabel, row) {
+  if (!row) return row;
+  if (tabel === 'mitra') {
+    const { $id, nama_usaha, alamat_usaha, nomor_tenant } = row;
+    return { $id, nama_usaha, alamat_usaha, nomor_tenant };
+  }
+  if (tabel === 'payment_gateway') {
+    const { $id, nama_layanan } = row;
+    return { $id, nama_layanan };
+  }
+  return row;
 }

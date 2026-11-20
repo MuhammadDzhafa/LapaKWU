@@ -1,11 +1,25 @@
 import { svc, siapa, err, getRow, put, upd, del, ID } from '@/lib/server';
 import { hapusFile } from '@/lib/backblaze';
+import { cariBanyak, cariSatu, hapusData } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 // Kelola produk mitra: tambah, ubah, hapus.
 // Akses tulis diperiksa di server berdasarkan akun mitra pemilik produk.
 const hargaValid = (n) => Number.isFinite(+n) && +n >= 0 && Number.isSafeInteger(Math.round(+n * 100));
 const stokValid = (n) => Number.isSafeInteger(+n) && +n >= 0;
+
+async function hapusGambarJikaTidakDipakai(id, uid, produkDikecualikan) {
+  if (!id) return;
+  const [file, produk, mitra, pencairan] = await Promise.all([
+    cariSatu('unggahan_file', { _id: id, id_pengguna: uid }),
+    cariBanyak('produk', { id_gambar: id }, { limit: 500 }),
+    cariSatu('mitra', { id_qris: id }),
+    cariSatu('pencairan_dompet', { id_qris: id }),
+  ]);
+  if (!file || produk.length === 500 || produk.some((row) => row.$id !== produkDikecualikan) || mitra || pencairan) return;
+  await hapusFile(id).catch(() => {});
+  await hapusData('unggahan_file', { _id: id, id_pengguna: uid });
+}
 
 export async function POST(req) {
   try {
@@ -25,6 +39,7 @@ export async function POST(req) {
     const { nama, harga, kategori, deskripsi, stok, id_gambar } = b;
     if (!nama || harga == null || !kategori || stok == null) return err('Data produk tidak lengkap.');
     if (!hargaValid(harga) || !stokValid(stok)) return err('Harga atau stok tidak valid.');
+    if (id_gambar && !(await cariSatu('unggahan_file', { _id: id_gambar, id_pengguna: u.$id, jenis: 'gambar' }))) return err('Gambar tidak ditemukan atau bukan milik akun ini.', 403);
     const data = { id_mitra: u.$id, nama, harga: +harga, kategori, deskripsi: deskripsi || '', stok: +stok };
     if (id_gambar) data.id_gambar = id_gambar;
     const row = await put(db, 'produk', ID.unique(), data);
@@ -43,8 +58,9 @@ export async function POST(req) {
     if (b.deskripsi != null) data.deskripsi = b.deskripsi;
     if (b.kategori != null) data.kategori = b.kategori;
     if (b.id_gambar != null) data.id_gambar = b.id_gambar;
+    if (b.id_gambar != null && b.id_gambar !== p.id_gambar && !(await cariSatu('unggahan_file', { _id: b.id_gambar, id_pengguna: u.$id, jenis: 'gambar' }))) return err('Gambar tidak ditemukan atau bukan milik akun ini.', 403);
     await upd(db, 'produk', p.$id, data);
-      if (b.id_gambar != null && p.id_gambar && p.id_gambar !== b.id_gambar) await hapusFile(p.id_gambar).catch(() => {});
+      if (b.id_gambar != null && p.id_gambar && p.id_gambar !== b.id_gambar) await hapusGambarJikaTidakDipakai(p.id_gambar, u.$id, p.$id);
     return Response.json({ ok: true });
   }
 
@@ -53,7 +69,7 @@ export async function POST(req) {
     const p = await getRow(db, 'produk', String(b.id || '')).catch(() => null);
     if (!p || p.id_mitra !== u.$id) return err('Produk tidak ditemukan.', 404);
     await del(db, 'produk', p.$id);
-      if (p.id_gambar) await hapusFile(p.id_gambar).catch(() => {});
+      if (p.id_gambar) await hapusGambarJikaTidakDipakai(p.id_gambar, u.$id);
     return Response.json({ ok: true });
   }
 
