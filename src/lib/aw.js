@@ -99,8 +99,8 @@ export const list = async (tabel, queries = []) => {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ tabel, queries }),
   });
-  if (!r.ok) throw new Error('Gagal ambil data.');
-  const d = await r.json();
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || 'Gagal ambil data.');
   return d.rows;
 };
 
@@ -209,5 +209,6 @@ export const ID = { unique: () => Math.random().toString(36).slice(2) + Date.now
 export const Query = {
   equal: (col, val) => ({ type: 'eq', col, val }),
   limit: (n) => ({ type: 'limit', n }),
+  offset: (n) => ({ type: 'offset', n }),
   orderDesc: (col) => ({ type: 'orderDesc', col }),
 };

@@ -105,6 +105,16 @@ export async function POST(req) {
       return Response.json({ ok: true });
     }
 
+    if (b.aksi === 'pengantaran') {
+      const mt = await cariSatu('mitra', { _id: u.$id });
+      if (!mt || pg?.status_akun !== 'AKTIF') return err('Khusus mitra aktif.', 403);
+      if (typeof b.antar_aktif !== 'boolean' || !Number.isSafeInteger(b.ongkir) || b.ongkir < 0 || b.ongkir > 999999999) {
+        return err('Isi ongkir dalam rupiah bulat antara 0 dan 999.999.999.');
+      }
+      await upd(null, 'mitra', u.$id, { antar_aktif: b.antar_aktif, ongkir: b.ongkir });
+      return Response.json({ ok: true });
+    }
+
     if (b.aksi === 'detail') {
       const mt = await getRow(null, 'mitra', u.$id).catch(() => null);
       const pb = await getRow(null, 'pembeli', u.$id).catch(() => null);

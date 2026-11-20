@@ -7,7 +7,7 @@ export function nomorTenantValid(nomor) {
 }
 
 export function bolehLihatDenah(pesanan, sekarang) {
-  if (pesanan.status_pesanan === 'DIBATALKAN') return false;
+  if (pesanan.jenis_pemesanan === 'ONLINE' || pesanan.status_pesanan === 'DIBATALKAN') return false;
   if (pesanan.bayar?.metode === 'QRIS') return true;
   const tenggat = tenggatBayarTenant(pesanan);
   return pesanan.bayar?.metode === 'BAYAR_DI_TEMPAT'

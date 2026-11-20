@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const uid = await getUserIdDariCookie();
-    if (!uid) return Response.json({ error: 'Tidak ada sesi.' }, { status: 401 });
+    if (!uid) return Response.json(null);
 
     const akun = await cariAkunById(uid);
     if (!akun) return Response.json({ error: 'Sesi tidak lagi berlaku. Silakan masuk kembali.' }, { status: 401 });

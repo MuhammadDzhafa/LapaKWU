@@ -26,6 +26,26 @@ const LABEL = {
   DIBATALKAN: 'Dibatalkan',
 };
 
+// Pelacak tahap pesanan: pembeli dan mitra langsung tahu pesanan sedang di mana.
+function Lacak({ status, antar }) {
+  const idx = { MENUNGGU_KONFIRMASI: 0, DIPROSES: 1, DIKIRIM: 2, SIAP_DIAMBIL: 2, SELESAI: 3 }[status];
+  if (idx === undefined) return null;
+  const langkah = ['Dipesan', 'Diproses', antar ? 'Dikirim' : 'Siap diambil', 'Selesai'];
+  const tamat = status === 'SELESAI';
+  return (
+    <ol className="lacak" aria-label="Tahap pesanan">
+      {langkah.map((nama, i) => {
+        const done = tamat || i < idx;
+        return (
+          <li key={nama} className={done ? 'done' : i === idx ? 'now' : ''} aria-current={!tamat && i === idx ? 'step' : undefined}>
+            <i aria-hidden="true">{done ? '✓' : ''}</i><span>{nama}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 // Modal konfirmasi / input — menggantikan alert() / confirm() / prompt() bawaan browser
 function Modal({ judul, pesan, withInput, inputLabel, onOk, onBatal, busy }) {
   const [val, setVal] = useState('');
@@ -92,12 +112,7 @@ export default function Pesanan({ uid, sebagai }) {
     if (versi !== versiMuat.current) return;
     const lapak = new Map(mitra.map((m) => [m.$id, m]));
     const pembayaranPerPesanan = new Map(by.map((x) => [x.id_pesanan, x]));
-    const terlihat = ps.filter((p) => {
-      if (sebagai !== 'mitra') return true;
-      const pembayaran = pembayaranPerPesanan.get(p.$id);
-      return pembayaran?.metode !== 'QRIS' || ['BERHASIL', 'REFUND_DIAJUKAN', 'DIKEMBALIKAN'].includes(pembayaran.status_pembayaran);
-    });
-    setD(terlihat.map((p) => ({
+    setD(ps.map((p) => ({
       ...p,
       lapak: lapak.get(p.id_mitra),
       bayar: pembayaranPerPesanan.get(p.$id),
@@ -211,7 +226,8 @@ export default function Pesanan({ uid, sebagai }) {
         const lunas = p.bayar?.status_pembayaran === 'BERHASIL';
         const nomor = p.lapak?.nomor_tenant;
         const adaNomor = nomorTenantValid(nomor);
-        const tampilDenah = sebagai === 'pembeli' && bolehLihatDenah(p, sekarang);
+        const antar = p.jenis_pemesanan === 'ONLINE';
+        const tampilDenah = !antar && sebagai === 'pembeli' && bolehLihatDenah(p, sekarang);
 
         return (
           <article key={p.$id} className="card pad">
@@ -238,6 +254,8 @@ export default function Pesanan({ uid, sebagai }) {
               </div>
             </div>
 
+            <Lacak status={p.status_pesanan} antar={antar} />
+
             <ul className="lines" style={{ margin: '10px 0' }}>
               {p.items.map((i) => (
                 <li key={i.$id}>
@@ -247,7 +265,9 @@ export default function Pesanan({ uid, sebagai }) {
               ))}
             </ul>
 
-            {(sebagai !== 'pembeli' || !isOffline || tampilDenah) && <p className="muted" style={{ marginBottom: 8, fontSize: '0.85rem' }}>
+            {antar && <p className="muted" style={{ overflowWrap: 'anywhere' }}><b>Antar ke</b> {p.alamat_pengiriman} · Ongkir {rp(p.ongkir)}</p>}
+            {p.catatan_pembeli && <p className="muted" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}><b>Catatan pembeli</b> {p.catatan_pembeli}</p>}
+            {(!antar && (sebagai !== 'pembeli' || !isOffline || tampilDenah)) && <p className="muted" style={{ marginBottom: 8, fontSize: '0.85rem' }}>
               {adaNomor ? `Ambil di lapak: Tenant ${nomor}` : 'Nomor tenant belum ditetapkan'}
               {p.lapak?.nama_usaha && ` · ${p.lapak.nama_usaha}`}
               {p.alasan_pembatalan ? ` • Alasan batal: ${p.alasan_pembatalan}` : ''}
@@ -327,12 +347,12 @@ export default function Pesanan({ uid, sebagai }) {
                     {p.status_pesanan === 'MENUNGGU_KONFIRMASI' && (
                       <>
                         {!isOffline && lunas && tombol(p, 'terima', 'Terima')}
-                        {tombol(p, 'tolak', 'Tolak', 'red')}
+                        {(isOffline || lunas) && tombol(p, 'tolak', 'Tolak', 'red')}
                       </>
                     )}
                     {p.status_pesanan === 'DIPROSES' && (
                       <>
-                        {!isOffline && lunas && tombol(p, 'siap', 'Siap diambil')}
+                        {!isOffline && lunas && (antar ? tombol(p, 'kirim', 'Kirim pesanan') : tombol(p, 'siap', 'Siap diambil'))}
                         {tombol(p, 'tolak', 'Batalkan', 'red')}
                       </>
                     )}
@@ -478,7 +498,7 @@ export default function Pesanan({ uid, sebagai }) {
               </div>
               <div>
                 <span className="muted" style={{ display: 'block', fontSize: '0.78rem' }}>LOKASI PENGAMBILAN</span>
-                <b>{nomorTenantValid(modalInvoice.lapak?.nomor_tenant) ? `Tenant ${modalInvoice.lapak.nomor_tenant}` : 'Nomor tenant belum ditetapkan'}</b>
+                <b>{modalInvoice.jenis_pemesanan === 'ONLINE' ? modalInvoice.alamat_pengiriman : nomorTenantValid(modalInvoice.lapak?.nomor_tenant) ? `Tenant ${modalInvoice.lapak.nomor_tenant}` : 'Nomor tenant belum ditetapkan'}</b>
               </div>
               <div>
                 <span className="muted" style={{ display: 'block', fontSize: '0.78rem' }}>STATUS PESANAN</span>
@@ -507,7 +527,7 @@ export default function Pesanan({ uid, sebagai }) {
 
             {/* Catatan footer */}
             <p className="muted" style={{ fontSize: '0.8rem', textAlign: 'center', margin: '14px 0 0', lineHeight: 1.4 }}>
-              Terima kasih telah berbelanja di LapaKWU. Tunjukkan invoice ini saat mengambil pesanan di lapak mitra.
+              {modalInvoice.jenis_pemesanan === 'ONLINE' ? 'Ongkir ' + rp(modalInvoice.ongkir) + ' sudah termasuk dalam total.' : 'Tunjukkan invoice ini saat mengambil pesanan di lapak mitra.'}
             </p>
 
             {/* Tombol aksi */}

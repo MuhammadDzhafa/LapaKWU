@@ -13,7 +13,8 @@
   --ease:cubic-bezier(.2,.8,.2,1);
 }
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;overflow-x:clip}
+.nav-sidebar:not(.open){pointer-events:none}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.6 var(--f-body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit;text-decoration:none}
 img{max-width:100%}
@@ -154,7 +155,7 @@ fieldset{border:0;padding:0;margin:0}
 .tabs .chip{border:0;background:transparent;padding:8px 18px}.tabs .chip:hover{background:rgba(255,255,255,.7)}
 .tabs .chip.on{background:var(--ink);color:#fff;box-shadow:0 6px 14px -8px rgba(34,49,63,.8)}
 .split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px}
-@media(max-width:760px){.split,.two,.opsi{grid-template-columns:1fr}.split{gap:22px}}
+@media(max-width:760px){.split,.two,.opsi{grid-template-columns:minmax(0,1fr)}.split{gap:22px}}
 .msg{background:#FFF0C9;border-left:5px solid var(--sun);padding:12px 16px;border-radius:14px;margin:12px 0;animation:rise .4s var(--ease)}
 .msg.err{background:#FBE1D9;border-color:var(--coral)}.msg.ok{background:#DCEAF4;border-color:var(--mint)}
 .badge{display:inline-flex;align-items:center;gap:6px;padding:3px 12px;border-radius:99px;background:var(--tint);color:var(--or-d);font-size:.8rem;font-weight:700}
@@ -759,6 +760,9 @@ html[data-scrolled] .top .wrap{min-height:52px;background:rgba(255,253,248,.9);b
 
 /* ---------- halaman formulir: kartu bertenda ---------- */
 .auth{position:relative;isolation:isolate}
+.auth-password{position:relative}
+.auth-password input{padding-inline-end:52px}
+.auth-password button{position:absolute;inset-block:0;inset-inline-end:4px;width:44px;display:grid;place-items:center;padding:0;background:none;border:0;border-radius:10px;color:var(--mute);cursor:pointer}
 .auth::before,.auth::after{content:"";position:absolute;border-radius:50%;z-index:-1;pointer-events:none}
 .auth::before{width:280px;height:280px;right:-110px;top:30px;background:var(--bl);opacity:.32;filter:blur(2px);animation:float 11s ease-in-out infinite alternate}
 .auth::after{width:150px;height:150px;left:-70px;bottom:40px;border:30px solid color-mix(in srgb,var(--or) 26%,transparent);animation:float 9s -3s ease-in-out infinite alternate-reverse}
@@ -797,5 +801,266 @@ html[data-nav=hide] .top:has(.toast){transform:none}
 .rekap-toolbar{justify-content:flex-end;flex-wrap:wrap}
 .rekap-grafik{margin:0 0 18px;padding:clamp(12px,3vw,20px);background:var(--card);border:1px solid var(--line);border-radius:16px}
 .rekap-baris{display:grid;grid-template-columns:auto minmax(20px,1fr) auto;align-items:center;gap:clamp(6px,2vw,12px);margin-top:8px;font-size:.85rem;font-variant-numeric:tabular-nums}
+.rekap-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:16px;margin-bottom:20px}
+.rekap-charts>figure{margin:0;min-width:0;border:1px solid var(--line);border-radius:18px;background:var(--card);padding:16px}
+.rekap-charts svg{display:block;width:100%;height:auto}
+.rekap-pie{width:120px;aspect-ratio:1;border-radius:50%;margin:12px auto}
 .rekap-lintasan{border-radius:999px;background:var(--tint);overflow:hidden}
 .rekap-isi{display:block;height:12px;border-radius:999px;background:var(--ye)}
+
+
+/* =====================================================================
+   LAPISAN v3: dashboard admin/mitra, navigasi jempol di HP, tabel yang
+   berubah jadi kartu, pelacak pesanan, dan polesan formulir.
+   Palet tidak berubah: semua warna memakai variabel :root atau campuran
+   transparan darinya (color-mix).
+   ===================================================================== */
+
+/* ---------- dock navigasi bawah (khusus HP) ---------- */
+.dock{display:none}
+@media(max-width:699px){
+  .dock{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:2px;position:fixed;z-index:36;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));padding:6px;border-radius:26px;background:rgba(255,253,248,.88);-webkit-backdrop-filter:saturate(1.6) blur(16px);backdrop-filter:saturate(1.6) blur(16px);border:1px solid rgba(34,49,63,.1);box-shadow:0 18px 40px -14px rgba(34,49,63,.55);animation:dockin .7s .35s var(--ease) both}
+  .dock-i{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px 7px;border-radius:20px;color:var(--mute);font:700 .68rem/1.1 var(--f-body);transition:background .3s var(--ease),color .25s,transform .2s var(--ease)}
+  .dock-i:active{transform:scale(.92)}
+  .dock-ic{position:relative;display:grid;place-items:center;transition:transform .45s var(--ease)}
+  .dock-i[aria-current=page]{background:var(--ink);color:var(--cr)}
+  .dock-i[aria-current=page] .dock-ic{transform:translateY(-1px) scale(1.1);color:var(--ye)}
+  .dock-t{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dock-n{position:absolute;top:-6px;right:-11px;min-width:18px;padding:2px 5px;border-radius:99px;background:var(--coral);color:#fff;font:800 .66rem/1.2 var(--f-disp);text-align:center;border:2px solid var(--card);animation:bump .5s var(--ease)}
+  .dock-i[aria-current=page] .dock-n{border-color:var(--ink)}
+  .dock ~ .floating-cart-bar{bottom:calc(86px + env(safe-area-inset-bottom,0px))}
+  .foot{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+}
+@keyframes dockin{from{transform:translateY(130%);opacity:0}}
+
+/* ---------- kepala dashboard + ringkasan ---------- */
+main.wrap:has(.tabs){max-width:1240px}
+.dash-head{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:10px 20px;margin-bottom:22px}
+.dash-head h2{margin:0;font-size:clamp(1.5rem,3.6vw,2.3rem);overflow-wrap:anywhere}
+.dash-head p{margin:4px 0 0;color:var(--mute)}
+.dash-head::after{content:"";flex:0 0 100%;height:10px;margin-top:8px;border-radius:99px;background:var(--stripe);transform-origin:left;animation:garis .9s .15s var(--ease) both}
+@keyframes garis{from{transform:scaleX(0)}}
+.todo{display:inline-flex;align-items:center;gap:9px;padding:8px 16px;border-radius:99px;background:var(--cr);color:var(--ink);font-weight:700;font-size:.92rem;box-shadow:0 8px 18px -12px rgba(184,80,10,.7)}
+.todo::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--coral);animation:denyut 1.4s ease-in-out infinite}
+.todo.ok{background:var(--bl-s);box-shadow:none}
+.todo.ok::before{background:var(--bl-d);animation:none}
+
+button.stat{border:0;font:inherit;color:var(--ink);text-align:left;cursor:pointer;width:100%}
+.stat{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:flex-start}
+.stat .si{display:grid;place-items:center;width:42px;height:42px;margin-bottom:14px;border-radius:14px;background:rgba(255,253,248,.62);color:var(--ink);font-style:normal;transform:rotate(-6deg);transition:transform .45s var(--ease),background .3s}
+.stat:hover .si{transform:rotate(4deg) scale(1.12)}
+.stat:nth-child(3) .si{background:rgba(255,253,248,.14);color:var(--ye)}
+.stat:nth-child(4){background:var(--cr)}
+.stat:nth-child(4) small{color:rgba(34,49,63,.75)}
+button.stat:active{transform:scale(.97)}
+@media(max-width:560px){
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:20px}
+  .stat{padding:14px 15px;border-radius:20px}
+  .stat .si{width:36px;height:36px;margin-bottom:10px;border-radius:12px}
+  .stat b{font-size:1.25rem;overflow-wrap:anywhere}
+}
+
+/* ---------- tab dashboard: menempel, ber-ikon, bisa digeser ---------- */
+.tabs{position:sticky;top:84px;z-index:25;max-width:100%;scroll-snap-type:x proximity;box-shadow:0 14px 26px -20px rgba(34,49,63,.55);transition:top .55s var(--ease)}
+html[data-nav=hide] .tabs{top:14px}
+.tabs .chip{display:inline-flex;align-items:center;gap:8px;scroll-snap-align:center}
+.tabs .chip svg{flex:none;opacity:.75;transition:transform .35s var(--ease),opacity .2s}
+.tabs .chip:hover svg{transform:rotate(-8deg) scale(1.1)}
+.tabs .chip.on svg{opacity:1;color:var(--ye)}
+.cnt{font:800 .72rem/1.4 var(--f-disp);font-style:normal;background:var(--coral);color:#fff;border-radius:99px;padding:0 7px;margin-left:2px;animation:bump .5s var(--ease)}
+@media(max-width:700px){
+  .tabs{--gut:20px;top:76px;width:auto;max-width:none;margin-left:calc(var(--gut)*-1);margin-right:calc(var(--gut)*-1);padding:8px var(--gut);border-radius:0 0 22px 22px;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  html[data-nav=hide] .tabs{top:0}
+}
+@media(max-width:560px){.tabs{--gut:16px}}
+
+/* ---------- tabel jadi kartu di layar sempit ---------- */
+@media(max-width:700px){
+  .scroll:has(>table[data-kartu]){overflow:visible;border:0;border-radius:0;background:transparent;box-shadow:none}
+  .scroll table[data-kartu]{min-width:0;display:block;background:transparent}
+  table[data-kartu] thead{display:none}
+  table[data-kartu] tbody,table[data-kartu] tfoot{display:grid;gap:12px}
+  table[data-kartu] tfoot{margin-top:12px}
+  table[data-kartu] tr{display:grid;padding:6px 16px;background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--lift)}
+  table[data-kartu] td,table[data-kartu] th{display:grid;grid-template-columns:minmax(84px,34%) minmax(0,1fr);align-items:center;gap:10px;padding:10px 0;border:0;border-bottom:1px dashed var(--line);background:transparent;white-space:normal;color:var(--ink);font-size:.95rem}
+  table[data-kartu] tr>:last-child{border-bottom:0}
+  table[data-kartu] td::before,table[data-kartu] tfoot th::before{content:attr(data-label);font:700 .78rem/1.3 var(--f-body);color:var(--mute)}
+  table[data-kartu] td[data-label=""],table[data-kartu] td:not([data-label]){grid-template-columns:minmax(0,1fr)}
+  table[data-kartu] td[data-label=""]::before,table[data-kartu] td:not([data-label])::before{display:none}
+  table[data-kartu] td input,table[data-kartu] td select{min-width:0}
+  table[data-kartu] td .row{flex-wrap:wrap}
+  table[data-kartu] td form.row{flex-wrap:nowrap}
+}
+
+/* ---------- pelacak tahap pesanan ---------- */
+.lacak{list-style:none;margin:16px 0 8px;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.lacak li{position:relative;display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center;font-size:.8rem;font-weight:600;color:var(--mute)}
+.lacak li::before{content:"";position:absolute;top:11px;right:50%;width:100%;height:4px;border-radius:4px;background:var(--line);transform-origin:right}
+.lacak li:first-child::before{display:none}
+.lacak li.done::before,.lacak li.now::before{background:var(--or);animation:isi .7s var(--ease) both}
+.lacak li i{position:relative;z-index:1;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--card);border:3px solid var(--line);font:800 .72rem/1 var(--f-body);font-style:normal;color:var(--ink);transition:background .3s,border-color .3s}
+.lacak li.done{color:var(--ink)}
+.lacak li.done i{background:var(--or);border-color:var(--or)}
+.lacak li.now{color:var(--ink);font-weight:800}
+.lacak li.now i{background:var(--ye);border-color:var(--or);animation:cincin 1.8s ease-out infinite}
+@keyframes isi{from{transform:scaleX(0)}}
+@keyframes cincin{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--or) 55%,transparent)}100%{box-shadow:0 0 0 12px transparent}}
+@media(max-width:420px){.lacak li{font-size:.72rem}.lacak li i{width:24px;height:24px}.lacak li::before{top:10px}}
+
+/* ---------- pesan kosong, unggah berkas, tombol aksi ---------- */
+p.kosong{padding:34px 20px;text-align:center;border:2px dashed var(--line);border-radius:24px;background:color-mix(in srgb,var(--card) 70%,transparent)}
+p.kosong::before{content:"";display:block;width:58px;height:58px;margin:0 auto 14px;border-radius:19px;transform:rotate(-6deg);background:var(--tint) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2322313F' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M5 8h14l-1 12H6L5 8Z'/><path d='M9 8V6a3 3 0 0 1 6 0v2'/></svg>") center/28px no-repeat}
+input[type=file]{padding:10px;border-style:dashed;background:var(--tint);cursor:pointer}
+input[type=file]::file-selector-button{margin-right:12px;padding:8px 16px;border:0;border-radius:99px;background:var(--or);color:var(--ink);font:700 .9rem var(--f-body);cursor:pointer;transition:background .2s}
+input[type=file]:hover::file-selector-button{background:var(--ye)}
+.card .row>.link{min-height:36px;padding:6px 14px;border-radius:99px;background:var(--tint);font-size:.88rem;transition:background .2s,transform .15s}
+.card .row>.link:hover{background:var(--ye);text-decoration:none}
+.card .row>.link:active{transform:scale(.95)}
+
+/* ---------- info QRIS + pratinjau gambar (menggantikan gaya inline) ---------- */
+.info-card{background:var(--bl-s);border:1px solid var(--bl)}
+.info-in{display:flex;gap:14px;align-items:flex-start}
+.info-ic{flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:15px;background:var(--bl);color:var(--ink);transform:rotate(-5deg)}
+.info-card b{color:var(--bl-d)}
+.info-card p{margin:2px 0 0;font-size:.9rem}
+.modal-box.lightbox{max-width:540px;max-height:92dvh;overflow:auto;text-align:center}
+.lightbox .modal-head{align-items:center;text-align:left}
+.lightbox img{display:block;width:100%;max-height:62dvh;object-fit:contain;border-radius:16px;border:1px solid var(--line);background:var(--tint)}
+.lightbox .modal-aksi{justify-content:center;flex-wrap:wrap}
+@media(max-width:560px){.modal-box{padding:20px;border-radius:24px}.modal-aksi>.btn{flex:1 1 auto}}
+
+@media (prefers-reduced-motion:reduce){
+  .tabs{transition:none}
+  .dash-head::after,.lacak li::before,.lacak li.now i,.dock{animation:none}
+}
+
+
+/* =====================================================================
+   LAPISAN v4: gerak yang lebih hidup.
+   Satu momen utama (tirai tenda saat pertama masuk), sisanya gerak yang
+   menjawab tindakan: pegas, tilt 3D, percikan, cincin warna, parallax.
+   Palet tetap; semua warna dari variabel :root.
+   ===================================================================== */
+:root{--spring:var(--ease)}
+@supports (transition-timing-function:linear(0,1)){
+  :root{--spring:linear(0,.1 2.2%,.38 6%,.72 11%,.98 17%,1.12 22%,1.15 26%,1.1 31%,1.03 38%,.98 45%,.99 53%,1.005 63%,1)}
+}
+
+/* ---------- tirai tenda: sekali per sesi ---------- */
+.curtain{display:none}
+html[data-intro] .curtain{display:grid;position:fixed;inset:0;z-index:200;place-items:center;background:var(--ye);pointer-events:none;animation:tirai .95s .8s cubic-bezier(.77,0,.18,1) forwards}
+.curtain::before,.curtain::after{content:"";position:absolute;left:0;right:0}
+.curtain::before{bottom:0;height:46px;background:var(--stripe)}
+.curtain::after{top:100%;height:18px;background:var(--stripe);-webkit-mask:radial-gradient(circle at 18px 0,#000 17.5px,transparent 18px) 0 0/36px 18px repeat-x;mask:radial-gradient(circle at 18px 0,#000 17.5px,transparent 18px) 0 0/36px 18px repeat-x}
+.curtain .brand{font-size:clamp(2.6rem,11vw,5.6rem);animation:merek .9s .05s var(--spring) both}
+.curtain .brand b{animation:merekb .9s .25s var(--spring) both}
+@keyframes merek{from{transform:translateY(40px) scale(.6);opacity:0}}
+@keyframes merekb{from{transform:rotate(-24deg) scale(.4);opacity:0}}
+@keyframes tirai{to{transform:translateY(-118%);visibility:hidden}}
+/* hero menunggu tirai terangkat, lalu masuk berurutan */
+html[data-hold] .hero2 *,html[data-hold] .hero2 *::after,html[data-hold] .hero2::after{animation-play-state:paused!important}
+
+
+/* ---------- pegas di tempat yang menjawab tindakan ---------- */
+[data-rv]{transition:opacity .6s ease var(--d,0ms),transform 1.05s var(--spring) var(--d,0ms),filter .7s ease var(--d,0ms)}
+.modal-box,.denah-modal[open]{animation:modalpop .7s var(--spring)}
+@keyframes modalpop{from{opacity:0;transform:translateY(40px) scale(.9)}}
+.toast{animation:toastin .7s var(--spring)}
+@keyframes toastin{from{transform:translate(-50%,-24px) scale(.9);opacity:0}}
+.top .toast{animation:toastdrop .7s var(--spring)}
+@keyframes toastdrop{from{transform:translateY(-18px) scale(.9);opacity:0}}
+@media(max-width:699px){.top .toast{animation:toastin .7s var(--spring)}}
+.floating-cart-bar{animation:floatUp .8s var(--spring) both}
+.dock{animation-timing-function:var(--spring)}
+.plus.ok{animation:okpop .6s var(--spring)}
+.stepper-card{animation:okpop .55s var(--spring)}
+@keyframes okpop{35%{transform:scale(1.28) rotate(-6deg)}}
+.cart-bar-icon-wrap::after{content:"";position:absolute;inset:0;border-radius:50%;animation:napas 2.8s ease-out infinite;pointer-events:none}
+@keyframes napas{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--or) 60%,transparent)}70%,100%{box-shadow:0 0 0 14px transparent}}
+.badge[data-s=SELESAI]::before,.badge[data-s=BERHASIL]::before{animation:okpop .7s .3s var(--spring) both}
+
+/* ---------- kartu produk: tilt 3D mengikuti kursor ---------- */
+@media(hover:hover) and (pointer:fine){
+  .prod:hover{transform:perspective(900px) rotateX(var(--tx,0deg)) rotateY(var(--ty,0deg)) translateY(-6px);transition:transform .14s linear,box-shadow .3s}
+  .prod:hover .ph{transform:translateZ(0)}
+}
+.ph img{animation:imgin 1s var(--ease) backwards}
+@keyframes imgin{from{opacity:0;transform:scale(1.14);filter:blur(12px)}}
+
+/* ---------- pencarian: cincin warna berputar saat fokus ---------- */
+@property --a{syntax:"<angle>";inherits:false;initial-value:0deg}
+.searchcard::before{content:"";position:absolute;inset:-3px;border-radius:31px;padding:3px;pointer-events:none;opacity:0;transition:opacity .4s;background:conic-gradient(from var(--a),var(--or),var(--ye),var(--bl),var(--or));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);mask-composite:exclude;animation:putar 3.2s linear infinite}
+.searchcard:focus-within::before{opacity:1}
+@keyframes putar{to{--a:360deg}}
+@media(max-width:560px){.searchcard::before{border-radius:25px}}
+
+/* ---------- parallax saat scroll (browser yang mendukung) ---------- */
+@supports (animation-timeline:scroll()){
+  .aurora i:nth-child(1){--py:90px;animation:drift 18s ease-in-out infinite alternate,para linear both;animation-timeline:auto,scroll(root);animation-range:normal,0px 700px}
+  .aurora i:nth-child(2){--py:150px;animation:drift 22s -6s ease-in-out infinite alternate-reverse,para linear both;animation-timeline:auto,scroll(root);animation-range:normal,0px 700px}
+  .aurora i:nth-child(3){--py:-70px;animation:drift 20s -3s ease-in-out infinite alternate,para linear both;animation-timeline:auto,scroll(root);animation-range:normal,0px 700px}
+  .stage{animation:rise .9s .25s var(--ease) both,paraart linear both;animation-timeline:auto,scroll(root);animation-range:normal,0px 600px}
+  @keyframes para{to{translate:0 var(--py)}}
+  @keyframes paraart{to{translate:0 -36px}}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .curtain{display:none!important}
+  .cart-bar-icon-wrap::after,.searchcard::before,.prod::before{animation:none}
+  .prod:hover{transform:none}
+  .ph img{animation:none}
+}
+
+
+/* =====================================================================
+   LAPISAN v5: kesan canggih. Penunjuk kursor, indikator yang meluncur,
+   cincin warna pada kartu, kilau di judul hero. Palet tidak berubah.
+   ===================================================================== */
+
+/* ---------- indikator meluncur (tab dashboard + dock HP) ---------- */
+.glide{position:absolute;left:0;top:0;z-index:0;width:0;height:0;background:var(--ink);pointer-events:none;opacity:0;box-shadow:0 8px 18px -8px rgba(34,49,63,.7)}
+.glide.siap{transition:transform .55s var(--spring),width .55s var(--spring),height .55s var(--spring),opacity .25s}
+.tabs .glide{border-radius:99px}
+.dock .glide{border-radius:20px}
+.tabs[data-glide] .chip,.dock[data-glide] .dock-i{position:relative;z-index:1}
+.tabs[data-glide] .chip.on{background:transparent;box-shadow:none}
+.dock[data-glide] .dock-i[aria-current=page]{background:transparent}
+
+/* ---------- penunjuk kursor (hanya mouse/trackpad) ---------- */
+.kursor{position:fixed;left:0;top:0;z-index:300;width:0;height:0;pointer-events:none;opacity:0;transition:opacity .3s}
+.kursor.on{opacity:1}
+.kursor::before{content:"";position:absolute;left:-17px;top:-17px;width:34px;height:34px;border-radius:50%;border:2px solid color-mix(in srgb,var(--ink) 55%,transparent);background:transparent;transition:transform .35s var(--spring),background .25s,border-color .25s}
+.kursor::after{content:"";position:absolute;left:-3px;top:-3px;width:6px;height:6px;border-radius:50%;background:var(--ink);transition:transform .25s var(--spring),opacity .2s}
+.kursor.besar::before{transform:scale(1.7);background:color-mix(in srgb,var(--or) 22%,transparent);border-color:var(--or-d)}
+.kursor.besar::after{transform:scale(0);opacity:0}
+.kursor.teks::before{transform:scale(.4,1.2);border-radius:6px}
+.kursor.tekan::before{transform:scale(.8)}
+.kursor.besar.tekan::before{transform:scale(1.4)}
+@media(hover:none),(pointer:coarse){.kursor{display:none}}
+
+/* ---------- kartu produk: cincin warna berputar saat disorot ---------- */
+@media(hover:hover) and (pointer:fine){
+  .prod::before{content:"";position:absolute;inset:0;z-index:2;border-radius:inherit;padding:2px;pointer-events:none;opacity:0;transition:opacity .35s;background:conic-gradient(from var(--a),var(--or),var(--ye),var(--bl),var(--or));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);mask-composite:exclude;animation:putar 4s linear infinite}
+  .prod:hover::before{opacity:1}
+}
+
+/* ---------- judul hero: kilau sekali lewat setelah kata-katanya masuk ---------- */
+@supports ((-webkit-background-clip:text) or (background-clip:text)){
+  .hero2 h1 .w>span{
+    background:linear-gradient(100deg,var(--ink) 42%,var(--or-d) 50%,var(--ink) 58%) 100% 0/260% 100% no-repeat;
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;
+    animation-name:wordup,kilauteks;
+    animation-duration:.8s,2.2s;
+    animation-delay:calc(.35s + var(--w,0)*90ms),calc(1.5s + var(--w,0)*160ms);
+    animation-timing-function:var(--ease),ease-in-out;
+    animation-fill-mode:both,none;
+    animation-iteration-count:1,1;
+  }
+  @keyframes kilauteks{from{background-position:100% 0}to{background-position:0 0}}
+}
+@media (prefers-reduced-motion:reduce){
+  .hero2 h1 .w>span{animation:none}
+  .glide.siap{transition:none}
+  .kursor{display:none}
+}

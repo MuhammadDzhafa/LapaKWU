@@ -11,7 +11,7 @@ export default function Checkout() {
   const r = useRouter();
   const [it, setIt] = useState(null);
   const [mitras, setMitras] = useState({});
-  const [f, setF] = useState({ metode: 'QRIS' });
+  const [f, setF] = useState({ metode: 'QRIS', pengantaran: 'AMBIL', alamat: null, catatan: '' });
   const [fileBukti, setFileBukti] = useState(null);
   const [previewBukti, setPreviewBukti] = useState(null);
   const [qrisError, setQrisError] = useState(false);
@@ -19,7 +19,7 @@ export default function Checkout() {
   const [busy, setBusy] = useState(false);
   const checkoutId = useRef(null);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  // set tidak digunakan langsung di JSX, opsi() dipakai untuk radio metode pembayaran
+
 
   useEffect(() => {
     if (!akun) return;
@@ -31,10 +31,10 @@ export default function Checkout() {
         setLg({ id: p.$id, jumlah });
         const mt = await ambil('mitra', p.id_mitra).catch(() => null);
         if (mt) setMitras({ [p.id_mitra]: mt });
-        return setIt([{ $id: 'langsung', id_produk: p.$id, id_mitra: p.id_mitra, nama: p.nama, jumlah, subtotal: jumlah * p.harga }]);
+        return setIt([{ $id: 'langsung', id_produk: p.$id, id_mitra: p.id_mitra, nama: p.nama, jumlah, harga: p.harga, subtotal: jumlah * p.harga }]);
       }
       const x = await list('item_keranjang', [Query.equal('id_keranjang', akun.$id)]);
-      const ps = x.length ? await list('produk', [Query.equal('$id', x.map((i) => i.id_produk))]) : [];
+      const ps = x.length ? await list('produk', [Query.equal('$id', x.map((i) => i.id_produk)), Query.limit(500)]) : [];
       const mIds = [...new Set(ps.map((p) => p.id_mitra).filter(Boolean))];
       const mList = await Promise.all(mIds.map((mid) => ambil('mitra', mid).catch(() => null)));
       const mMap = {};
@@ -46,6 +46,7 @@ export default function Checkout() {
           ...i,
           id_mitra: prod?.id_mitra,
           nama: prod?.nama || 'Produk',
+          harga: prod?.harga || 0,
           subtotal: i.jumlah * (prod?.harga || 0),
         };
       }));
@@ -102,7 +103,7 @@ export default function Checkout() {
     try {
       checkoutId.current ||= sessionStorage.getItem('lapakwu_checkout_request') || crypto.randomUUID();
       sessionStorage.setItem('lapakwu_checkout_request', checkoutId.current);
-      const hasil = await api('/api/checkout', { metode: f.metode, id_bukti, langsung: lg, request_id: checkoutId.current });
+      const hasil = await api('/api/checkout', { ...f, alamat: f.alamat ?? pembeli?.alamat ?? '', id_bukti, langsung: lg, request_id: checkoutId.current, total_diharapkan: totalSen });
       sessionStorage.removeItem('lapakwu_checkout_request');
       checkoutId.current = null;
       selesaiCheckout(akun.$id, hasil.itemTerpesan);
@@ -122,20 +123,18 @@ export default function Checkout() {
     );
   }
 
-  const total = (it || []).reduce((a, i) => a + i.subtotal, 0);
+  const idsMitra = [...new Set((it || []).map((item) => item.id_mitra))];
+  const bisaAntar = idsMitra.length > 0 && idsMitra.every((id) => mitras[id]?.antar_aktif === true);
+  const antar = f.pengantaran === 'ANTAR';
+  const ongkir = antar ? idsMitra.reduce((sum, id) => sum + (mitras[id]?.ongkir ?? 0), 0) : 0;
+  const totalSen = (it || []).reduce((sum, item) => sum + item.jumlah * Math.round(item.harga * 100), ongkir * 100);
+  const total = totalSen / 100;
   const opsi = (k, v, t) => (
     <label className="row">
       <input type="radio" style={{ width: 'auto' }} name={k} checked={f[k] === v} onChange={() => setF({ ...f, [k]: v })} />
       {t}
     </label>
   );
-
-  // Hitung total belanja per mitra untuk scan QRIS masing-masing mitra
-  const perMitra = {};
-  (it || []).forEach((item) => {
-    const mid = item.id_mitra;
-    if (mid) perMitra[mid] = (perMitra[mid] || 0) + item.subtotal;
-  });
 
   return (
     <main className="wrap split">
@@ -146,20 +145,25 @@ export default function Checkout() {
           <p className="msg err">Akunmu belum aktif. <a className="link" href="/verifikasi">Verifikasi dulu</a> sebelum memesan.</p>
         )}
 
-        {/* INFO: Semua pesanan ambil di lapak mitra */}
-        <div className="card pad" style={{ background: 'var(--bl-s)', border: '1px solid var(--bl)', borderRadius: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: '1.3rem' }}>🏪</span>
-            <div>
-              <b style={{ color: 'var(--bl-d)', display: 'block' }}>Ambil sendiri di lapak mitra</b>
-              <small className="muted">Semua pesanan diambil langsung di tenant/lapak mitra. Pilih cara pembayaranmu di bawah.</small>
-            </div>
+        <fieldset className="card pad stack"><legend><b>Terima pesanan</b></legend>
+          {opsi('pengantaran', 'AMBIL', 'Ambil di lapak')}
+          {bisaAntar ? <label className="row"><input type="radio" style={{ width: 'auto' }} name="pengantaran"
+            checked={antar} onChange={() => setF({ ...f, pengantaran: 'ANTAR', metode: 'QRIS' })} /> Antar ke alamat</label>
+            : <small className="muted">Pengantaran tersedia jika semua mitra dalam checkout menerima pesanan antar.</small>}
+          {antar && <div className="field">
+            <label htmlFor="alamat-antar">Alamat pengiriman</label>
+            <textarea id="alamat-antar" required maxLength={500} value={f.alamat ?? pembeli?.alamat ?? ''} onChange={set('alamat')} />
+            {idsMitra.map((id) => <small key={id}>{mitras[id]?.nama_usaha} · Ongkir {rp(mitras[id]?.ongkir)}</small>)}
+          </div>}
+          <div className="field">
+            <label htmlFor="catatan-pembeli">Catatan untuk mitra (opsional)</label>
+            <textarea id="catatan-pembeli" maxLength={500} value={f.catatan} onChange={set('catatan')} />
           </div>
-        </div>
+        </fieldset>
 
         <fieldset className="card pad"><legend><b>Metode pembayaran</b></legend>
           {opsi('metode', 'QRIS', '💳 Transfer / QRIS (bayar sekarang, upload bukti)')}
-          {opsi('metode', 'BAYAR_DI_TEMPAT', '💵 Bayar langsung di lapak mitra')}
+          {!antar && opsi('metode', 'BAYAR_DI_TEMPAT', '💵 Bayar langsung di lapak mitra')}
         </fieldset>
 
         {/* QRIS LapaKWU dan bukti pembayaran */}
@@ -262,7 +266,7 @@ export default function Checkout() {
         )}
 
         {msg && <p className="msg err" role="alert">{msg}</p>}
-        <button className="btn sun" disabled={busy || !it?.length}>
+        <button className="btn sun" disabled={busy || !it?.length || pengguna?.status_akun !== 'AKTIF' || (antar && !bisaAntar)}>
           {busy ? 'Memproses…' : `Bayar dan pesan ${rp(total)}`}
         </button>
       </form>
@@ -283,6 +287,7 @@ export default function Checkout() {
           </ul>
         </div>
 
+        {antar && <div className="row" style={{ justifyContent: 'space-between' }}><span>Total ongkir</span><b>{rp(ongkir)}</b></div>}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 4 }}>
           <span style={{ fontWeight: 700, fontSize: '1.02rem' }}>Total Pembayaran</span>
           <b style={{ fontSize: '1.2rem', color: 'var(--or-d)' }}>{rp(total)}</b>
@@ -290,7 +295,7 @@ export default function Checkout() {
 
         <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
           <small>
-            Produk dari mitra berbeda dipecah menjadi satu pesanan per mitra. Mitra akan memeriksa pembayaran dan mengonfirmasi pesananmu.
+            Produk dari mitra berbeda dipisah menjadi satu pesanan per mitra. {f.metode === 'QRIS' ? 'Admin memeriksa pembayaran sebelum mitra memproses pesanan.' : 'Mitra mengonfirmasi pembayaran di lapak.'}
           </small>
         </p>
       </aside>

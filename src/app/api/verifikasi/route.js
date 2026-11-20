@@ -1,6 +1,6 @@
 import { createHash, randomInt } from 'node:crypto';
 import { siapa, err, getRow, put, upd } from '@/lib/server';
-import { hapusData, ubahData, denganTransaksi } from '@/lib/db';
+import { cariSatu, hapusData, ubahData, denganTransaksi } from '@/lib/db';
 import { getJwtSecret } from '@/lib/auth';
 import { kirimEmail, kirimWA } from '@/lib/kirim';
 export const dynamic = 'force-dynamic';
@@ -16,6 +16,7 @@ export async function POST(req) {
   const { db } = { db: null };
   const pg = await getRow(db, 'pengguna', u.$id).catch(() => null);
   if (!pg) return err('Profil belum dibuat.', 404);
+  if (pg.status_akun === 'DIBLOKIR') return err('Akun diblokir.', 403);
   if (pg.kontak_terverifikasi) return Response.json({ ok: true, sudah: true });
   const lama = await getRow(db, 'kode_verifikasi', u.$id).catch(() => null);
 
@@ -43,10 +44,16 @@ export async function POST(req) {
       return err('Kode salah.');
     }
     const dipakai = await denganTransaksi(async () => {
+      const kontak = await getRow(db, 'pengguna', u.$id);
+      const tujuan = kontak.kanal === 'WHATSAPP' ? kontak.no_telepon : kontak.email;
+      if (kontak.status_akun === 'DIBLOKIR' || kontak.kanal !== lama.kanal || tujuan !== lama.tujuan) return false;
       const consume = await hapusData('kode_verifikasi', { _id: u.$id, kode_hash: lama.kode_hash, percobaan: { $lt: 5 }, kedaluwarsa: { $gt: new Date() } });
       if (!consume.deletedCount) return false;
-      const pembeli = await getRow(null, 'pembeli', u.$id).catch(() => null);
-      await upd(null, 'pengguna', u.$id, { kontak_terverifikasi: true, ...(pembeli ? { status_akun: 'AKTIF' } : {}) });
+      const mitra = await cariSatu('mitra', { _id: u.$id });
+      await upd(null, 'pengguna', u.$id, {
+        kontak_terverifikasi: true,
+        ...(!mitra && kontak.status_akun === 'MENUNGGU_VERIFIKASI' ? { status_akun: 'AKTIF' } : {}),
+      });
       return true;
     });
     if (!dipakai) return err('Kode sudah tidak berlaku. Minta kode baru.', 409);

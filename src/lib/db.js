@@ -82,18 +82,19 @@ export async function denganTransaksi(jalankan) {
   if (transaksi.getStore()) return jalankan();
   const client = await (await getDatabase()).connect();
   const context = { client, setelahCommit: [] };
+  let hasil;
   try {
     await client.query('BEGIN');
-    const hasil = await transaksi.run(context, jalankan);
+    hasil = await transaksi.run(context, jalankan);
     await client.query('COMMIT');
-    await Promise.allSettled(context.setelahCommit.map((callback) => callback()));
-    return hasil;
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     throw error;
   } finally {
     client.release();
   }
+  await Promise.allSettled(context.setelahCommit.map(async (callback) => callback()));
+  return hasil;
 }
 
 export async function sesudahCommit(callback) {

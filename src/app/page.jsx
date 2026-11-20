@@ -47,6 +47,7 @@ export default function Beranda() {
   const { akun, peran, toast, keranjang, ubahItemKeranjang } = useSaya();
   const r = useRouter();
   const [p, setP] = useState(null);
+  const [galatKatalog, setGalatKatalog] = useState('');
   const [m, setM] = useState([]);
   const [q, setQ] = useState('');
   const [k, setK] = useState('Semua');
@@ -54,13 +55,26 @@ export default function Beranda() {
   const [baru, setBaru] = useState(null);
 
   useEffect(() => {
-    Promise.all([list('produk', [Query.orderDesc('$createdAt')]), list('mitra')]).then(([ps, ms]) => { setP(ps); setM(ms); }).catch(() => setP([]));
-    const t = setInterval(() => { if (!document.hidden) list('produk', [Query.orderDesc('$createdAt')]).then(setP).catch(() => {}); }, 15000); // stok mengikuti penjualan offline mitra
-    return () => clearInterval(t);
+    let aktif = true;
+    const muat = async () => {
+      try {
+        const [ps, ms] = await Promise.all([list('produk', [Query.orderDesc('$createdAt'), Query.limit(500)]), list('mitra', [Query.limit(500)])]);
+        if (aktif) { setP(ps); setM(ms); setGalatKatalog(''); }
+      } catch (error) {
+        if (aktif) setGalatKatalog(error.message);
+      }
+    };
+    muat();
+    const t = setInterval(() => { if (!document.hidden) muat(); }, 30000); // stok mengikuti penjualan offline mitra
+    return () => {
+      aktif = false;
+      clearInterval(t);
+    };
   }, []);
 
   const nama = useMemo(() => Object.fromEntries(m.map((x) => [x.$id, x.nama_usaha])), [m]);
   const kat = useMemo(() => ['Semua', ...new Set((p || []).map((x) => x.kategori))], [p]);
+  const layananMitra = new Map(m.map((mitra) => [mitra.$id, mitra]));
   const lapakAda = m.filter((x) => (p || []).some((y) => y.id_mitra === x.$id));
   const tampil = (p || []).filter((x) => (k === 'Semua' || x.kategori === k) && (!lapak || x.id_mitra === lapak) && x.nama.toLowerCase().includes(q.toLowerCase()));
   const keranjangMap = useMemo(() => Object.fromEntries((keranjang || []).map((i) => [i.id_produk, i.jumlah])), [keranjang]);
@@ -147,6 +161,8 @@ export default function Beranda() {
               <div className="pb">
                 <Link href={`/produk/${x.$id}`} className="nm">{x.nama}</Link>
                 <small className="muted">{nama[x.id_mitra] || 'Mitra'}</small>
+                <small className="muted" style={{ display: 'block' }}>{layananMitra.get(x.id_mitra)?.antar_aktif
+                  ? 'Siap diantar + ' + rp(layananMitra.get(x.id_mitra).ongkir) + ' ongkir' : 'Ambil di lapak'}</small>
                 <div className="pf">
                   <span className="tag">{rp(x.harga)}</span>
                   {x.stok > 0 && (
@@ -187,6 +203,7 @@ export default function Beranda() {
             </article>
           ))}
         </div>
+        {galatKatalog && <p className="msg err" role="status">{galatKatalog} Katalog akan dimuat ulang otomatis.</p>}
         {p && !tampil.length && <p className="kosong">{p.length ? 'Tidak ada produk yang cocok. Coba kata kunci, kategori, atau lapak lain.' : 'Belum ada produk. Mitra yang sudah diverifikasi bisa menambahkannya dari menu Lapak saya.'}</p>}
       </div></section>
 

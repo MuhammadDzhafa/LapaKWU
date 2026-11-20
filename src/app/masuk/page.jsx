@@ -29,6 +29,8 @@ export default function Masuk() {
       // Determine role and redirect accordingly
       const me = await account.get();
 
+      if (!me) throw new Error('Sesi masuk belum tersedia. Silakan coba lagi.');
+      if (me.peran === 'mitra') { location.href = '/mitra'; return; }
       if (me.peran === 'admin') {
         location.href = '/admin';
         return;
@@ -58,26 +60,26 @@ export default function Masuk() {
           <label htmlFor="e">Email</label>
           <input id="e" type="email" required autoComplete="email" value={f.email} onChange={set('email')} />
         </div>
-        <div className="field" style={{ position: 'relative' }}>
+        <div className="field">
           <label htmlFor="p">Kata sandi</label>
-          <input
-            id="p"
-            type={showPass ? 'text' : 'password'}
-            minLength={8}
-            required
-            autoComplete="current-password"
-            style={{ paddingRight: 44 }}
-            value={f.password}
-            onChange={set('password')}
-          />
-          <button
-            type="button"
-            onClick={() => setShowPass(!showPass)}
-            style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#5E6A75', paddingTop: 22 }}
-            aria-label={showPass ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
-          >
-            <EyeIcon show={showPass} />
-          </button>
+          <div className="auth-password">
+            <input
+              id="p"
+              type={showPass ? 'text' : 'password'}
+              minLength={8}
+              required
+              autoComplete="current-password"
+              value={f.password}
+              onChange={set('password')}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPass((terlihat) => !terlihat)}
+              aria-label={showPass ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+            >
+              <EyeIcon show={showPass} />
+            </button>
+          </div>
         </div>
         <div style={{ textAlign: 'right', marginTop: -4, marginBottom: 12 }}>
           <Link href="/lupa-sandi" className="muted" style={{ fontSize: '0.875rem' }}>Lupa Kata Sandi?</Link>

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
-import { openSync, closeSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, openSync, closeSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { setTimeout as tunggu } from 'node:timers/promises';
 import pg from 'pg';
 
@@ -24,10 +24,15 @@ if (process.env.LAPAKWU_POSTGRES_LOCAL === '1') {
   }
   url.pathname = '/postgres';
   if (!await siap(url)) {
-    const folder = join(process.cwd(), 'data', 'postgres-dev');
+    const folder = resolve(process.env.LAPAKWU_POSTGRES_DIR?.trim() || join('data', 'postgres-dev'));
     const postgres = join(folder, 'node_modules', '@embedded-postgres', 'windows-x64', 'native', 'bin', 'postgres.exe');
-    const log = openSync(join(folder, 'postgres.log'), 'a');
-    const child = spawn(postgres, ['-D', join(folder, 'cluster'), '-h', url.hostname, '-p', url.port], {
+    const cluster = join(folder, 'cluster');
+    if (!existsSync(postgres) || !existsSync(join(cluster, 'PG_VERSION'))) {
+      throw new Error('PostgreSQL belum berjalan. Arahkan LAPAKWU_POSTGRES_DIR ke folder PostgreSQL portabel yang memuat node_modules dan cluster.');
+    }
+    const logPath = join(folder, 'postgres.log');
+    const log = openSync(logPath, 'a');
+    const child = spawn(postgres, ['-D', cluster, '-h', url.hostname, '-p', url.port], {
       detached: true, windowsHide: true, stdio: ['ignore', log, log],
     });
     closeSync(log);
@@ -40,6 +45,6 @@ if (process.env.LAPAKWU_POSTGRES_LOCAL === '1') {
       await tunggu(400);
       if (await siap(url)) { terhubung = true; break; }
     }
-    if (!terhubung) throw gagal || new Error('PostgreSQL lokal gagal dimulai. Lihat data/postgres-dev/postgres.log.');
+    if (!terhubung) throw gagal || new Error('PostgreSQL lokal gagal dimulai. Lihat ' + logPath);
   }
 }

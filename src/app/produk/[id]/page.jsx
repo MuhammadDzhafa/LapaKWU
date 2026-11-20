@@ -20,7 +20,13 @@ export default function Detail() {
 
   useEffect(() => {
     ambil('produk', id).then(async (x) => { setP(x); setMt(await ambil('mitra', x.id_mitra).catch(() => null)); }).catch(() => setP(false));
-    const t = setInterval(() => { if (!document.hidden) ambil('produk', id).then(setP).catch(() => {}); }, 15000); // stok mengikuti penjualan offline mitra
+    const t = setInterval(() => {
+      if (document.hidden) return;
+      ambil('produk', id).then(async (produk) => {
+        setP(produk);
+        setMt(await ambil('mitra', produk.id_mitra));
+      }).catch(() => {});
+    }, 30000); // stok mengikuti penjualan offline mitra
     return () => clearInterval(t);
   }, [id]);
 
@@ -80,6 +86,7 @@ export default function Detail() {
       <div className="stack">
         <h2 style={{ marginBottom: 0 }}>{p.nama}</h2>
         <p className="muted">{p.kategori} • dijual oleh <b>{mt?.nama_usaha || 'Mitra'}</b></p>
+        <p className="muted">{mt?.antar_aktif ? 'Siap diantar + ' + rp(mt.ongkir) + ' ongkir per pesanan' : 'Ambil di lapak'}</p>
         <span className="tag" style={{ fontSize: '1.4rem' }}>{rp(p.harga)}</span>
         <p>{p.deskripsi || 'Belum ada deskripsi.'}</p>
         <p><span className="badge" data-s={p.stok > 0 ? 'AKTIF' : 'DIBATALKAN'}>{p.stok > 0 ? `Stok ${p.stok}` : 'Stok habis'}</span>{mt?.alamat_usaha && <small className="muted"> &nbsp;Lapak di {mt.alamat_usaha}</small>}</p>

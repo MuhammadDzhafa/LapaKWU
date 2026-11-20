@@ -28,6 +28,9 @@ export function getTransporter() {
   if (!user || !pass) return null;
   _transporter = nodemailer.createTransport({
     service: 'gmail',
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 15000,
     auth: {
       user,
       pass, // App Password Gmail (16 digit)
@@ -144,7 +147,7 @@ export async function kirimWA(nomor, pesan) {
       body: new URLSearchParams({ target: nomor, message: pesan, countryCode: '62' }),
     });
     const d = await r.json().catch(() => ({}));
-    return r.ok && d.status !== false;
+    return r.ok && d.status === true;
   } catch { return false; }
 }
 

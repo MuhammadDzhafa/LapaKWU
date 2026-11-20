@@ -1,13 +1,15 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { list, api, storage, ID, Query, BUCKET, rp, img } from '@/lib/aw';
+import { list, ubah, api, storage, ID, Query, BUCKET, rp, img } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
 import { periodeJakarta } from '@/lib/waktu';
 import Pesanan from '@/components/Pesanan';
 import DompetMitra from '@/components/DompetMitra';
 import Rekap from '@/components/Rekap';
 import Modal from '@/components/Modal';
+import Ikon from '@/components/Ikon';
+import { Hitung } from '@/components/Motion';
 
 export default function Lapak() {
   const { akun, peran, pengguna, mitra, memuat, muat: muatSaya, toast } = useSaya();
@@ -20,6 +22,9 @@ export default function Lapak() {
   const [st, setSt] = useState(null);
   const [off, setOff] = useState(null);
   const [edit, setEdit] = useState({});
+  const [notifikasi, setNotifikasi] = useState([]);
+  const [layanan, setLayanan] = useState(null);
+  const [simpanLayanan, setSimpanLayanan] = useState(false);
 
   // Modal State pengganti alert/confirm/prompt
   const [modalInfo, setModalInfo] = useState(null);
@@ -43,11 +48,43 @@ export default function Lapak() {
 const bln = () => periodeJakarta();
   const muatOff = useCallback(() => list('penjualan_offline', [Query.equal('id_mitra', akun.$id), Query.equal('periode', bln()), Query.limit(500)]).then(setOff).catch(() => setOff([])), [akun]);
   useEffect(() => { if (akun && peran === 'mitra' && tab === 'offline') muatOff(); }, [akun, peran, tab, muatOff]);
+  const uid = akun?.$id;
+  useEffect(() => {
+    if (!uid || peran !== 'mitra') return;
+    let aktif = true;
+    const periksa = async () => {
+      if (document.hidden) return;
+      try {
+        const hasil = await list('notifikasi', [Query.equal('id_pengguna', uid), Query.equal('sudah_dibaca', false), Query.orderDesc('$createdAt'), Query.limit(10)]);
+        if (aktif) setNotifikasi(hasil);
+      } catch {}
+    };
+    periksa();
+    const timer = setInterval(periksa, 5000);
+    window.addEventListener('focus', periksa);
+    return () => { aktif = false; clearInterval(timer); window.removeEventListener('focus', periksa); };
+  }, [uid, peran]);
   if (memuat) return <main className="wrap" />;
   if (peran !== 'mitra') return <main className="wrap"><p className="kosong">Halaman ini khusus mitra. <Link className="link" href="/masuk">Masuk atau daftar sebagai mitra</Link></p></main>;
   if (pengguna?.status_akun !== 'AKTIF') return (
     <main className="wrap" style={{ maxWidth: 620 }}><h2>Lapak {mitra?.nama_usaha}</h2>
       <p className="msg">{pengguna?.status_akun === 'DITOLAK' ? `Datamu perlu diperbaiki: ${mitra?.catatan_verifikasi}` : pengguna?.status_akun === 'DIBLOKIR' ? 'Akunmu diblokir admin.' : 'Akunmu menunggu verifikasi email dan persetujuan admin. Setelah disetujui, kamu bisa menambah produk di sini.'}</p></main>);
+
+  const pengantaran = layanan ?? { antar_aktif: mitra?.antar_aktif === true, ongkir: mitra?.ongkir ?? 0 };
+  const simpanPengantaran = async (e) => {
+    e.preventDefault();
+    setSimpanLayanan(true);
+    try {
+      await api('/api/profil', { aksi: 'pengantaran', ...pengantaran, ongkir: Number(pengantaran.ongkir) });
+      await muatSaya();
+      setLayanan(null);
+      toast('Pengaturan pengantaran disimpan.');
+    } catch (error) {
+      toast(error.message, true);
+    } finally {
+      setSimpanLayanan(false);
+    }
+  };
 
   const tambah = async (e) => {
     e.preventDefault(); setMsg('');
@@ -231,8 +268,17 @@ const bln = () => periodeJakarta();
           onBatal={() => setModalInfo(null)}
         />
       )}
-      <h2>Lapak {mitra?.nama_usaha}</h2>
-      {st && <div className="stats"><div className="stat"><small>Pesanan baru</small><b>{st.baru}</b></div><div className="stat"><small>Penjualan bulan ini</small><b>{rp(st.jual)}</b></div></div>}
+      <div className="dash-head">
+        <div>
+          <h2>Lapak {mitra?.nama_usaha}</h2>
+          <p>Atur produk, stok, dan pesanan masuk dari sini.</p>
+        </div>
+        {st && <span className={'todo' + (st.baru ? '' : ' ok')} role="status">{st.baru ? `${st.baru} pesanan baru` : 'Belum ada pesanan baru'}</span>}
+      </div>
+      {st && <div className="stats">
+        <button type="button" className="stat" onClick={() => setTab('pesanan')}><i className="si"><Ikon n="inbox" size={22} /></i><small>Pesanan baru</small><b><Hitung ke={Number(st.baru) || 0} /></b></button>
+        <div className="stat"><i className="si"><Ikon n="chart" size={22} /></i><small>Penjualan bulan ini</small><b>{rp(st.jual)}</b></div>
+      </div>}
       {!mitra?.id_qris && (
         <div className="msg" style={{ background: 'var(--tint)', border: '1px solid var(--ye)', color: 'var(--ink)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <span>⚠️ <b>Barcode QRIS toko belum diunggah.</b> Unggah QRIS untuk menerima pencairan saldo.</span>
@@ -240,23 +286,49 @@ const bln = () => periodeJakarta();
         </div>
       )}
 
-      <div className="tabs">
+      <div className="tabs" role="tablist" aria-label="Bagian lapak">
         {[
-          ['produk', 'Produk dan stok'],
-          ['offline', 'Terjual offline'],
-          ['pesanan', 'Pesanan masuk'],
-          ['qris', 'QRIS Toko'],
-          ['dompet', 'Dompet Mitra'],
-          ['rekap', 'Rekap Penjualan'],
-        ].map(([k, t]) => (
-          <button key={k} className={'chip' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>
-            {t}
+          ['produk', 'Produk dan stok', 'box'],
+          ['offline', 'Terjual offline', 'tag'],
+          ['pesanan', 'Pesanan masuk', 'inbox'],
+          ['qris', 'QRIS Toko', 'qr'],
+          ['dompet', 'Dompet Mitra', 'wallet'],
+          ['rekap', 'Rekap Penjualan', 'chart'],
+        ].map(([k, t, ic]) => (
+          <button key={k} role="tab" aria-selected={tab === k} className={'chip' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>
+            <Ikon n={ic} size={16} />{t}
           </button>
         ))}
       </div>
 
       {msg && <p className="msg" role="status">{msg}</p>}
 
+      {!!notifikasi.length && <section className="card pad stack" aria-live="polite">
+        <h3>Notifikasi lapak</h3>
+        {notifikasi.map((n) => <div key={n.$id}>
+          <b>{n.judul}</b><p style={{ overflowWrap: 'anywhere' }}>{n.pesan}</p>
+          <button type="button" className="btn sm out" onClick={async () => {
+            setTab('pesanan');
+            try {
+              await ubah('notifikasi', n.$id, { sudah_dibaca: true });
+              setNotifikasi((items) => items.filter((item) => item.$id !== n.$id));
+            } catch (error) { toast(error.message, true); }
+          }}>Lihat pesanan</button>
+        </div>)}
+      </section>}
+      {tab === 'produk' && <form className="card pad stack" onSubmit={simpanPengantaran}>
+        <h3>Pengantaran pesanan</h3>
+        <label className="row"><input type="checkbox" role="switch" style={{ width: 'auto' }}
+          checked={pengantaran.antar_aktif} disabled={simpanLayanan}
+          onChange={(e) => setLayanan({ ...pengantaran, antar_aktif: e.target.checked })} /> Terima pesanan antar</label>
+        <div className="field">
+          <label htmlFor="ongkir">Ongkir per pesanan (Rp)</label>
+          <input id="ongkir" type="number" required min="0" max="999999999" step="1"
+            value={pengantaran.ongkir} disabled={simpanLayanan}
+            onChange={(e) => setLayanan({ ...pengantaran, ongkir: e.target.value })} />
+        </div>
+        <button className="btn sm sun" disabled={simpanLayanan}>Simpan pengantaran</button>
+      </form>}
       {tab === 'produk' && <div className="split s1">
         <form className="card pad" onSubmit={tambah}><h3>Tambah produk</h3>
           <div className="field"><label htmlFor="pn">Nama</label><input id="pn" required value={f.nama} onChange={set('nama')} /></div>

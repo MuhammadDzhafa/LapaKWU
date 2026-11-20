@@ -42,6 +42,32 @@ export function terbang(dari) {
   };
 }
 
+/* Percikan kecil berwarna palet saat produk masuk keranjang. */
+export function percik(dari) {
+  if (!dari || kurangiGerak()) return;
+  const r = dari.getBoundingClientRect();
+  const x0 = r.left + r.width / 2, y0 = r.top + r.height / 2;
+  const warna = ['var(--or)', 'var(--ye)', 'var(--bl)', 'var(--ink)', 'var(--cr)'];
+  const wadah = document.createElement('div');
+  wadah.className = 'fly'; wadah.setAttribute('aria-hidden', 'true');
+  wadah.style.cssText = `left:${x0}px;top:${y0}px;width:0;height:0`;
+  document.body.appendChild(wadah);
+  let sisa = 10;
+  for (let i = 0; i < 10; i++) {
+    const b = document.createElement('i');
+    const u = 5 + Math.random() * 6;
+    b.style.cssText = `position:absolute;left:${-u / 2}px;top:${-u / 2}px;width:${u}px;height:${u}px;border-radius:${i % 3 ? '50%' : '2px'};background:${warna[i % warna.length]}`;
+    wadah.appendChild(b);
+    const sudut = (i / 10) * Math.PI * 2 + Math.random() * 0.6, jarak = 34 + Math.random() * 30;
+    const a = b.animate([
+      { transform: 'translate(0,0) scale(1) rotate(0)', opacity: 1 },
+      { transform: `translate(${Math.cos(sudut) * jarak}px,${Math.sin(sudut) * jarak - 10}px) scale(1) rotate(${Math.random() * 240}deg)`, opacity: 1, offset: 0.6 },
+      { transform: `translate(${Math.cos(sudut) * jarak * 1.15}px,${Math.sin(sudut) * jarak + 22}px) scale(.2) rotate(${Math.random() * 360}deg)`, opacity: 0 },
+    ], { duration: 650 + Math.random() * 200, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
+    a.onfinish = () => { if (--sisa === 0) wadah.remove(); };
+  }
+}
+
 /* Angka yang berhitung naik saat terlihat. */
 export function Hitung({ ke, durasi = 1100 }) {
   const ref = useRef(null);
@@ -137,6 +163,8 @@ export default function Motion() {
       raf = requestAnimationFrame(() => {
         const t = e.target.closest?.('.prod,.step,.stat,.stack>.card,.pcard,.stall,.idcard');
         if (t) { const r = t.getBoundingClientRect(); t.style.setProperty('--mx', `${e.clientX - r.left}px`); t.style.setProperty('--my', `${e.clientY - r.top}px`); }
+        const pr = e.target.closest?.('.prod');
+        if (pr) { const r = pr.getBoundingClientRect(); pr.style.setProperty('--ty', `${(((e.clientX - r.left) / r.width - 0.5) * 9).toFixed(2)}deg`); pr.style.setProperty('--tx', `${((0.5 - (e.clientY - r.top) / r.height) * 9).toFixed(2)}deg`); }
         const h = e.target.closest?.('.hero2');
         if (h) { const r = h.getBoundingClientRect(); h.style.setProperty('--gx', `${e.clientX - r.left}px`); h.style.setProperty('--gy', `${e.clientY - r.top}px`); }
         const btn = e.target.closest?.('.btn.lg');
@@ -149,6 +177,10 @@ export default function Motion() {
       });
     };
     addEventListener('pointermove', bergerak, { passive: true });
+    const lepas = (e) => { const pr = e.target.closest?.('.prod'); if (pr && !pr.contains(e.relatedTarget)) { pr.style.removeProperty('--tx'); pr.style.removeProperty('--ty'); } };
+    addEventListener('pointerout', lepas, { passive: true });
+    const klikTambah = (e) => { const t = e.target.closest?.('.plus,.step-btn.plus-btn'); if (t && !t.disabled) percik(t); };
+    addEventListener('click', klikTambah);
 
     /* riak air saat menekan tombol */
     const tekan = (e) => {
@@ -165,9 +197,105 @@ export default function Motion() {
 
     return () => {
       removeEventListener('scroll', onScroll); removeEventListener('keydown', kunci);
-      removeEventListener('pointermove', bergerak); removeEventListener('pointerdown', tekan);
+      removeEventListener('pointermove', bergerak); removeEventListener('pointerdown', tekan); removeEventListener('pointerout', lepas); removeEventListener('click', klikTambah);
       io.disconnect(); mo.disconnect(); cancelAnimationFrame(raf);
     };
+  }, []);
+
+  /* Dibiarkan aktif walau animasi dikurangi: ini soal keterbacaan, bukan gerak. */
+  useEffect(() => {
+    /* Tabel jadi kartu di layar sempit: tiap sel membawa nama kolomnya (data-label). */
+    let rafT = 0;
+    const beriLabel = () => {
+      rafT = 0;
+      document.querySelectorAll('table').forEach((t) => {
+        const kolom = [...t.querySelectorAll('thead th')].map((th) => th.textContent.trim());
+        if (!kolom.length) return;
+        t.setAttribute('data-kartu', '');
+        t.querySelectorAll('tbody tr, tfoot tr').forEach((tr) => {
+          let c = 0;
+          [...tr.children].forEach((sel) => {
+            const lebar = sel.colSpan || 1;
+            if (lebar === 1) sel.setAttribute('data-label', kolom[c] || '');
+            c += lebar;
+          });
+        });
+      });
+    };
+    const jadwal = () => { if (!rafT) rafT = requestAnimationFrame(beriLabel); };
+    jadwal();
+    const moT = new MutationObserver(jadwal);
+    moT.observe(document.body, { childList: true, subtree: true });
+
+    /* Tab yang diketuk digeser ke tengah supaya tab di sebelahnya kelihatan. */
+    const klikTab = (e) => {
+      const c = e.target.closest?.('.tabs .chip');
+      if (c) requestAnimationFrame(() => c.scrollIntoView({ inline: 'center', block: 'nearest', behavior: kurangiGerak() ? 'auto' : 'smooth' }));
+    };
+    addEventListener('click', klikTab);
+    return () => { moT.disconnect(); cancelAnimationFrame(rafT); removeEventListener('click', klikTab); };
+  }, []);
+
+  /* Indikator yang meluncur antar tab/menu, dan penunjuk kursor yang mengikuti dengan halus. */
+  useEffect(() => {
+    let rafG = 0;
+    const luncur = () => {
+      rafG = 0;
+      document.querySelectorAll('.tabs, .dock').forEach((w) => {
+        const aktif = w.querySelector('.chip.on, .dock-i[aria-current=page]');
+        let p = w.querySelector(':scope > .glide');
+        if (!aktif) { if (p) p.style.opacity = 0; return; }
+        if (!p) {
+          p = document.createElement('span'); p.className = 'glide'; p.setAttribute('aria-hidden', 'true');
+          w.appendChild(p); w.setAttribute('data-glide', '');
+        }
+        p.style.opacity = 1;
+        p.style.width = `${aktif.offsetWidth}px`; p.style.height = `${aktif.offsetHeight}px`;
+        p.style.transform = `translate(${aktif.offsetLeft}px,${aktif.offsetTop}px)`;
+        if (!p.classList.contains('siap')) requestAnimationFrame(() => requestAnimationFrame(() => p.classList.add('siap')));
+      });
+    };
+    const jadwalG = () => { if (!rafG) rafG = requestAnimationFrame(luncur); };
+    jadwalG();
+    const moG = new MutationObserver(jadwalG);
+    moG.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'aria-current'] });
+    addEventListener('resize', jadwalG);
+    document.fonts?.ready?.then(jadwalG);
+
+    let bersih = () => {};
+    if (!kurangiGerak() && matchMedia('(hover:hover) and (pointer:fine)').matches) {
+      const k = document.createElement('div');
+      k.className = 'kursor'; k.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(k);
+      let x = 0, y = 0, tx = 0, ty = 0, rafK = 0, ada = false;
+      const putar = () => {
+        x += (tx - x) * 0.2; y += (ty - y) * 0.2;
+        k.style.transform = `translate3d(${x}px,${y}px,0)`;
+        rafK = Math.abs(tx - x) + Math.abs(ty - y) > 0.3 ? requestAnimationFrame(putar) : 0;
+      };
+      const pindah = (e) => {
+        if (e.pointerType === 'touch') return;
+        tx = e.clientX; ty = e.clientY;
+        if (!ada) { ada = true; x = tx; y = ty; k.classList.add('on'); }
+        const el = e.target.closest?.('a,button,.chip,.prod,.stall,label,select,[role=button],[role=tab]');
+        k.classList.toggle('besar', !!el);
+        k.classList.toggle('teks', !!e.target.closest?.('input:not([type=file]):not([type=checkbox]):not([type=radio]),textarea'));
+        if (!rafK) rafK = requestAnimationFrame(putar);
+      };
+      const keluar = () => { ada = false; k.classList.remove('on'); };
+      const turun = () => k.classList.add('tekan');
+      const naik = () => k.classList.remove('tekan');
+      addEventListener('pointermove', pindah, { passive: true });
+      document.documentElement.addEventListener('pointerleave', keluar);
+      addEventListener('pointerdown', turun, { passive: true });
+      addEventListener('pointerup', naik, { passive: true });
+      bersih = () => {
+        removeEventListener('pointermove', pindah); document.documentElement.removeEventListener('pointerleave', keluar);
+        removeEventListener('pointerdown', turun); removeEventListener('pointerup', naik);
+        cancelAnimationFrame(rafK); k.remove();
+      };
+    }
+    return () => { moG.disconnect(); cancelAnimationFrame(rafG); removeEventListener('resize', jadwalG); bersih(); };
   }, []);
 
   return <div className="progress" aria-hidden="true" />;

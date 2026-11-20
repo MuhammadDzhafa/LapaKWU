@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { account, list, Query, rp, ubahJumlahKeranjang } from '@/lib/aw';
 import Footer from '@/components/Footer';
 import Motion from '@/components/Motion';
+import Ikon from '@/components/Ikon';
 import { bacaKeranjangLokal, simpanKeranjangLokal } from '@/lib/keranjang-lokal';
 
 const Ctx = createContext({});
@@ -55,6 +56,7 @@ export default function Shell({ children }) {
   const muat = useCallback(async () => {
     try {
       const data = await account.get();
+      if (!data) { setS({ memuat: false }); muatKeranjang(); return; }
       setS({
         akun: { $id: data.$id, name: data.name, email: data.email },
         pengguna: data.pengguna,
@@ -156,9 +158,19 @@ export default function Shell({ children }) {
   const awal = (nama.trim()[0] || '?').toUpperCase();
   const aktif = (h) => (h === '/' ? path === '/' : path.startsWith(h)) ? 'page' : undefined;
 
+  const tanpaDock = ['/checkout', '/masuk', '/daftar', '/lupa-sandi', '/reset-sandi', '/verifikasi'].includes(path);
+  const dock = s.akun ? [
+    ['/', 'Katalog', 'home'],
+    ...(s.peran === 'mitra' ? [['/mitra', 'Lapak', 'store']] : s.peran === 'admin' ? [['/admin', 'Admin', 'shield']] : []),
+    ['/keranjang', 'Keranjang', 'bag'],
+    ['/pesanan', 'Pesanan', 'receipt'],
+    ['/profil', 'Saya', 'user'],
+  ] : [['/', 'Katalog', 'home'], ['/masuk', 'Masuk', 'login']];
+  const menuCepat = dock.filter(([href]) => href !== '/' || path !== '/');
+
   const NavMenu = ({ onClick }) => (
     <>
-      <Link href="/" onClick={onClick} aria-current={aktif('/')}>Katalog</Link>
+      {path !== '/' && <Link href="/" onClick={onClick}>Katalog</Link>}
       {s.peran === 'pembeli' && (
         <>
           <Link href="/keranjang" onClick={onClick} aria-current={aktif('/keranjang')}>Keranjang</Link>
@@ -187,7 +199,7 @@ export default function Shell({ children }) {
       <Link href="/profil" className="me" aria-current={aktif('/profil')} aria-label={`Profil ${nama}`}>
         <i>{awal}</i><span>{nama.split(' ')[0]}</span>
       </Link>
-    ) : !s.memuat ? (
+    ) : !s.memuat && path !== '/masuk' ? (
       <Link href="/masuk" className="btn sm">Masuk</Link>
     ) : null
   );
@@ -203,7 +215,7 @@ export default function Shell({ children }) {
           </span>
         </div>
       </Link>
-    ) : !s.memuat ? (
+    ) : !s.memuat && path !== '/masuk' ? (
       <Link href="/masuk" className="btn sm" onClick={onClick} style={{ width: '100%', textAlign: 'center' }}>
         Masuk / Daftar Akun
       </Link>
@@ -246,9 +258,9 @@ export default function Shell({ children }) {
         <nav className="nav-sidebar-body">
           <NavMenu onClick={tutup} />
         </nav>
-        <div className="nav-sidebar-foot">
+        {(s.akun || (!s.memuat && path !== '/masuk')) && <div className="nav-sidebar-foot">
           <NavUserMobile onClick={tutup} />
-        </div>
+        </div>}
       </aside>
       {perlu && (
         <div className="banner"><div className="wrap">
@@ -258,6 +270,20 @@ export default function Shell({ children }) {
       )}
       <div key={path} className="page">{children}</div>
       <Footer />
+
+      {!tanpaDock && !s.memuat && (
+        <nav className="dock" aria-label="Menu cepat" style={{ '--n': menuCepat.length }}>
+          {menuCepat.map(([h, l, ic]) => (
+            <Link key={h} href={h} className="dock-i" aria-current={aktif(h)}>
+              <span className="dock-ic">
+                <Ikon n={ic} size={22} />
+                {h === '/keranjang' && jumlahKeranjang > 0 && <b key={jumlahKeranjang} className="dock-n">{jumlahKeranjang > 99 ? '99+' : jumlahKeranjang}</b>}
+              </span>
+              <span className="dock-t">{l}</span>
+            </Link>
+          ))}
+        </nav>
+      )}
 
       {/* ── Floating Cart Bar ala ShopeeFood / GoFood ── */}
       {jumlahKeranjang > 0 && !['/keranjang', '/checkout'].includes(path) && (

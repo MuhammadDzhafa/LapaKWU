@@ -5,16 +5,18 @@ import { hapus, api, rp, img, tgl } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
 import Rekap from '@/components/Rekap';
 import Modal from '@/components/Modal';
+import Ikon from '@/components/Ikon';
+import { Hitung } from '@/components/Motion';
 import { JUMLAH_TENANT } from '@/lib/tenant';
 
 const TABS = [
-  ['mitra', 'Verifikasi mitra'],
-  ['qris', 'Verifikasi QRIS'],
-  ['pencairan', 'Pencairan Mitra'],
-  ['pengguna', 'Pengguna dan peran'],
-  ['produk', 'Produk'],
-  ['rekap', 'Rekap Penjualan'],
-  ['refund', 'Refund'],
+  ['mitra', 'Verifikasi mitra', 'store'],
+  ['qris', 'Verifikasi QRIS', 'qr'],
+  ['pencairan', 'Pencairan Mitra', 'cash'],
+  ['pengguna', 'Pengguna dan peran', 'users'],
+  ['produk', 'Produk', 'box'],
+  ['rekap', 'Rekap Penjualan', 'chart'],
+  ['refund', 'Refund', 'undo'],
 ];
 
 export default function Admin() {
@@ -151,6 +153,13 @@ export default function Admin() {
     });
   };
 
+  useEffect(() => {
+    if (!modalGambar) return undefined;
+    const esc = (e) => e.key === 'Escape' && setModalGambar(null);
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [modalGambar]);
+
   const nama = Object.fromEntries(d.m.map((x) => [x.$id, x.nama_usaha]));
   const pg = (id) => d.u.find((x) => x.$id === id);
   const peranDari = (id) => (d.ad.some((x) => x.$id === id) ? 'admin' : d.m.some((x) => x.$id === id) ? 'mitra' : 'pembeli');
@@ -158,6 +167,10 @@ export default function Admin() {
 
   if (memuat) return <main className="wrap" />;
   if (peran !== 'admin') return <main className="wrap"><p className="kosong">Halaman ini khusus admin. <Link className="link" href="/masuk">Masuk</Link></p></main>;
+  const nMitra = d.m.filter((x) => pg(x.$id)?.status_akun !== 'AKTIF').length;
+  const nQris = (d.qris || []).length;
+  const nRefund = d.rf.length;
+  const nTindak = nMitra + nQris + nRefund + pencairan.length;
   return (
     <main className="wrap">
       {modalInfo && (
@@ -176,16 +189,24 @@ export default function Admin() {
           onBatal={() => setModalInfo(null)}
         />
       )}
-      <h2>Panel admin</h2>
-      <div className="stats">
-        <div className="stat"><small>Mitra menunggu</small><b>{d.m.filter((x) => pg(x.$id)?.status_akun !== 'AKTIF').length}</b></div>
-        <div className="stat"><small>QRIS menunggu</small><b>{(d.qris || []).length}</b></div>
-        <div className="stat"><small>Total pengguna</small><b>{d.u.length}</b></div>
-        <div className="stat"><small>Refund menunggu</small><b>{d.rf.length}</b></div>
+      <div className="dash-head">
+        <div>
+          <h2>Panel admin</h2>
+          <p>Semua yang perlu kamu cek hari ini ada di sini.</p>
+        </div>
+        <span className={'todo' + (nTindak ? '' : ' ok')} role="status">
+          {nTindak ? `${nTindak} hal perlu tindakan` : 'Semua sudah beres'}
+        </span>
       </div>
-      <div className="tabs">{TABS.map(([k, t]) => (
-        <button key={k} className={'chip' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>
-          {t}{k === 'pencairan' && pencairan.length > 0 && ` (${pencairan.length}${pencairan.length === 50 ? '+' : ''})`}
+      <div className="stats">
+        <button type="button" className="stat" onClick={() => setTab('mitra')}><i className="si"><Ikon n="store" size={22} /></i><small>Mitra menunggu</small><b><Hitung ke={nMitra} /></b></button>
+        <button type="button" className="stat" onClick={() => setTab('qris')}><i className="si"><Ikon n="qr" size={22} /></i><small>QRIS menunggu</small><b><Hitung ke={nQris} /></b></button>
+        <button type="button" className="stat" onClick={() => setTab('pengguna')}><i className="si"><Ikon n="users" size={22} /></i><small>Total pengguna</small><b><Hitung ke={d.u.length} /></b></button>
+        <button type="button" className="stat" onClick={() => setTab('refund')}><i className="si"><Ikon n="undo" size={22} /></i><small>Refund menunggu</small><b><Hitung ke={nRefund} /></b></button>
+      </div>
+      <div className="tabs" role="tablist" aria-label="Bagian panel admin">{TABS.map(([k, t, ic]) => (
+        <button key={k} role="tab" aria-selected={tab === k} className={'chip' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}>
+          <Ikon n={ic} size={16} />{t}{k === 'pencairan' && pencairan.length > 0 && <em className="cnt">{pencairan.length}{pencairan.length === 50 ? '+' : ''}</em>}
         </button>
       ))}</div>
 
@@ -226,12 +247,12 @@ export default function Admin() {
 
       {tab === 'qris' && (
         <div className="stack">
-          <div className="card pad" style={{ background: 'var(--bl-s)', border: '1px solid var(--bl)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: '1.4rem' }}>📲</span>
+          <div className="card pad info-card">
+            <div className="info-in">
+              <span className="info-ic" aria-hidden="true"><Ikon n="qr" size={22} /></span>
               <div>
-                <b style={{ color: 'var(--bl-d)' }}>Verifikasi pembayaran QRIS LapaKWU</b>
-                <p className="muted" style={{ margin: 0, fontSize: '0.88rem' }}>
+                <b>Verifikasi pembayaran QRIS LapaKWU</b>
+                <p className="muted">
                   PayHook dapat menandai dana masuk jika nominal dan referensi transaksi cocok dengan hasil OCR.
                   Cocokkan bukti dan nominal dengan dana yang benar-benar masuk sebelum menyetujui pembayaran.
                 </p>
@@ -376,63 +397,16 @@ export default function Admin() {
 
       {/* MODAL PREVIEW BUKTI TRANSFER */}
       {modalGambar && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setModalGambar(null)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 16,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: '#fff',
-              borderRadius: 12,
-              padding: 20,
-              maxWidth: 500,
-              width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              textAlign: 'center',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <b style={{ fontSize: '1.05rem', color: 'var(--bl-d)' }}>Pratinjau gambar QRIS</b>
-              <button
-                type="button"
-                onClick={() => setModalGambar(null)}
-                style={{ background: 'none', border: 'none', fontSize: '1.4rem', cursor: 'pointer', padding: 4 }}
-              >
-                ✕
-              </button>
+        <div className="modal-back" role="dialog" aria-modal="true" aria-label="Pratinjau gambar" onClick={() => setModalGambar(null)}>
+          <div className="modal-box lightbox" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <b>Pratinjau gambar</b>
+              <button type="button" className="modal-x" aria-label="Tutup pratinjau" onClick={() => setModalGambar(null)}>✕</button>
             </div>
-            <img
-              src={modalGambar}
-              alt="Bukti Transfer Penuh"
-              style={{
-                width: '100%',
-                maxHeight: '65vh',
-                objectFit: 'contain',
-                borderRadius: 8,
-                border: '1px solid var(--line)',
-                background: 'var(--tint)',
-              }}
-            />
-            <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 10 }}>
-              <a href={modalGambar} target="_blank" rel="noopener noreferrer" className="btn sm">
-                Buka di Tab Baru ↗
-              </a>
-              <button type="button" className="btn sm out" onClick={() => setModalGambar(null)}>
-                Tutup
-              </button>
+            <img src={modalGambar} alt="Gambar penuh" />
+            <div className="modal-aksi">
+              <a href={modalGambar} target="_blank" rel="noopener noreferrer" className="btn sm">Buka di tab baru ↗</a>
+              <button type="button" className="btn sm out" onClick={() => setModalGambar(null)}>Tutup</button>
             </div>
           </div>
         </div>

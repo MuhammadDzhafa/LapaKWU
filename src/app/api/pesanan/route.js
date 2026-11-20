@@ -56,7 +56,7 @@ async function catatRekap(db, p, by) {
   }, { upsert: true, insertOnly: true });
   const digital = by && by.metode !== 'BAYAR_DI_TEMPAT' ? p.total_harga : 0;
   const offline = by?.metode === 'BAYAR_DI_TEMPAT' ? p.total_harga : 0;
-  const komisi = hitungKomisi(p.total_harga);
+  const komisi = hitungKomisi(p.total_harga - (p.ongkir ?? 0));
   const detail = offline ? await rows(db, 'detail_pesanan', [Query.equal('id_pesanan', p.$id)]) : [];
   const unitOffline = detail.reduce((sum, item) => sum + item.jumlah, 0);
   for (const [k, v] of [['total_penjualan', p.total_harga], ['jumlah_transaksi', 1], ['total_digital', digital], ['total_offline', offline], ['jumlah_offline', unitOffline], ['total_komisi', komisi]]) {
