@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { list, ambil, api, storage, Query, rp, img } from '@/lib/aw';
+import { list, ambil, api, storage, Query, rp } from '@/lib/aw';
 import { MAKS_BUKTI_PEMBAYARAN, PESAN_UKURAN_BUKTI } from '@/lib/bukti-pembayaran';
 import { useSaya } from '@/components/Shell';
 

@@ -12,8 +12,7 @@ export const ID = Object.assign(() => nanoid(), {
 // ── Auth helper ────────────────────────────────────────────
 // Ambil user dari JWT cookie (server-side Next.js route handler)
 export async function siapa(req) {
-  // Dukung dua mode: JWT cookie (browser) atau header x-jwt (token lama)
-  // Untuk migrasi: cek header x-jwt dulu (klien lama kirim JWT Appwrite), lalu fallback ke cookie
+  // Sesi browser diverifikasi dari cookie JWT.
   const cookie = req.headers.get('cookie') || '';
   const match = cookie.match(/lapakwu_sess=([^;]+)/);
   if (!match) return null;
@@ -138,9 +137,7 @@ export async function notif(_, uid, judul, pesan, luar = false) {
   if (luar) await sesudahCommit(() => kirimNotifLuar(uid, judul, pesan));
 }
 
-// ── Permission helpers (kompatibilitas route lama) ────────
-export const baca = (..._ids) => [];
-export const milik = (_uid) => [];
+// Helper kueri data.
 export const Query = {
   equal: (col, val) => ({ type: 'eq', col, val }),
   limit: (n) => ({ type: 'limit', n }),
@@ -149,7 +146,5 @@ export const Query = {
   greaterThan: (col, val) => ({ type: 'gt', col, val }),
   lessThan: (col, val) => ({ type: 'lt', col, val }),
 };
-export const Permission = { read: () => '', update: () => '', delete: () => '', create: () => '' };
-export const Role = { user: (id) => id, any: () => '*', users: () => 'users', label: (l) => l };
 
 export const svc = () => ({ db: null, users: null, storage: null });

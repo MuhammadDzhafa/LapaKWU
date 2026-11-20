@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { list, hapus, api, Query, rp, img, tgl } from '@/lib/aw';
+import { hapus, api, rp, img, tgl } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
 import Rekap from '@/components/Rekap';
 import Modal from '@/components/Modal';

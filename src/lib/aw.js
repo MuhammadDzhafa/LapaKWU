@@ -1,8 +1,5 @@
 // Lapisan API sisi browser; data hanya diakses melalui route Next.js.
 
-export const EP = ''; // tidak dipakai lagi
-export const PID = '';
-export const DB = 'lapakwu';
 export const BUCKET = 'gambar-produk';
 
 // ── Format helper ──────────────────────────────────────────
@@ -87,12 +84,6 @@ export const account = {
     return d;
   },
 
-  /** Buat JWT untuk otorisasi API (tidak diperlukan lagi — sesi pakai cookie) */
-  async createJWT() {
-    // Stub untuk kompatibilitas: kembalikan string kosong
-    // Cookie HttpOnly sudah dikirim otomatis oleh browser
-    return { jwt: '' };
-  },
 };
 
 // ── db helpers (browser → API route) ──────────────────────
@@ -175,10 +166,6 @@ export async function ubahJumlahKeranjang(uid, p, delta = 1) {
   return newJml;
 }
 
-export async function tambahKeranjang(uid, p, n = 1) {
-  return ubahJumlahKeranjang(uid, p, n);
-}
-
 // ── API caller (tidak perlu JWT lagi — cookie dikirim otomatis) ───
 export async function api(path, body) {
   const r = await fetch(path, {
@@ -215,15 +202,6 @@ export const storage = {
     if (!r.ok) throw new Error(d.error || 'Upload gagal.');
     return d; // { $id: namaFile }
   },
-  async deleteFile(arg1, arg2) {
-    const fileId = typeof arg1 === 'object' ? arg1.fileId : (arg2 || arg1);
-    if (!fileId) return;
-    await fetch('/api/upload/hapus', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ id: fileId }),
-    });
-  },
 };
 
 // ── Misc exports (agar import lama tidak break) ────────────
@@ -233,6 +211,3 @@ export const Query = {
   limit: (n) => ({ type: 'limit', n }),
   orderDesc: (col) => ({ type: 'orderDesc', col }),
 };
-export const Permission = { read: () => '', update: () => '', delete: () => '' };
-export const Role = { user: (id) => id, any: () => '*', users: () => 'users', label: (l) => l };
-export const milik = (_uid) => [];

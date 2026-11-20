@@ -1,4 +1,4 @@
-import { svc, siapa, err, getRow, put, upd, del, ID, Permission, Role } from '@/lib/server';
+import { svc, siapa, err, getRow, put, upd, del, ID } from '@/lib/server';
 import { hapusFile } from '@/lib/backblaze';
 export const dynamic = 'force-dynamic';
 
@@ -27,11 +27,7 @@ export async function POST(req) {
     if (!hargaValid(harga) || !stokValid(stok)) return err('Harga atau stok tidak valid.');
     const data = { id_mitra: u.$id, nama, harga: +harga, kategori, deskripsi: deskripsi || '', stok: +stok };
     if (id_gambar) data.id_gambar = id_gambar;
-    const row = await put(db, 'produk', ID.unique(), data, [
-      Permission.read(Role.any()),
-      Permission.update(Role.user(u.$id)),
-      Permission.delete(Role.user(u.$id)),
-    ]);
+    const row = await put(db, 'produk', ID.unique(), data);
     return Response.json({ ok: true, id: row.$id });
   }
 

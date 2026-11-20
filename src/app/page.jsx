@@ -2,7 +2,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { list, Query, rp, img, tambahKeranjang } from '@/lib/aw';
+import { list, Query, rp, img } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
 import { PetaTenant } from '@/components/DenahTenant';
 import Lapak from '@/components/Lapak';

@@ -1,6 +1,6 @@
 import { cariBanyak, cariSatu, denganTransaksi, kunciPesanan, ubahData } from '@/lib/db';
 import { siapa, err, getRow, rows, put, upd, del, inc, notif, Query } from '@/lib/server';
-import { buatAkun, cariAkunByEmail, hapusAkun, ubahPassword } from '@/lib/auth';
+import { buatAkun, cariAkunByEmail, hapusAkun } from '@/lib/auth';
 import { nanoid } from 'nanoid';
 import { nomorTenantValid } from '@/lib/tenant';
 export const dynamic = 'force-dynamic';

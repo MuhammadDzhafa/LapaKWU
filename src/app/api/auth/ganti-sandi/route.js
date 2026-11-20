@@ -1,5 +1,5 @@
 // POST /api/auth/ganti-sandi — Ganti kata sandi dengan kata sandi lama
-import { getUserIdDariCookie, cariAkunById, verifikasiPassword, ubahPassword } from '@/lib/auth';
+import { getUserIdDariCookie, verifikasiPassword, ubahPassword } from '@/lib/auth';
 import { cariSatu } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 

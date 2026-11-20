@@ -36,7 +36,7 @@ if (process.env.LAPAKWU_POSTGRES_LOCAL === '1') {
     child.unref();
 
     let terhubung = false;
-    for (let attempt = 0; attempt < 20 && !gagal; attempt++) {
+    for (let attempt = 0; attempt < 120 && !gagal; attempt++) {
       await tunggu(400);
       if (await siap(url)) { terhubung = true; break; }
     }

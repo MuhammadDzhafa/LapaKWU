@@ -1,4 +1,4 @@
-import { siapa, err, getRow, put, upd, baca, milik } from '@/lib/server';
+import { siapa, err, getRow, put, upd } from '@/lib/server';
 import { ubahNama, ubahEmail } from '@/lib/auth';
 import { normHp } from '@/lib/kirim';
 

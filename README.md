@@ -1,5 +1,25 @@
 # LapaKWU
 
+## Demo localhost dengan data dummy
+
+Pada komputer ini PostgreSQL portabel dan `.env.local` sudah tersedia. Jalankan `npm run demo`, lalu buka `http://localhost:3000`. Perintah ini menyalakan PostgreSQL lokal, menambahkan fixture tanpa menghapus data, dan menjalankan Next.js. Untuk menambahkan data saja: `npm run db:seed`.
+
+Semua akun demo baru memakai password **DemoLapak123!**:
+
+| Peran | Email |
+| --- | --- |
+| Admin | admin@demo.lapakwu.test |
+| Pembeli | pembeli@demo.lapakwu.test |
+| Mitra kuliner | mitra@demo.lapakwu.test |
+| Mitra kreatif | mitra2@demo.lapakwu.test |
+| Calon mitra untuk verifikasi admin | pending@demo.lapakwu.test |
+
+Pembeli memiliki keranjang dan tujuh contoh pesanan: tunai menunggu pembayaran, QRIS menunggu admin, diproses, siap diambil, selesai, refund, dan dibatalkan. Mitra memiliki enam produk (termasuk stok habis), rekap bulan berjalan, penjualan offline, saldo QRIS, dan pengajuan pencairan Rp10.000. Gunakan jendela privat atau browser berbeda untuk mencoba beberapa peran sekaligus.
+
+Di `.env.local`, gunakan `LAPAKWU_STORAGE=local` dan `LAPAKWU_NOTIFIKASI=console`. Dalam mode development, email/WhatsApp dicetak di terminal Next.js; ambil OTP atau tautan reset dari sana. Tidak ada pesan eksternal yang dikirim dalam mode ini. Unggahan gambar dan bukti disimpan di `data/unggahan-dev/`. Tanpa PaddleOCR, bukti QRIS tetap masuk untuk pemeriksaan manual admin. Gambar bukti/QRIS bawaan hanya fixture: jangan melakukan pembayaran sungguhan. OCR nyata, pengiriman email/WhatsApp nyata, dan webhook penyedia pembayaran memerlukan konfigurasi layanan masing-masing.
+
+Seed hanya menerima database localhost di luar production. Menjalankannya ulang mempertahankan perubahan pada fixture yang sudah ada, termasuk password dan status pesanan; pesanan tunai contoh kedaluwarsa setelah satu jam, dan checkout baru dapat dibuat untuk mencoba alurnya kembali. Pada komputer lain, siapkan PostgreSQL serta `.env.local` sesuai langkah di bawah sebelum menjalankan demo.
+
 Aplikasi marketplace berbasis Next.js. Website dan API dijalankan oleh Node.js; PostgreSQL menyimpan akun, produk, keranjang, pesanan, pembayaran, serta catatan operasional; Backblaze B2 menyimpan gambar dan bukti pembayaran. Pemeriksaan bukti QRIS memakai PaddleOCR lokal di server. Pembeli tetap dapat memilih tunai di lapak atau transfer/QRIS.
 
 ## Menjalankan di komputer pengembangan

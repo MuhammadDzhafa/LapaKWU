@@ -2,7 +2,7 @@
 // Pakai jose (Edge-compatible) untuk sign/verify JWT.
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
-import { cariSatu, cariBanyak, tulis, ubahData } from './db';
+import { cariSatu, tulis, ubahData } from './db';
 import bcrypt from 'bcryptjs';
 
 const SECRET = new TextEncoder().encode(
@@ -98,11 +98,4 @@ export async function verifikasiPassword(user, password) {
 export async function hapusAkun(userId) {
   const { del } = await import('./server');
   await del(null, 'users', userId);
-}
-
-export async function daftarSemuaAkun({ limit = 25, offset = 0, search = '' } = {}) {
-  const literal = [...search].map((char) => '^$\\.*+?()[]{}|'.includes(char) ? '\\' + char : char).join('');
-  const filter = search ? { $or: [{ nama: new RegExp(literal, 'i') }, { email: new RegExp(literal, 'i') }] } : {};
-  const users = await cariBanyak('users', filter, { sort: { created_at: -1 }, limit, skip: offset });
-  return users.map(({ id, nama, email, created_at }) => ({ id, nama, email, created_at }));
 }

@@ -2,7 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { account, ambil, api, list, Query, rp, ubahJumlahKeranjang } from '@/lib/aw';
+import { account, list, Query, rp, ubahJumlahKeranjang } from '@/lib/aw';
 import Footer from '@/components/Footer';
 import Motion from '@/components/Motion';
 import { bacaKeranjangLokal, simpanKeranjangLokal } from '@/lib/keranjang-lokal';

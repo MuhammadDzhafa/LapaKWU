@@ -15,6 +15,12 @@ export const normHp = (v) => {
 // Singleton nodemailer transporter untuk SMTP Gmail
 let _transporter = null;
 export function getTransporter() {
+  if (process.env.NODE_ENV === 'development' && process.env.LAPAKWU_NOTIFIKASI === 'console') {
+    return { async sendMail({ to, subject, text }) {
+      console.info('[Email demo localhost]', { to, subject, text });
+      return { accepted: [to] };
+    } };
+  }
   if (_transporter) return _transporter;
   const user = process.env.EMAIL_USER?.trim();
   const pass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : null;
@@ -124,6 +130,10 @@ export async function sendOtpPasswordEmail(to, otpCode) {
 }
 
 export async function kirimWA(nomor, pesan) {
+  if (process.env.NODE_ENV === 'development' && process.env.LAPAKWU_NOTIFIKASI === 'console') {
+    console.info('[WhatsApp demo localhost]', { nomor, pesan });
+    return true;
+  }
   const token = process.env.FONNTE_TOKEN;
   if (!token || !nomor) return false;
   try {
