@@ -194,7 +194,8 @@ export async function POST(req) {
       await status('AKTIF');
     } else if (aksi === 'hapus' || aksi === 'hapus_mitra') {
       if (id === u.$id) return err('Tidak bisa menghapus akunmu sendiri.');
-      await hapusAkun(id);
+      const hasilHapus = await hapusAkun(id);
+      return Response.json({ ok: true, ...hasilHapus });
     } else return err('Aksi tidak dikenal.');
 
     return Response.json({ ok: true });

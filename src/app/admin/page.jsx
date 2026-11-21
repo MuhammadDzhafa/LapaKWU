@@ -59,7 +59,12 @@ export default function Admin() {
   }, [peran, muatPencairan]);
 
   const act = async (aksi, id, extra = {}, ok = 'Tersimpan.') => {
-    try { await api('/api/admin', { aksi, id, ...extra }); toast(ok); void muat(); return true; } catch (e) { toast(e.message, true); return false; }
+    try {
+      const hasil = await api('/api/admin', { aksi, id, ...extra });
+      toast(typeof ok === 'function' ? ok(hasil) : ok);
+      void muat();
+      return true;
+    } catch (e) { toast(e.message, true); return false; }
   };
   const aturTenant = async (e, mitra) => {
     e.preventDefault();
@@ -121,12 +126,14 @@ export default function Admin() {
   const konfirmasiHapusPengguna = (u) => {
     setModalInfo({
       judul: `Hapus Akun Pengguna?`,
-      pesan: `Apakah kamu yakin ingin menghapus akun ${u.nama} (${u.email})? Tindakan ini tidak dapat dibatalkan.`,
+      pesan: `Hapus akun ${u.nama} (${u.email})? Jika akun punya riwayat pesanan, aksesnya akan dinonaktifkan dan data kontak dianonimkan agar riwayat transaksi tetap tersimpan.`,
       warnaOk: 'red',
       tombolOk: 'Hapus Akun',
       onOk: async () => {
         setBusyModal(true);
-        await act('hapus', u.$id, {}, 'Akun pengguna dihapus.');
+        await act('hapus', u.$id, {}, (hasil) => hasil.dianonimkan
+          ? 'Akun dinonaktifkan dan dianonimkan; riwayat transaksi dipertahankan.'
+          : 'Akun pengguna dihapus.');
         setBusyModal(false);
         setModalInfo(null);
       },

@@ -2,7 +2,7 @@
 // Pakai jose (Edge-compatible) untuk sign/verify JWT.
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
-import { cariSatu, tulis, ubahData } from './db';
+import { cariSatu, tulis, ubahData, denganTransaksi } from './db';
 import bcrypt from 'bcryptjs';
 
 export function getJwtSecret() {
@@ -106,5 +106,24 @@ export async function verifikasiPassword(user, password) {
 
 export async function hapusAkun(userId) {
   const { del } = await import('./server');
-  await del(null, 'users', userId);
+  try {
+    await del(null, 'users', userId);
+    return { dihapus: true, dianonimkan: false };
+  } catch (error) {
+    if (error.code !== 409) throw error;
+    // Akun yang punya pesanan/riwayat penjualan harus tetap direferensikan
+    // transaksi. Nonaktifkan aksesnya dan hilangkan data kontak, tanpa
+    // menghapus riwayat yang dibutuhkan pembeli/mitra dan pembukuan.
+    const emailAnonim = `dihapus+${userId}@example.invalid`;
+    await denganTransaksi(async () => {
+      await ubahData('users', { _id: userId }, {
+        nama: 'Akun dihapus', email: emailAnonim,
+      }, { inc: { session_version: 1 } });
+      await ubahData('pengguna', { _id: userId }, {
+        nama: 'Akun dihapus', email: emailAnonim, no_telepon: '',
+        status_akun: 'DIBLOKIR', kontak_terverifikasi: false,
+      });
+    });
+    return { dihapus: false, dianonimkan: true };
+  }
 }
