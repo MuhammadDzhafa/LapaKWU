@@ -92,6 +92,23 @@ function NavigasiKatalog({ rel, label, jumlah }) {
   );
 }
 
+function useKolomProduk() {
+  const [kolom, setKolom] = useState(4);
+  useEffect(() => {
+    const kecil = window.matchMedia('(max-width: 640px)');
+    const sedang = window.matchMedia('(max-width: 900px)');
+    const ukur = () => setKolom(kecil.matches ? 2 : sedang.matches ? 3 : 4);
+    ukur();
+    kecil.addEventListener('change', ukur);
+    sedang.addEventListener('change', ukur);
+    return () => {
+      kecil.removeEventListener('change', ukur);
+      sedang.removeEventListener('change', ukur);
+    };
+  }, []);
+  return kolom;
+}
+
 export default function Beranda() {
   const { akun, peran, keranjang, ubahItemKeranjang } = useSaya();
   const [p, setP] = useState(null);
@@ -106,6 +123,7 @@ export default function Beranda() {
   const relLapak = useRef(null);
   const relProduk = useRef(null);
   const ujungProduk = useRef(null);
+  const kolomProduk = useKolomProduk();
 
   useEffect(() => {
     let aktif = true;
@@ -153,6 +171,11 @@ export default function Beranda() {
   const lapakDariProduk = new Set(produkCocok.map((x) => x.id_mitra));
   const hasilLapak = lapakAda.filter((x) => lapakCocok.has(x.$id) || lapakDariProduk.has(x.$id));
   const tampil = lapakDipilih ? produkCocok.filter((x) => x.id_mitra === lapak) : produkCocok;
+  const ukuranHalaman = kolomProduk * 3;
+  const produkTerlihat = Math.min(tampil.length, batasProduk);
+  const halamanProduk = Array.from({ length: Math.ceil(produkTerlihat / ukuranHalaman) },
+    (_, i) => tampil.slice(i * ukuranHalaman, Math.min((i + 1) * ukuranHalaman, produkTerlihat)));
+  const jumlahHalaman = Math.ceil(tampil.length / ukuranHalaman);
   const keranjangMap = useMemo(() => Object.fromEntries((keranjang || []).map((i) => [i.id_produk, i.jumlah])), [keranjang]);
 
   useEffect(() => {
@@ -175,7 +198,7 @@ export default function Beranda() {
     }, { root: rel, rootMargin: '0px 400px 0px 0px' });
     observer.observe(ujung);
     return () => observer.disconnect();
-  }, [batasProduk, tampil.length]);
+  }, [batasProduk, tampil.length, ukuranHalaman]);
 
   const pilihKategori = (nilai) => {
     setK(nilai);
@@ -275,62 +298,65 @@ export default function Beranda() {
       <section className="sec"><div className="wrap">
         <h2 ref={judulProduk} tabIndex={-1} className="judul-katalog">{lapakDipilih ? `Produk ${lapakDipilih.nama_usaha}` : 'Semua produk'}{p && <span className="jml" aria-label={`${tampil.length} produk`}>{tampil.length}</span>}</h2>
         {lapakDipilih && <button type="button" className="chip hapus-filter-lapak" onClick={() => pilihLapak('')}>Lihat produk semua lapak</button>}
-        <NavigasiKatalog rel={relProduk} label="produk" jumlah={tampil.length} />
-        <div id="rel-produk" ref={relProduk} className="rel-produk rel-kartu-produk" role="region" aria-label="Daftar produk yang dapat digeser" tabIndex={tampil.length > 1 ? 0 : undefined}>
-          {p === null && Array.from({ length: 6 }, (_, i) => <div key={i} className="skel" />)}
-          {tampil.slice(0, batasProduk).map((x, n) => (
-            <article key={x.$id} className="card prod" style={{ '--i': Math.min(n, 12) }}>
-              <Link href={`/produk/${x.$id}`} className="ph" aria-label={x.nama}>
-                {x.id_gambar ? <img src={img(x.id_gambar)} alt="" loading="lazy" /> : <span>{x.nama[0]}</span>}
-                {x.kategori && <span className="kat">{x.kategori}</span>}
-                {x.stok < 1 && <em className="habis">Habis</em>}
-                {x.stok > 0 && x.stok <= 5 && <em className="sisa">Sisa {x.stok}</em>}
-              </Link>
-              <div className="pb">
-                <Link href={`/produk/${x.$id}`} className="nm">{x.nama}</Link>
-                <small className="muted">{layananMitra.get(x.id_mitra)?.nama_usaha || 'Mitra'}</small>
-                <small className="muted" style={{ display: 'block' }}>{layananMitra.get(x.id_mitra)?.antar_aktif
-                  ? 'Siap diantar + ' + rp(layananMitra.get(x.id_mitra).ongkir) + ' ongkir' : 'Ambil di lapak'}</small>
-                <div className="pf">
-                  <span className="tag">{rp(x.harga)}</span>
-                  {x.stok > 0 && (
-                    keranjangMap[x.$id] > 0 ? (
-                      <div className="stepper-card" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          className="step-btn minus"
-                          aria-label={`Kurangi ${x.nama}`}
-                          onClick={(e) => { e.preventDefault(); handleUbah(x, -1, e.currentTarget); }}
-                        >
-                          <Ikon n="minus" size={16} />
-                        </button>
-                        <span className="step-num">{keranjangMap[x.$id]}</span>
-                        <button
-                          type="button"
-                          className="step-btn plus-btn"
-                          aria-label={`Tambah ${x.nama}`}
-                          disabled={keranjangMap[x.$id] >= x.stok}
-                          onClick={(e) => { e.preventDefault(); handleUbah(x, 1, e.currentTarget); }}
-                        >
-                          <Ikon n="plus" size={16} />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className={'plus' + (baru === x.$id ? ' ok' : '')}
-                        aria-label={`Tambah ${x.nama} ke keranjang`}
-                        onClick={(e) => { e.preventDefault(); handleUbah(x, 1, e.currentTarget); }}
-                      >
-                        <Ikon n={baru === x.$id ? 'check' : 'plus'} size={20} />
-                      </button>
-                    )
-                  )}
-                </div>
-              </div>
-            </article>
+        <NavigasiKatalog rel={relProduk} label="produk" jumlah={jumlahHalaman} />
+        <div id="rel-produk" ref={relProduk} className="rel-produk rel-kartu-produk" role="region" aria-label="Daftar produk" tabIndex={jumlahHalaman > 1 ? 0 : undefined} style={{ '--kolom-produk': kolomProduk }}>
+          {p === null && <div className="halaman-produk">{Array.from({ length: 6 }, (_, i) => <div key={i} className="skel" />)}</div>}
+          {halamanProduk.map((halaman, indeks) => (
+            <div key={indeks} className="halaman-produk" ref={indeks === halamanProduk.length - 1 && tampil.length > batasProduk ? ujungProduk : null}>
+              {halaman.map((x, n) => (
+                <article key={x.$id} className="card prod" style={{ '--i': Math.min(n, 12) }}>
+                  <Link href={`/produk/${x.$id}`} className="ph" aria-label={x.nama}>
+                    {x.id_gambar ? <img src={img(x.id_gambar)} alt="" loading="lazy" /> : <span>{x.nama[0]}</span>}
+                    {x.kategori && <span className="kat">{x.kategori}</span>}
+                    {x.stok < 1 && <em className="habis">Habis</em>}
+                    {x.stok > 0 && x.stok <= 5 && <em className="sisa">Sisa {x.stok}</em>}
+                  </Link>
+                  <div className="pb">
+                    <Link href={`/produk/${x.$id}`} className="nm">{x.nama}</Link>
+                    <small className="muted">{layananMitra.get(x.id_mitra)?.nama_usaha || 'Mitra'}</small>
+                    <small className="muted" style={{ display: 'block' }}>{layananMitra.get(x.id_mitra)?.antar_aktif
+                      ? 'Siap diantar + ' + rp(layananMitra.get(x.id_mitra).ongkir) + ' ongkir' : 'Ambil di lapak'}</small>
+                    <div className="pf">
+                      <span className="tag">{rp(x.harga)}</span>
+                      {x.stok > 0 && (
+                        keranjangMap[x.$id] > 0 ? (
+                          <div className="stepper-card" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              className="step-btn minus"
+                              aria-label={`Kurangi ${x.nama}`}
+                              onClick={(e) => { e.preventDefault(); handleUbah(x, -1, e.currentTarget); }}
+                            >
+                              <Ikon n="minus" size={16} />
+                            </button>
+                            <span className="step-num">{keranjangMap[x.$id]}</span>
+                            <button
+                              type="button"
+                              className="step-btn plus-btn"
+                              aria-label={`Tambah ${x.nama}`}
+                              disabled={keranjangMap[x.$id] >= x.stok}
+                              onClick={(e) => { e.preventDefault(); handleUbah(x, 1, e.currentTarget); }}
+                            >
+                              <Ikon n="plus" size={16} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            className={'plus' + (baru === x.$id ? ' ok' : '')}
+                            aria-label={`Tambah ${x.nama} ke keranjang`}
+                            onClick={(e) => { e.preventDefault(); handleUbah(x, 1, e.currentTarget); }}
+                          >
+                            <Ikon n={baru === x.$id ? 'check' : 'plus'} size={20} />
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
           ))}
-          {tampil.length > batasProduk && <span ref={ujungProduk} className="ujung-produk" aria-hidden="true" />}
         </div>
         {galatKatalog && <p className="msg err" role="status">{galatKatalog} Katalog akan dimuat ulang otomatis.</p>}
         {p && !tampil.length && <p className="kosong">{p.length ? 'Tidak ada produk yang cocok. Coba kata kunci, kategori, atau lapak lain.' : 'Belum ada produk. Mitra yang sudah diverifikasi bisa menambahkannya dari menu Lapak saya.'}</p>}

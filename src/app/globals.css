@@ -128,13 +128,14 @@ main.wrap>h2{margin-bottom:1.1rem}
 .navigasi-produk .chip{display:grid;place-items:center;width:44px;height:44px;padding:0;flex:none}
 .rel-produk{display:grid;grid-auto-flow:column;grid-auto-columns:calc((100% - 44px)/4);gap:14px;overflow-x:auto;overscroll-behavior-inline:contain;scroll-snap-type:x mandatory;scrollbar-width:thin;padding:8px 2px 20px;scroll-padding-inline:2px;margin-top:8px}
 .rel-produk:empty{display:none}
-.stalls:has(> :nth-child(2)),.rel-kartu-produk:has(> :nth-child(2)){grid-template-rows:repeat(2,auto)}
-.rel-kartu-produk:has(> :nth-child(3)){grid-template-rows:repeat(3,auto)}
+.stalls:has(> :nth-child(2)){grid-template-rows:repeat(2,auto)}
 .rel-produk .prod,.rel-produk .skel,.rel-produk .stall{scroll-snap-align:start;min-width:0}
 .rel-produk .nm,.rel-produk .pb small{overflow-wrap:anywhere}
-.ujung-produk{width:1px;height:1px}
 @media(max-width:900px){.rel-produk{grid-auto-columns:calc((100% - 28px)/3)}}
 @media(max-width:640px){.rel-produk{grid-auto-columns:calc((100% - 14px)/2)}}
+.rel-kartu-produk{grid-auto-columns:100%}
+.halaman-produk{display:grid;grid-template-columns:repeat(var(--kolom-produk),minmax(0,1fr));grid-auto-rows:max-content;gap:14px;scroll-snap-align:start;min-width:0}
+.halaman-produk .prod,.halaman-produk .skel{scroll-snap-align:none}
 
 /* langkah + ajakan */
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
