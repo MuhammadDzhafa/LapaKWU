@@ -220,7 +220,7 @@ export default function Checkout() {
               )}
 
               <p className="muted" style={{ fontSize: '0.82rem', margin: '12px 0 0', lineHeight: 1.5 }}>
-                Unggah bukti pembayaran QRIS. Invoice terbit setelah dana masuk dikonfirmasi.
+                Unggah bukti yang menampilkan nominal, nama merchant, dan tanggal yang sama dengan hari pemesanan. Jam transaksi bebas dan tidak harus terbaca. Pembayaran menunggu konfirmasi admin.
               </p>
             </div>
 

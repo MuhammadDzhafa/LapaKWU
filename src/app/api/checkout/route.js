@@ -29,7 +29,6 @@ export async function POST(req) {
       const { rows: [tersimpan] } = await queryDatabase('SELECT id_pembeli, response FROM checkout_request WHERE id = $1', [b.request_id]);
       if (tersimpan?.id_pembeli === u.$id && tersimpan.response) return Response.json({ ok: true, ...tersimpan.response });
       if (tersimpan && tersimpan.id_pembeli !== u.$id) return err('ID checkout sudah digunakan.', 409);
-      if (!process.env.OCR_NAMA_PENERIMA?.trim()) return err('Bukti pembayaran belum dapat diperiksa. Hubungi admin.', 503);
       if (typeof b.id_bukti !== 'string' || !FORMAT_ID_BUKTI.test(b.id_bukti)) {
         return err('Harap unggah bukti pembayaran dalam format JPG, PNG, atau WebP.');
       }
