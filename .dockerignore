@@ -1,8 +1,13 @@
 .git
 .next
+.next-*
 node_modules
 .env*
 data
 .venv*
 *.log
 docs
+.agents
+.codex
+motion
+output

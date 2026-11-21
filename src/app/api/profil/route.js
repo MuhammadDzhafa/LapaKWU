@@ -31,9 +31,9 @@ export async function POST(req) {
       } else {
         await put(null, 'pengguna', u.$id, { nama: u.name, email: u.email, no_telepon: hp || '', status_akun: 'MENUNGGU_VERIFIKASI', kanal, kontak_terverifikasi: false }, []);
       }
-      const pbAda = await getRow(null, 'pembeli', u.$id).catch(() => null);
-      if (pbAda) await upd(null, 'pembeli', u.$id, { alamat: s(b.alamat) });
-      else await put(null, 'pembeli', u.$id, { alamat: s(b.alamat) }, []);
+      if (!(await getRow(null, 'pembeli', u.$id).catch(() => null))) {
+        await put(null, 'pembeli', u.$id, {}, []);
+      }
       if (!(await getRow(null, 'keranjang', u.$id).catch(() => null))) {
         await put(null, 'keranjang', u.$id, { id_pembeli: u.$id, total_harga: 0 }, []);
       }
@@ -50,7 +50,7 @@ export async function POST(req) {
       const mt = await getRow(null, 'mitra', u.$id).catch(() => null);
       const pb = await getRow(null, 'pembeli', u.$id).catch(() => null);
       if (!mt && !pb && !adaAdmin) {
-        await put(null, 'pembeli', u.$id, { alamat: '' }, []);
+        await put(null, 'pembeli', u.$id, {}, []);
         if (!(await getRow(null, 'keranjang', u.$id).catch(() => null))) {
           await put(null, 'keranjang', u.$id, { id_pembeli: u.$id, total_harga: 0 }, []);
         }
@@ -117,17 +117,15 @@ export async function POST(req) {
 
     if (b.aksi === 'detail') {
       const mt = await getRow(null, 'mitra', u.$id).catch(() => null);
-      const pb = await getRow(null, 'pembeli', u.$id).catch(() => null);
       if (mt) {
         const d = {};
         if ('nama_usaha' in b) { if (!s(b.nama_usaha)) return err('Nama usaha tidak boleh kosong.'); d.nama_usaha = s(b.nama_usaha); }
-        if ('alamat' in b) d.alamat_usaha = s(b.alamat);
         if ('id_qris' in b) {
           if (b.id_qris && !(await cariSatu('unggahan_file', { _id: s(b.id_qris, 36), id_pengguna: u.$id }))) return err('File QRIS tidak ditemukan atau bukan milik akun ini.', 403);
           d.id_qris = b.id_qris ? s(b.id_qris, 36) : null;
         }
         await upd(null, 'mitra', u.$id, d);
-      } else if (pb && 'alamat' in b) await upd(null, 'pembeli', u.$id, { alamat: s(b.alamat) });
+      }
       return Response.json({ ok: true });
     }
 
@@ -159,10 +157,9 @@ export async function POST(req) {
       }
       await ubahNama(u.$id, nama);
       await upd(null, 'pengguna', u.$id, data);
-      if (await getRow(null, 'pembeli', u.$id).catch(() => null)) await upd(null, 'pembeli', u.$id, { alamat: s(b.alamat) });
       if (await getRow(null, 'mitra', u.$id).catch(() => null)) {
         if (!s(b.nama_usaha)) return err('Nama usaha tidak boleh kosong.');
-        await upd(null, 'mitra', u.$id, { nama_usaha: s(b.nama_usaha), alamat_usaha: s(b.alamat) });
+        await upd(null, 'mitra', u.$id, { nama_usaha: s(b.nama_usaha) });
       }
       return Response.json({ ok: true });
     }

@@ -9,8 +9,10 @@ export const dynamic = 'force-dynamic';
 export async function POST(req) {
   try {
     if (!originValid(req)) return Response.json({ error: 'Sumber permintaan tidak diizinkan.' }, { status: 403 });
-    const { email, password, nama, userId } = await req.json();
-    if (!email || !password || !nama) return Response.json({ error: 'Isi nama, email, dan kata sandi.' }, { status: 400 });
+    const { email, password, nama, userId } = (await req.json().catch(() => null)) || {};
+    if (typeof email !== 'string' || !email.trim() || typeof password !== 'string' || !password || typeof nama !== 'string' || !nama.trim()) {
+      return Response.json({ error: 'Isi nama, email, dan kata sandi.' }, { status: 400 });
+    }
     if (password.length < 8) return Response.json({ error: 'Kata sandi minimal 8 karakter.' }, { status: 400 });
 
     const emailNorm = email.trim().toLowerCase();

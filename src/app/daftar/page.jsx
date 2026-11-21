@@ -17,7 +17,7 @@ const EyeIcon = ({ show }) => (
 
 export default function Daftar() {
   const r = useRouter();
-  const [f, setF] = useState({ email: '', password: '', nama: '', alamat: '', telp: '', kanal: 'EMAIL' });
+  const [f, setF] = useState({ email: '', password: '', nama: '', telp: '', kanal: 'EMAIL' });
   const [msg, setMsg] = useState('');
   const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
@@ -32,7 +32,7 @@ export default function Daftar() {
         const { email, dariLogin } = JSON.parse(raw);
         setF((x) => ({ ...x, email: email || '' }));
         if (dariLogin) {
-          setInfo('Email belum terdaftar. Silakan lengkapi nama dan alamat untuk menyelesaikan pendaftaran akun barumu.');
+          setInfo('Email belum terdaftar. Silakan lengkapi nama untuk menyelesaikan pendaftaran akun barumu.');
         }
         sessionStorage.removeItem('lapakwu_prefill');
         setTimeout(() => nameRef.current?.focus(), 150);
@@ -47,7 +47,7 @@ export default function Daftar() {
     try {
       await account.create({ userId: ID.unique(), email: f.email, password: f.password, name: f.nama });
       // Always register as pembeli
-      await api('/api/profil', { aksi: 'daftar', peran: 'pembeli', kanal: f.kanal, no_telepon: f.telp, alamat: f.alamat });
+      await api('/api/profil', { aksi: 'daftar', peran: 'pembeli', kanal: f.kanal, no_telepon: f.telp });
 
       // Check checkout intent
       const intent = sessionStorage.getItem('lapakwu_checkout_intent');
@@ -103,10 +103,6 @@ export default function Daftar() {
           >
             <EyeIcon show={showPass} />
           </button>
-        </div>
-        <div className="field">
-          <label htmlFor="a">Alamat pengiriman</label>
-          <input id="a" required value={f.alamat} onChange={set('alamat')} />
         </div>
         <fieldset className="field">
           <legend>Verifikasi akun lewat</legend>

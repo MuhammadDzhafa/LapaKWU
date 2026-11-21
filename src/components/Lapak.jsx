@@ -1,4 +1,4 @@
-// Ilustrasi lapak untuk hero beranda (SVG murni, tanpa gambar eksternal)
+// Ilustrasi lapak untuk hero beranda
 export default function Lapak() {
   const warna = (i) => (i % 2 ? '#FFF8E6' : '#FF933E');
   return (
@@ -25,7 +25,7 @@ export default function Lapak() {
       ))}
       <rect x="62" y="274" width="316" height="106" fill="#22313F" />
       <rect x="50" y="260" width="340" height="18" rx="5" fill="#73A5CA" stroke="#22313F" strokeWidth="3" />
-      <text x="220" y="338" textAnchor="middle" fontFamily="Bricolage Grotesque,sans-serif" fontWeight="800" fontSize="30" fill="#FFCB56">LapaKWU</text>
+      <image href="/logo-lapakwu.svg" x="177" y="286" width="86" height="76" />
       <rect x="78" y="212" width="104" height="48" rx="4" fill="#FFCB56" stroke="#22313F" strokeWidth="3" />
       {[100, 130, 160].map((cx, i) => <circle key={cx} className="buah" style={{ '--k': i }} cx={cx} cy={i % 2 ? 204 : 208} r="16" fill="#FF933E" stroke="#22313F" strokeWidth="2.5" />)}
       {[[206, '#FF933E'], [248, '#73A5CA'], [290, '#FFCB56']].map(([x, c]) => (

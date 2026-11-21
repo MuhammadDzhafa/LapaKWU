@@ -6,12 +6,12 @@ import { MAKS_BUKTI_PEMBAYARAN, PESAN_UKURAN_BUKTI } from '@/lib/bukti-pembayara
 import { useSaya } from '@/components/Shell';
 
 export default function Checkout() {
-  const { akun, peran, pengguna, pembeli, selesaiCheckout, toast } = useSaya();
+  const { akun, pengguna, selesaiCheckout, toast } = useSaya();
   const [lg, setLg] = useState(null); // beli langsung: { id, jumlah }
   const r = useRouter();
   const [it, setIt] = useState(null);
   const [mitras, setMitras] = useState({});
-  const [f, setF] = useState({ metode: 'QRIS', pengantaran: 'AMBIL', alamat: null, catatan: '' });
+  const [f, setF] = useState({ metode: 'QRIS', pengantaran: 'AMBIL', alamat: '', catatan: '' });
   const [fileBukti, setFileBukti] = useState(null);
   const [previewBukti, setPreviewBukti] = useState(null);
   const [qrisError, setQrisError] = useState(false);
@@ -109,7 +109,8 @@ export default function Checkout() {
     try {
       checkoutId.current ||= sessionStorage.getItem('lapakwu_checkout_request') || crypto.randomUUID();
       sessionStorage.setItem('lapakwu_checkout_request', checkoutId.current);
-      const hasil = await api('/api/checkout', { ...f, alamat: f.alamat ?? pembeli?.alamat ?? '', id_bukti, langsung: lg, request_id: checkoutId.current, total_diharapkan: totalSen });
+      const { alamat, ...data } = f;
+      const hasil = await api('/api/checkout', { ...data, ...(antar ? { alamat } : {}), id_bukti, langsung: lg, request_id: checkoutId.current, total_diharapkan: totalSen });
       sessionStorage.removeItem('lapakwu_checkout_request');
       checkoutId.current = null;
       selesaiCheckout(akun.$id, hasil.itemTerpesan);
@@ -159,7 +160,7 @@ export default function Checkout() {
             : <small className="muted">Pengantaran tersedia jika semua mitra dalam checkout menerima pesanan antar.</small>}
           {antar && <div className="field">
             <label htmlFor="alamat-antar">Alamat pengiriman</label>
-            <textarea id="alamat-antar" required maxLength={500} value={f.alamat ?? pembeli?.alamat ?? ''} onChange={set('alamat')} />
+            <textarea id="alamat-antar" required maxLength={500} value={f.alamat} onChange={set('alamat')} />
             {idsMitra.map((id) => <small key={id}>{mitras[id]?.nama_usaha} · Ongkir {rp(mitras[id]?.ongkir)}</small>)}
           </div>}
           <div className="field">

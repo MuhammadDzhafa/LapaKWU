@@ -118,7 +118,7 @@ export async function POST(req) {
           id_pembeli: u.$id, id_mitra: mid, tanggal_pesanan: now,
           jenis_pemesanan: antar ? 'ONLINE' : 'OFFLINE', total_harga: total,
           status_pesanan: 'MENUNGGU_KONFIRMASI', catatan_pembeli: catatan,
-          ...(antar ? { alamat_pengiriman: alamat, ongkir: mt.ongkir } : { lokasi_pengambilan: mt.alamat_usaha }),
+          ...(antar ? { alamat_pengiriman: alamat, ongkir: mt.ongkir } : {}),
         });
         for (const { item, produk } of grup) {
           await put(null, 'detail_pesanan', ID.unique(), {

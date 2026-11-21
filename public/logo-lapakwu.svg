@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 26 180 160">
+  <defs>
+    <linearGradient id="orange" x2="0" y2="1">
+      <stop stop-color="#FFB56F"/><stop offset="1" stop-color="#FF7F1F"/>
+    </linearGradient>
+    <linearGradient id="cream" x2="0" y2="1">
+      <stop stop-color="#FFF8DE"/><stop offset="1" stop-color="#FFDC8A"/>
+    </linearGradient>
+    <linearGradient id="blue" x2="1" y2="1">
+      <stop stop-color="#A9D0EE"/><stop offset="1" stop-color="#4A83B1"/>
+    </linearGradient>
+    <linearGradient id="gold" x2="1" y2="1">
+      <stop stop-color="#FFE794"/><stop offset="1" stop-color="#FFAE24"/>
+    </linearGradient>
+    <path id="frame" d="M48 94H76V146H150V174H48Z"/>
+    <path id="post" d="M152 100V152"/>
+    <path id="awning-orange" d="M20 50Q20 34 36 34H52V64A16 16 0 0 1 20 64Z M84 34H116V64A16 16 0 0 1 84 64Z M148 34H164Q180 34 180 50V64A16 16 0 0 1 148 64Z"/>
+    <path id="awning-cream" d="M52 34H84V64A16 16 0 0 1 52 64Z M116 34H148V64A16 16 0 0 1 116 64Z"/>
+  </defs>
+  <g stroke-width="12" stroke-linejoin="round">
+    <g fill="#2D5F86" stroke="#2D5F86" transform="translate(3 4)">
+      <use href="#frame"/><use href="#post" stroke-linecap="round"/>
+    </g>
+    <use href="#frame" fill="url(#blue)" stroke="url(#blue)"/>
+    <use href="#post" fill="none" stroke="url(#blue)" stroke-linecap="round"/>
+  </g>
+  <path d="M56 106V138M86 151H142" fill="none" stroke="#FFF" stroke-opacity=".55" stroke-width="4"/>
+  <g transform="translate(2 4)">
+    <use href="#awning-orange" fill="#B8500A"/>
+    <use href="#awning-cream" fill="#B79352"/>
+  </g>
+  <use href="#awning-orange" fill="url(#orange)"/>
+  <use href="#awning-cream" fill="url(#cream)"/>
+  <rect x="24" y="37" width="152" height="8" rx="4" fill="#FFF" opacity=".32"/>
+  <circle cx="114" cy="125" r="17" fill="#B8500A"/>
+  <circle cx="112" cy="122" r="17" fill="url(#gold)"/>
+  <circle cx="112" cy="122" r="10.5" fill="none" stroke="#B8500A" stroke-opacity=".28" stroke-width="3"/>
+  <path d="M102 116a11 11 0 0 1 8-7" fill="none" stroke="#FFF" stroke-opacity=".85" stroke-width="3" stroke-linecap="round"/>
+</svg>

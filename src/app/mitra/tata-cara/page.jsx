@@ -1,14 +1,12 @@
 'use client';
 import Link from 'next/link';
-
-// TODO: Ganti dengan nomor WhatsApp Admin LapaKWU yang sebenarnya
-const ADMIN_WA = '62895334248010';
+import { TAUTAN_WA } from '@/lib/kontak';
 
 const pesanWA = () => {
   const teks = encodeURIComponent(
-    `Halo Admin LapaKWU 👋\n\nSaya ingin mendaftar sebagai Mitra di LapaKWU.\n\nBerikut data saya:\n- Nama: [NAMA LENGKAP]\n- Nama Usaha: [NAMA LAPAK/USAHA]\n- Jenis Produk: [contoh: Makanan, Fashion, Kerajinan]\n- Nomor WA Aktif: [NOMOR WA]\n- Alamat Lapak: [ALAMAT LAPAK]\n\nSaya sudah membaca syarat & ketentuan mitra LapaKWU dan siap melengkapi dokumen yang dibutuhkan.\n\nTerima kasih! 🙏`
+    `Halo Admin LapaKWU 👋\n\nSaya ingin mendaftar sebagai Mitra di LapaKWU.\n\nBerikut data saya:\n- Nama: [NAMA LENGKAP]\n- Nama Usaha: [NAMA LAPAK/USAHA]\n- Jenis Produk: [contoh: Makanan, Fashion, Kerajinan]\n- Nomor WA Aktif: [NOMOR WA]\n\nSaya sudah membaca syarat & ketentuan mitra LapaKWU dan siap melengkapi dokumen yang dibutuhkan.\n\nTerima kasih! 🙏`
   );
-  window.open('https://wa.me/' + ADMIN_WA + '?text=' + teks, '_blank', 'noopener,noreferrer');
+  window.open(TAUTAN_WA + '?text=' + teks, '_blank', 'noopener,noreferrer');
 };
 
 export default function TataCaraMitra() {

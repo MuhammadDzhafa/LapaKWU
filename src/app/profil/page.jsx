@@ -59,7 +59,6 @@ const I = {
   user: <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M4 21c1-4.2 4-6 8-6s7 1.8 8 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>,
   mail: <svg viewBox="0 0 24 24" width="20" height="20"><rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" strokeWidth="2" /><path d="m4 7 8 6 8-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>,
   phone: <svg viewBox="0 0 24 24" width="20" height="20"><rect x="7" y="2.5" width="10" height="19" rx="3" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M11 18.5h2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>,
-  pin: <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.800 12 21 12 21z" fill="none" stroke="currentColor" strokeWidth="2" /><circle cx="12" cy="9.5" r="2.5" fill="none" stroke="currentColor" strokeWidth="2" /></svg>,
   shop: <svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 9.500 5.500 4h13L20 9.500M4 9.500c0 1.700 1.300 2.500 2.700 2.500S9.300 11.200 9.300 9.500c0 1.700 1 2.500 2.700 2.500s2.700-.8 2.700-2.500c0 1.700 1.200 2.500 2.600 2.500S20 11.200 20 9.500M5.500 12v8h13v-8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /></svg>,
   bank: <svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 10 12 4l9 6M5 10v8m4-8v8m6-8v8m4-8v8M3 20h18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>,
   lock: <svg viewBox="0 0 24 24" width="20" height="20"><rect x="5" y="10.500" width="14" height="10" rx="3" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M8 10.500V8a4 4 0 0 1 8 0v2.500" fill="none" stroke="currentColor" strokeWidth="2" /></svg>,
@@ -67,7 +66,7 @@ const I = {
 };
 
 export default function Profil() {
-  const { akun, pengguna, pembeli, mitra, peran, memuat, muat, toast, keluar, galatProfil } = useSaya();
+  const { akun, pengguna, mitra, peran, memuat, muat, toast, keluar, galatProfil } = useSaya();
   const [buka, setBuka] = useState(null);
   const [f, setF] = useState({});
   const [yakin, setYakin] = useState(false);
@@ -207,34 +206,27 @@ export default function Profil() {
             </Baris>
           </section>
 
-          {(peran === 'mitra' || peran === 'pembeli') && (
+          {peran === 'mitra' && (
             <section className="pcard" style={{ '--i': 2 }} aria-labelledby="h-lapak">
-              <h3 id="h-lapak">{peran === 'mitra' ? 'Data lapak' : 'Pengiriman'}</h3>
-              {peran === 'mitra' && (
-                <Baris id="usaha" ikon={I.shop} label="Nama usaha" nilai={mitra?.nama_usaha} tombol="Ubah nama usaha" buka={buka} setBuka={(v) => { if (v === 'usaha') mulai({ usaha: mitra?.nama_usaha || '' })(); setBuka(v); }}
-                  onSimpan={simpanData('detail', { nama_usaha: f.usaha }, 'Nama usaha diubah.')}>
-                  <div className="field"><label htmlFor="in-usaha">Nama usaha baru</label><input id="in-usaha" required value={f.usaha ?? ''} onChange={set('usaha')} /></div>
-                </Baris>)}
-              <Baris id="alamat" ikon={I.pin} label={peran === 'mitra' ? 'Alamat lapak' : 'Alamat pengiriman'} nilai={peran === 'mitra' ? mitra?.alamat_usaha : pembeli?.alamat} kosong="Belum diisi"
-                tombol="Ubah alamat" buka={buka} setBuka={(v) => { if (v === 'alamat') mulai({ alamat: (peran === 'mitra' ? mitra?.alamat_usaha : pembeli?.alamat) || '' })(); setBuka(v); }}
-                onSimpan={simpanData('detail', { alamat: f.alamat }, 'Alamat diubah.')}>
-                <div className="field"><label htmlFor="in-alamat">Alamat baru</label><input id="in-alamat" required value={f.alamat ?? ''} onChange={set('alamat')} /></div>
+              <h3 id="h-lapak">Data lapak</h3>
+              <Baris id="usaha" ikon={I.shop} label="Nama usaha" nilai={mitra?.nama_usaha} tombol="Ubah nama usaha" buka={buka} setBuka={(v) => { if (v === 'usaha') mulai({ usaha: mitra?.nama_usaha || '' })(); setBuka(v); }}
+                onSimpan={simpanData('detail', { nama_usaha: f.usaha }, 'Nama usaha diubah.')}>
+                <div className="field"><label htmlFor="in-usaha">Nama usaha baru</label><input id="in-usaha" required value={f.usaha ?? ''} onChange={set('usaha')} /></div>
               </Baris>
-              {peran === 'mitra' && (
-                <div className="br">
-                  <div className="br-ico" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 3h7v7H3zm2 2v3h3V5zm8-2h7v7h-7zm2 2v3h3V5zM3 14h7v7H3zm2 2v3h3v-3zm10 0h2v2h-2zm3 0h2v4h-2zm-3 3h2v2h-2zm5-1h1v2h-1z" fill="currentColor"/></svg>
+              <div className="br">
+                <div className="br-ico" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 3h7v7H3zm2 2v3h3V5zm8-2h7v7h-7zm2 2v3h3V5zM3 14h7v7H3zm2 2v3h3v-3zm10 0h2v2h-2zm3 0h2v4h-2zm-3 3h2v2h-2zm5-1h1v2h-1z" fill="currentColor"/></svg>
+                </div>
+                <div className="br-main">
+                  <small className="br-label">QRIS Toko</small>
+                  <div className="br-val">
+                    {mitra?.id_qris ? 'Sudah diunggah' : 'Belum diunggah'}
                   </div>
-                  <div className="br-main">
-                    <small className="br-label">QRIS Toko</small>
-                    <div className="br-val">
-                      {mitra?.id_qris ? 'Sudah diunggah' : 'Belum diunggah'}
-                    </div>
-                    <Link href="/mitra" className="br-btn">
-                      Kelola QRIS di Lapak Saya →
-                    </Link>
-                  </div>
-                </div>)}
+                  <Link href="/mitra" className="br-btn">
+                    Kelola QRIS di Lapak Saya →
+                  </Link>
+                </div>
+              </div>
             </section>
           )}
 

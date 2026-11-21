@@ -1,5 +1,10 @@
 /* Ikon garis sederhana (stroke = warna teks sekitarnya, jadi ikut palet yang ada). */
 const P = {
+  plus: <path d="M12 5v14M5 12h14" />,
+  minus: <path d="M5 12h14" />,
+  check: <path d="m5 12 4 4L19 6" />,
+  'chevron-left': <path d="m15 6-6 6 6 6" />,
+  'chevron-right': <path d="m9 6 6 6-6 6" />,
   home: <><path d="M3 11.5 12 4l9 7.5" /><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9" /></>,
   bag: <><path d="M5 8h14l-1 12H6L5 8Z" /><path d="M9 8V6a3 3 0 0 1 6 0v2" /></>,
   receipt: <><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" /><path d="M9 8h6M9 12h6" /></>,

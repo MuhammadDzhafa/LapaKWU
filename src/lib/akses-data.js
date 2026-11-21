@@ -36,8 +36,8 @@ export async function batasAkses(tabel, uid, queries) {
 export function sanitasiPublik(tabel, row) {
   if (!row) return row;
   if (tabel === 'mitra') {
-    const { $id, nama_usaha, alamat_usaha, nomor_tenant } = row;
-    return { $id, nama_usaha, alamat_usaha, nomor_tenant, antar_aktif: row.antar_aktif === true, ongkir: row.ongkir ?? 0 };
+    const { $id, nama_usaha, nomor_tenant } = row;
+    return { $id, nama_usaha, nomor_tenant, antar_aktif: row.antar_aktif === true, ongkir: row.ongkir ?? 0 };
   }
   if (tabel === 'payment_gateway') {
     const { $id, nama_layanan } = row;

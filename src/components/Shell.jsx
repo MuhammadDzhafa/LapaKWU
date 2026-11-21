@@ -1,5 +1,6 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import Logo from '@/components/Logo';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { account, list, Query, rp, ubahJumlahKeranjang } from '@/lib/aw';
@@ -194,7 +195,7 @@ export default function Shell({ children }) {
       {/* ── Desktop header ── */}
       <header className="top">
         <div className="wrap">
-          <Link href="/" className="brand">Lapa<b>KWU</b></Link>
+          <Link href="/" className="brand"><Logo /></Link>
           {/* Nav desktop */}
           <nav aria-label="Menu utama" className="nav-desktop" onPointerOver={sorot} onPointerLeave={redup} onFocus={sorot} onBlur={redup}>
             <span className="nav-pill" ref={pil} aria-hidden="true" />

@@ -9,8 +9,8 @@ async function setPeran(id, peran, info = {}) {
   const ada = (tb) => getRow(null, tb, id).catch(() => null);
   for (const tb of ['pembeli', 'mitra', 'admin']) if (tb !== peran && (await ada(tb))) await del(null, tb, id);
   if (!(await ada(peran))) {
-    if (peran === 'pembeli') await put(null, 'pembeli', id, { alamat: '' }, []);
-    if (peran === 'mitra') await put(null, 'mitra', id, { nama_usaha: info.nama_usaha || info.nama || 'Lapak Baru', alamat_usaha: info.alamat || '-' }, []);
+    if (peran === 'pembeli') await put(null, 'pembeli', id, {}, []);
+    if (peran === 'mitra') await put(null, 'mitra', id, { nama_usaha: info.nama_usaha || info.nama || 'Lapak Baru' }, []);
     if (peran === 'admin') await put(null, 'admin', id, { level_akses: 'ADMIN' }, []);
   }
   if (peran === 'pembeli' && !(await getRow(null, 'keranjang', id).catch(() => null)))

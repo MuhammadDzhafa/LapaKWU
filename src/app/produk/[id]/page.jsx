@@ -89,7 +89,7 @@ export default function Detail() {
         <p className="muted">{mt?.antar_aktif ? 'Siap diantar + ' + rp(mt.ongkir) + ' ongkir per pesanan' : 'Ambil di lapak'}</p>
         <span className="tag" style={{ fontSize: '1.4rem' }}>{rp(p.harga)}</span>
         <p>{p.deskripsi || 'Belum ada deskripsi.'}</p>
-        <p><span className="badge" data-s={p.stok > 0 ? 'AKTIF' : 'DIBATALKAN'}>{p.stok > 0 ? `Stok ${p.stok}` : 'Stok habis'}</span>{mt?.alamat_usaha && <small className="muted"> &nbsp;Lapak di {mt.alamat_usaha}</small>}</p>
+        <p><span className="badge" data-s={p.stok > 0 ? 'AKTIF' : 'DIBATALKAN'}>{p.stok > 0 ? `Stok ${p.stok}` : 'Stok habis'}</span></p>
         {p.stok > 0 ? (<>
           <div className="row">
             <label htmlFor="jml"><b>Jumlah</b></label>

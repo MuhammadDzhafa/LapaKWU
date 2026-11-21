@@ -1,6 +1,7 @@
 import Link from 'next/link';
+import Logo from '@/components/Logo';
+import { LABEL_WA, TAUTAN_WA } from '@/lib/kontak';
 
-const WA = process.env.NEXT_PUBLIC_KONTAK_WA;
 const EM = process.env.NEXT_PUBLIC_KONTAK_EMAIL?.trim() || 'lapakwu@gmail.com';
 
 export default function Footer() {
@@ -8,7 +9,7 @@ export default function Footer() {
     <footer className="foot">
       <div className="wrap fgrid">
         <div>
-          <Link href="/" className="brand">Lapa<b>KWU</b></Link>
+          <Link href="/" className="brand"><Logo /></Link>
           <p style={{ marginTop: 12 }}>Satu tempat untuk belanja dari banyak lapak mitra kewirausahaan. Pesan antar atau ambil langsung di lapaknya.</p>
         </div>
         <div>
@@ -26,7 +27,7 @@ export default function Footer() {
         </div>
         <div>
           <h4>Hubungi kami</h4>
-          {WA && <a href={`https://wa.me/${WA}`} target="_blank" rel="noreferrer">WhatsApp +{WA}</a>}
+          <a href={TAUTAN_WA} target="_blank" rel="noreferrer">WhatsApp {LABEL_WA}</a>
           <a href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(EM)}`} target="_blank" rel="noopener noreferrer">{EM}</a>
           <p style={{ marginTop: 8 }}><small>Kampus UPI di Cibiru, Bandung</small></p>
         </div>

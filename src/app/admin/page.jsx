@@ -75,7 +75,7 @@ export default function Admin() {
       tipe: 'input',
       inputType: 'textarea',
       inputLabel: 'Catatan perbaikan',
-      inputPlaceholder: 'Contoh: Harap unggah foto lapak yang lebih jelas atau perbarui alamat...',
+      inputPlaceholder: 'Contoh: Harap unggah foto lapak yang lebih jelas...',
       tombolOk: 'Kirim Catatan',
       warnaOk: 'sun',
       onOk: async (c) => {
@@ -359,9 +359,9 @@ export default function Admin() {
         </div>
       )}
 
-      {tab === 'mitra' && <div className="scroll"><table><thead><tr><th>Usaha</th><th>Alamat</th><th>Nomor tenant</th><th>Kontak</th><th>Status</th><th>Tindakan</th></tr></thead><tbody>
+      {tab === 'mitra' && <div className="scroll"><table><thead><tr><th>Usaha</th><th>Nomor tenant</th><th>Kontak</th><th>Status</th><th>Tindakan</th></tr></thead><tbody>
         {d.m.map((x) => { const u = pg(x.$id); return (
-          <tr key={x.$id}><td><b>{x.nama_usaha}</b></td><td>{x.alamat_usaha}</td>
+          <tr key={x.$id}><td><b>{x.nama_usaha}</b></td>
             <td><form className="row" onSubmit={(e) => aturTenant(e, x)} style={{ flexWrap: 'nowrap' }}>
               <select key={x.nomor_tenant ?? 'kosong'} name="nomor_tenant" aria-label={`Nomor tenant ${x.nama_usaha}`} defaultValue={x.nomor_tenant ?? ''} disabled={simpanTenant !== null}>
                 <option value="">Belum ditetapkan</option>
@@ -378,7 +378,7 @@ export default function Admin() {
               <button className="btn sm out" onClick={() => tolak(x)}>Minta perbaikan</button>
               <button className="btn sm red" onClick={() => konfirmasiHapusMitra(x)}>Hapus</button>
             </div></td></tr>); })}
-        {!d.m.length && <tr><td colSpan="6" className="muted">Belum ada mitra mendaftar.</td></tr>}</tbody></table></div>}
+        {!d.m.length && <tr><td colSpan="5" className="muted">Belum ada mitra mendaftar.</td></tr>}</tbody></table></div>}
 
       {tab === 'pengguna' && <div className="stack">
         <form className="card pad" onSubmit={tambah}><h3>Tambah pengguna</h3>

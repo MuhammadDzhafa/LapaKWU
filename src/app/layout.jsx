@@ -1,4 +1,5 @@
 import './globals.css';
+import Logo from '@/components/Logo';
 import Shell from '@/components/Shell';
 
 export const metadata = {
@@ -17,7 +18,7 @@ export default function RootLayout({ children }) {
         <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&display=swap" rel="stylesheet" />
       </head>
       <body>
-        <div className="curtain" aria-hidden="true"><span className="brand">Lapa<b>KWU</b></span></div>
+        <div className="curtain" aria-hidden="true"><span className="brand"><Logo /></span></div>
         <Shell>{children}</Shell>
       </body>
     </html>
