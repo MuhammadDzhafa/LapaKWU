@@ -57,7 +57,7 @@ export async function POST(req) {
       const items = langsung ? [langsung] : cart;
       if (!items.length) return { error: 'Keranjang kosong.' };
       for (const id of [...new Set(items.map((item) => item.id_produk))].sort()) await kunciProduk(id);
-      const produk = await rows(null, 'produk', [Query.equal('$id', items.map((i) => i.id_produk)), Query.limit(500)]);
+      const produk = await rows(null, 'produk', [Query.equal('$id', items.map((i) => i.id_produk)), Query.equal('diarsipkan', false), Query.limit(500)]);
       const katalog = new Map(produk.map((p) => [p.$id, p]));
       const perMitra = new Map();
       for (const item of items) {

@@ -3,6 +3,7 @@ import { siapa, err, getRow, rows, put, upd, del, inc, notif, Query } from '@/li
 import { buatAkun, cariAkunByEmail, hapusAkun } from '@/lib/auth';
 import { nanoid } from 'nanoid';
 import { nomorTenantValid } from '@/lib/tenant';
+import { arsipProduk } from '@/lib/arsip-produk';
 export const dynamic = 'force-dynamic';
 
 async function setPeran(id, peran, info = {}) {
@@ -40,7 +41,7 @@ export async function POST(req) {
     const [uRows, mRows, prRows, adRows, pbRows, rfRows] = await Promise.all([
       rows(null, 'pengguna', halaman('pengguna')),
       rows(null, 'mitra', halaman('mitra')),
-      rows(null, 'produk', halaman('produk')),
+      rows(null, 'produk', [Query.equal('diarsipkan', false), ...halaman('produk')]),
       rows(null, 'admin', halaman('admin')),
       rows(null, 'pembeli', halaman('pembeli')),
       rows(null, 'pembayaran', [Query.equal('status_pembayaran', ['MENUNGGU', 'REFUND_DIAJUKAN']), ...halaman('pembayaran')]),
@@ -72,6 +73,11 @@ export async function POST(req) {
 
     return Response.json({ u: uRows, m: mRows, pr: prRows, ad: adRows, pb: pbRows, peran, rf, qris,
       hasMore: [uRows, mRows, prRows, adRows, pbRows, rfRows].some((page) => page.length === 500), offset });
+  }
+
+  if (aksi === 'hapus_produk') {
+    if (typeof id !== 'string' || !await arsipProduk(id)) return err('Produk tidak ditemukan.', 404);
+    return Response.json({ ok: true });
   }
 
   if (aksi === 'atur_tenant') {

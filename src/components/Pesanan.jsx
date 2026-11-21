@@ -107,8 +107,6 @@ export default function Pesanan({ uid, sebagai }) {
       list('pembayaran', [Query.equal('id_pesanan', ids)]),
       list('mitra', [Query.equal('$id', mitraIds)]),
     ]);
-    const pid = [...new Set(dt.map((x) => x.id_produk))];
-    const pr = pid.length ? await list('produk', [Query.equal('$id', pid)]) : [];
     if (versi !== versiMuat.current) return;
     const lapak = new Map(mitra.map((m) => [m.$id, m]));
     const pembayaranPerPesanan = new Map(by.map((x) => [x.id_pesanan, x]));
@@ -118,7 +116,7 @@ export default function Pesanan({ uid, sebagai }) {
       bayar: pembayaranPerPesanan.get(p.$id),
       items: dt.filter((x) => x.id_pesanan === p.$id).map((x) => ({
         ...x,
-        nama: pr.find((y) => y.$id === x.id_produk)?.nama || 'Produk dihapus',
+        nama: x.nama_produk || 'Produk dihapus',
       })),
     })));
   }, [uid, sebagai]);

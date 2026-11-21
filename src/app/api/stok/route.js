@@ -38,7 +38,7 @@ export async function POST(req) {
     if (!p || p.id_mitra !== u.$id) return err('Produk tidak ditemukan.', 404);
     if (!await kunciProduk(p.$id)) return err('Produk tidak ditemukan.', 404);
     const produkTerkunci = await getRow(db, 'produk', p.$id).catch(() => null);
-    if (!produkTerkunci || produkTerkunci.id_mitra !== u.$id) return err('Produk tidak ditemukan.', 404);
+    if (!produkTerkunci || produkTerkunci.diarsipkan || produkTerkunci.id_mitra !== u.$id) return err('Produk tidak ditemukan.', 404);
     p = produkTerkunci;
     const jml = Math.floor(+b.jumlah);
     const periode = periodeIni();

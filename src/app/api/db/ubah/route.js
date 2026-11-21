@@ -25,7 +25,7 @@ export async function POST(req) {
       const item = await cariSatu(tabel, filter);
       if (!item) return err('Item tidak ditemukan.', 404);
       if (!Number.isSafeInteger(data.jumlah) || data.jumlah < 1) return err('Jumlah tidak valid.');
-      const produk = await cariSatu('produk', { _id: item.id_produk });
+      const produk = await cariSatu('produk', { _id: item.id_produk, diarsipkan: false });
       if (!produk || data.jumlah > produk.stok) return err('Stok tidak cukup.', 409);
       await ubahData(tabel, filter, { jumlah: data.jumlah, subtotal: data.jumlah * produk.harga });
     }

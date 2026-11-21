@@ -5,7 +5,10 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const { rows: [schema] } = await queryDatabase(
-      'SELECT bool_and(to_regclass(nama) IS NOT NULL) AS siap FROM unnest($1::text[]) AS tabel(nama)',
+      `SELECT bool_and(to_regclass(nama) IS NOT NULL)
+        AND EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass('produk')
+          AND attname = 'diarsipkan' AND NOT attisdropped) AS siap
+        FROM unnest($1::text[]) AS tabel(nama)`,
       [[...koleksiInti, 'checkout_request', 'rate_limit']],
     );
     if (!schema?.siap) {

@@ -116,6 +116,8 @@ export async function hapusAkun(userId) {
     // menghapus riwayat yang dibutuhkan pembeli/mitra dan pembukuan.
     const emailAnonim = `dihapus+${userId}@example.invalid`;
     await denganTransaksi(async () => {
+      const { arsipProdukMitra } = await import('./arsip-produk');
+      await arsipProdukMitra(userId);
       await ubahData('users', { _id: userId }, {
         nama: 'Akun dihapus', email: emailAnonim,
       }, { inc: { session_version: 1 } });

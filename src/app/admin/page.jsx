@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { hapus, api, rp, img, tgl } from '@/lib/aw';
+import { api, rp, img, tgl } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
 import Rekap from '@/components/Rekap';
 import Modal from '@/components/Modal';
@@ -149,7 +149,7 @@ export default function Admin() {
       onOk: async () => {
         setBusyModal(true);
         try {
-          await hapus('produk', pr.$id);
+          await api('/api/admin', { aksi: 'hapus_produk', id: pr.$id });
           toast('Produk dihapus.');
           await muat();
         } catch (e) {

@@ -1,4 +1,5 @@
-import { svc, siapa, err, getRow, put, upd, del, ID } from '@/lib/server';
+import { svc, siapa, err, getRow, put, upd, ID } from '@/lib/server';
+import { arsipProduk } from '@/lib/arsip-produk';
 import { hapusFile } from '@/lib/backblaze';
 import { cariBanyak, cariSatu, hapusData } from '@/lib/db';
 export const dynamic = 'force-dynamic';
@@ -49,7 +50,7 @@ export async function POST(req) {
   // ── Ubah harga / stok / nama / deskripsi ──────────────────────────
   if (b.aksi === 'ubah') {
     const p = await getRow(db, 'produk', String(b.id || '')).catch(() => null);
-    if (!p || p.id_mitra !== u.$id) return err('Produk tidak ditemukan.', 404);
+    if (!p || p.diarsipkan || p.id_mitra !== u.$id) return err('Produk tidak ditemukan.', 404);
     if ((b.harga != null && !hargaValid(b.harga)) || (b.stok != null && !stokValid(b.stok))) return err('Harga atau stok tidak valid.');
     const data = {};
     if (b.nama != null) data.nama = b.nama;
@@ -66,10 +67,7 @@ export async function POST(req) {
 
   // ── Hapus produk ──────────────────────────────────────────────────
   if (b.aksi === 'hapus') {
-    const p = await getRow(db, 'produk', String(b.id || '')).catch(() => null);
-    if (!p || p.id_mitra !== u.$id) return err('Produk tidak ditemukan.', 404);
-    await del(db, 'produk', p.$id);
-      if (p.id_gambar) await hapusGambarJikaTidakDipakai(p.id_gambar, u.$id);
+    if (typeof b.id !== 'string' || !await arsipProduk(b.id, u.$id)) return err('Produk tidak ditemukan.', 404);
     return Response.json({ ok: true });
   }
 

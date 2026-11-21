@@ -20,7 +20,7 @@ const kolom = {
   pembeli: ['alamat'],
   mitra: ['id_admin_verifikator', 'nama_usaha', 'alamat_usaha', 'catatan_verifikasi', 'rekening', 'id_qris', 'nomor_tenant'],
   admin: ['level_akses'],
-  produk: ['id_mitra', 'nama', 'harga', 'kategori', 'deskripsi', 'stok', 'id_gambar'],
+  produk: ['id_mitra', 'nama', 'harga', 'kategori', 'deskripsi', 'stok', 'id_gambar', 'diarsipkan'],
   keranjang: ['id_pembeli', 'total_harga'],
   item_keranjang: ['id_keranjang', 'id_produk', 'jumlah', 'subtotal'],
   pesanan: ['id_pembeli', 'id_mitra', 'tanggal_pesanan', 'jenis_pemesanan', 'total_harga', 'status_pesanan', 'alamat_pengiriman', 'lokasi_pengambilan', 'waktu_pengambilan', 'alasan_pembatalan'],

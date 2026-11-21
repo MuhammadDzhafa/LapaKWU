@@ -8,6 +8,7 @@ export async function GET(req, { params }) {
     const { tabel, id } = await params;
     if (![...TABEL_PUBLIK, ...TABEL_PRIVAT].includes(tabel)) return err('Tabel tidak valid.');
     const queries = [Query.equal('$id', id), Query.limit(1)];
+    if (tabel === 'produk') queries.push(Query.equal('diarsipkan', false));
     if (TABEL_PRIVAT.includes(tabel)) {
       const u = await siapa(req);
       if (!u) return err('Belum masuk.', 401);
