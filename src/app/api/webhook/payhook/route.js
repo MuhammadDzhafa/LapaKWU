@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { err, upd } from '@/lib/server';
 import { cariBanyak, cariSatu, denganTransaksi, tulis } from '@/lib/db';
 import { rupiahDalamSen } from '@/lib/ocr-bukti';
@@ -10,39 +10,58 @@ function teksPayload(value) {
   return value && typeof value === 'object' ? Object.values(value).map(teksPayload).join(' ') : '';
 }
 
-async function bacaPayload(req) {
+async function bacaPayload(req, body) {
   const jenis = req.headers.get('content-type') || '';
-  if (jenis.includes('application/json')) return req.json();
-  if (jenis.includes('form')) return Object.fromEntries(await req.formData());
-  const text = await req.text();
+  const text = body.toString('utf8');
+  if (jenis.includes('application/json')) return JSON.parse(text);
+  if (jenis.includes('form')) return Object.fromEntries(await new Response(body, { headers: { 'content-type': jenis } }).formData());
   try { return JSON.parse(text); } catch { return { text }; }
 }
 
-function rahasiaCocok(req) {
-  const nilai = req.headers.get('x-payhook-secret');
-  if (!nilai || !process.env.PAYHOOK_SECRET) return false;
-  const expected = Buffer.from(process.env.PAYHOOK_SECRET);
-  const actual = Buffer.from(nilai);
-  return actual.length === expected.length && timingSafeEqual(expected, actual);
+function nilaiCocok(nilai, harapan) {
+  const actual = Buffer.from(nilai || '');
+  const expected = Buffer.from(harapan);
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+function rahasiaCocok(req, body) {
+  const { PAYHOOK_SECRET: secret, PAYHOOK_TOKEN: token } = process.env;
+  if (!secret) return false;
+  if (!token) return nilaiCocok(req.headers.get('x-payhook-secret'), secret);
+  if (!nilaiCocok(req.headers.get('authorization'), `Bearer ${token}`)) return false;
+
+  const timestamp = req.headers.get('x-payhook-timestamp');
+  if (!/^\d{10}$/.test(timestamp || '') || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
+  const signature = createHmac('sha256', secret).update(`${timestamp}.`).update(body).digest('hex');
+  return nilaiCocok(req.headers.get('x-payhook-signature'), `sha256=${signature}`);
 }
 
 export async function POST(req) {
   try {
-    const payload = await bacaPayload(req) ?? {};
+    const body = Buffer.from(await req.arrayBuffer());
+    if (!rahasiaCocok(req, body)) return err('Unauthorized', 401);
+    const payload = await bacaPayload(req, body) ?? {};
     const teks = teksPayload(payload);
+    if (!teks || payload.is_test === true || payload.test === true || payload.ping === true || payload.action === 'test') {
+      return Response.json({ ok: true, status: 'connected', pesan: 'Webhook LapaKWU berhasil terhubung dengan PayHook!' });
+    }
     const nominalPayload = payload.nominal ?? payload.amount;
-    const raw = teks.match(/\b(?:RP|IDR)\.?\s*(\d[\d.,]*)/i)?.[1]
-      ?? (['string', 'number'].includes(typeof nominalPayload) ? String(nominalPayload) : undefined)
+    const raw = (['string', 'number'].includes(typeof nominalPayload) ? String(nominalPayload) : undefined)
+      ?? teks.match(/\b(?:RP|IDR)\.?\s*(\d[\d.,]*)/i)?.[1]
       ?? teks.match(/(?:diterima|masuk|menerima)\s*[:=]?\s*(\d[\d.,]*)/i)?.[1];
-    const nominal = raw ? rupiahDalamSen(raw) / 100 : 0;
-    const uji = !teks || payload.test === true || payload.ping === true || payload.action === 'test' || /\b(test|ping|uji coba)\b/i.test(teks);
-    if (uji && !nominal) return Response.json({ ok: true, status: 'connected', pesan: 'Webhook LapaKWU berhasil terhubung dengan PayHook!' });
-    if (!rahasiaCocok(req)) return err('Unauthorized', 401);
-    if (!nominal || (payload.direction !== 'incoming' && !/\b(menerima|diterima|uang masuk|saldo masuk|transfer masuk|pembayaran masuk)\b/i.test(teks))) {
+    const sen = raw ? rupiahDalamSen(raw) : null;
+    const masuk = ['in', 'incoming'].includes(payload.direction) || (!payload.direction && (
+      payload.event_type === 'payment.incoming' || (!payload.event_type && /\b(menerima|diterima|uang masuk|saldo masuk|transfer masuk|pembayaran masuk)\b/i.test(teks))
+    ));
+    if (!Number.isSafeInteger(sen) || sen <= 0 || !masuk || (payload.currency && payload.currency !== 'IDR')) {
       return Response.json({ ok: true, terproses: false, pesan: 'Notifikasi dana masuk tidak ditemukan.' });
     }
+    const nominal = sen / 100;
 
-    const ref = payload.referensi ?? payload.reference ?? teks.match(/(?:referensi|reference|ref\.?|id transaksi)\s*[:#]?\s*([A-Z0-9-]{8,64})\b/i)?.[1];
+    const notifikasi = [payload.notification_title, payload.notification_text].filter(Boolean).join(' ') || teks;
+    const ref = payload.referensi
+      ?? notifikasi.match(/\b(?:referensi|reference|ref\.?|id transaksi)\s*[:#]?\s*([A-Z0-9-]{8,64})(?![A-Z0-9-])/i)?.[1]
+      ?? (/^PH-\d+$/i.test(payload.reference) ? undefined : payload.reference);
     if (typeof ref !== 'string' || !/^[A-Z0-9-]{8,64}$/i.test(ref)) {
       return Response.json({ ok: true, terproses: false, nominal, pesan: 'Referensi transaksi tidak tersedia. Cocokkan dana masuk secara manual.' });
     }
