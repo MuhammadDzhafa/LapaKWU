@@ -134,6 +134,8 @@ function useKolomProduk() {
   return kolom;
 }
 
+const ANIMASI_BERANDA = '.searchcard, .sec h2, .sec .sub, .stall, .prod, .step, .denah-beranda, .band';
+
 export default function Beranda() {
   const { akun, peran, keranjang, ubahItemKeranjang } = useSaya();
   const [p, setP] = useState(null);
@@ -150,6 +152,41 @@ export default function Beranda() {
   const relProduk = useRef(null);
   const ujungProduk = useRef(null);
   const kolomProduk = useKolomProduk();
+
+  useEffect(() => {
+    const konten = document.getElementById('konten-utama');
+    if (!konten || !('IntersectionObserver' in window)) return;
+
+    const pengamat = new IntersectionObserver((entri) => {
+      for (const { target, isIntersecting } of entri) {
+        if (!isIntersecting) continue;
+        target.setAttribute('data-muncul-beranda', '');
+        pengamat.unobserve(target);
+      }
+    }, { threshold: 0.08 });
+    const pindai = (node, tangani) => {
+      if (node.matches?.(ANIMASI_BERANDA)) tangani(node);
+      node.querySelectorAll?.(ANIMASI_BERANDA).forEach(tangani);
+    };
+    const amati = (elemen) => {
+      if (!elemen.hasAttribute('data-muncul-beranda')) pengamat.observe(elemen);
+    };
+    pindai(konten, amati);
+    const perubahan = new MutationObserver((entri) => {
+      for (const { addedNodes, removedNodes } of entri) {
+        removedNodes.forEach((node) => pindai(node, (elemen) => pengamat.unobserve(elemen)));
+        addedNodes.forEach((node) => {
+          if (konten.contains(node)) pindai(node, amati);
+        });
+      }
+    });
+    perubahan.observe(konten, { childList: true, subtree: true });
+
+    return () => {
+      perubahan.disconnect();
+      pengamat.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     let aktif = true;
