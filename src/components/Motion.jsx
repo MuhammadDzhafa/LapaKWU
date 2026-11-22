@@ -79,6 +79,41 @@ export function Hitung({ ke, durasi = 1100 }) {
 export default function Motion() {
   const progress = useRef(null);
   useEffect(() => {
+    if (!('IntersectionObserver' in window)) return;
+
+    const selector = '[data-animasi-katalog=""]';
+    const pengamat = new IntersectionObserver((entri) => {
+      for (const { target, isIntersecting } of entri) {
+        if (!isIntersecting) continue;
+        target.setAttribute('data-animasi-katalog', 'tampil');
+        pengamat.unobserve(target);
+      }
+    });
+    const amati = (elemen) => pengamat.observe(elemen);
+    document.querySelectorAll(selector).forEach(amati);
+
+    const perubahanKatalog = new MutationObserver((perubahan) => {
+      for (const { addedNodes, removedNodes } of perubahan) {
+        for (const node of removedNodes) {
+          if (node.isConnected) continue;
+          if (node.matches?.(selector)) pengamat.unobserve(node);
+          node.querySelectorAll?.(selector).forEach((elemen) => pengamat.unobserve(elemen));
+        }
+        for (const node of addedNodes) {
+          if (!node.isConnected) continue;
+          if (node.matches?.(selector)) amati(node);
+          node.querySelectorAll?.(selector).forEach(amati);
+        }
+      }
+    });
+    perubahanKatalog.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      perubahanKatalog.disconnect();
+      pengamat.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
     const html = document.documentElement;
     let y0 = scrollY, rafScroll = 0;
     let gulir = html.hasAttribute('data-scrolled');
