@@ -809,6 +809,11 @@ html[data-nav=hide] .top:has(.toast){transform:none}
 .wallet-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px}
 .wallet-heading{justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
 .wallet-heading h3{margin:0}
+.wallet-identitas{display:grid;gap:4px}
+.atur-tenant{display:grid;grid-template-columns:minmax(0,1fr) max-content;align-items:center;gap:8px;min-width:0}
+.atur-tenant select{min-width:0}
+.atur-tenant .btn{white-space:nowrap}
+@media(max-width:700px){.atur-tenant{grid-template-columns:minmax(0,1fr)}.atur-tenant .btn{justify-self:start}}
 .wallet-form{max-width:420px}
 .wallet-qr{display:grid;place-items:center;width:min(100%,360px);padding:8px;background:#fff;border:1px solid var(--line);border-radius:12px;cursor:zoom-in}
 .wallet-qr img{display:block;width:100%;height:auto;max-height:460px;object-fit:contain}

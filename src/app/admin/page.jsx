@@ -257,8 +257,10 @@ export default function Admin() {
           <div className="wallet-grid">
             {pencairan.map((x) => (
               <article className="card pad stack" key={x.id}>
-                <b>{x.nama_usaha} · {rp(x.nominal)}</b>
-                <small className="muted">{tgl(x.created_at)} · #{x.id.slice(-8)}</small>
+                <header className="wallet-identitas">
+                  <b>{x.nama_usaha} · {rp(x.nominal)}</b>
+                  <small className="muted">{tgl(x.created_at)} · #{x.id.slice(-8)}</small>
+                </header>
                 <button className="wallet-qr" type="button" onClick={() => setModalGambar({ src: img(x.id_qris), judul: 'QRIS pencairan ' + x.nama_usaha, qris: true })} aria-label={'Perbesar QRIS ' + x.nama_usaha}>
                   <img loading="lazy" decoding="async" src={img(x.id_qris)} alt={'QRIS pencairan ' + x.nama_usaha} />
                 </button>
@@ -390,7 +392,7 @@ export default function Admin() {
         {d.offset !== undefined && <div className="scroll"><table><thead><tr><th>Usaha</th><th>Nomor tenant</th><th>Kontak</th><th>Status</th><th>Tindakan</th></tr></thead><tbody>
         {mitraCocok.slice(0, batasMitra).map((x) => { const u = pg(x.$id); return (
           <tr key={x.$id}><td><b>{x.nama_usaha}</b></td>
-            <td><form className="row" onSubmit={(e) => aturTenant(e, x)} style={{ flexWrap: 'nowrap' }}>
+            <td><form className="atur-tenant" onSubmit={(e) => aturTenant(e, x)}>
               <select key={x.nomor_tenant ?? 'kosong'} name="nomor_tenant" aria-label={`Nomor tenant ${x.nama_usaha}`} defaultValue={x.nomor_tenant ?? ''} disabled={simpanTenant !== null}>
                 <option value="">Belum ditetapkan</option>
                 {Array.from({ length: JUMLAH_TENANT }, (_, i) => i + 1).map((nomor) => (
