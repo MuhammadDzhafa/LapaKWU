@@ -8,6 +8,7 @@ import Lapak from '@/components/Lapak';
 import PilihAddOn from '@/components/PilihAddOn';
 import { kategoriProduk } from '@/lib/kategori';
 import Ikon from '@/components/Ikon';
+import Logo from '@/components/Logo';
 import { Hitung, terbang } from '@/components/Motion';
 
 // Peragaan di hero: tiap tekan − stok turun dan rekap naik, sama seperti di dashboard mitra.
@@ -256,6 +257,7 @@ export default function Beranda() {
 
   return (
     <>
+      <div className="curtain" aria-hidden="true"><span className="brand"><Logo /></span></div>
       {produkAddOn && <PilihAddOn produk={produkAddOn} onTutup={() => setProdukAddOn(null)} />}
       <section className="hero2">
         <div className="aurora" aria-hidden="true"><i /><i /><i /><b /></div>
@@ -291,7 +293,7 @@ export default function Beranda() {
       </section>
 
       <div className="wrap">
-        <div className="searchcard" id="katalog" data-animasi-katalog="">
+        <div className="searchcard" id="katalog">
           <div className="cari">
             <input type="search" aria-label="Cari produk, lapak, atau nomor tenant" placeholder="Cari produk, lapak, atau tenant" value={q} onChange={(e) => { setQ(e.target.value); setLapak(''); setBatasProduk(PRODUK_PER_TAMPIL); }} />
           </div>
@@ -309,7 +311,7 @@ export default function Beranda() {
           <NavigasiKatalog rel={relLapak} label="lapak" jumlah={hasilLapak.length} />
           <div id="rel-lapak" ref={relLapak} className="rel-produk stalls" role="region" aria-label="Daftar lapak yang dapat digeser" tabIndex={hasilLapak.length > 1 ? 0 : undefined}>
             {hasilLapak.map((x) => (
-              <button type="button" key={x.$id} className={'stall' + (lapak === x.$id ? ' on' : '')} data-animasi-katalog="" aria-pressed={lapak === x.$id} onClick={() => pilihLapak(lapak === x.$id ? '' : x.$id)}>
+              <button type="button" key={x.$id} className={'stall' + (lapak === x.$id ? ' on' : '')} aria-pressed={lapak === x.$id} onClick={() => pilihLapak(lapak === x.$id ? '' : x.$id)}>
                 <div><b>{x.nama_usaha}</b><small>{x.nomor_tenant != null && `Tenant ${x.nomor_tenant} · `}{jumlahPerLapak.get(x.$id)} produk</small></div>
               </button>
             ))}
@@ -327,7 +329,7 @@ export default function Beranda() {
           {halamanProduk.map((halaman, indeks) => (
             <div key={indeks} className="halaman-produk" ref={indeks === halamanProduk.length - 1 && tampil.length > batasProduk ? ujungProduk : null}>
               {halaman.map((x, n) => (
-                <article key={x.$id} className="card prod" data-animasi-katalog="" style={{ '--i': Math.min(n, 12) }}>
+                <article key={x.$id} className="card prod" style={{ '--i': Math.min(n, 12) }}>
                   <Link href={`/produk/${x.$id}`} className="ph" aria-label={x.nama}>
                     {x.id_gambar ? <img src={img(x.id_gambar)} alt="" loading="lazy" decoding="async" /> : <span>{x.nama[0]}</span>}
                     {kategoriPerProduk.get(x.$id)?.length > 0 && <span className="kat">{kategori || kategoriPerProduk.get(x.$id)[0]}</span>}
