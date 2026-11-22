@@ -62,7 +62,7 @@ main.wrap>h2{margin-bottom:1.1rem}
 .stage::before{content:"";position:absolute;inset:6% 4% 4%;background:var(--bl);border-radius:50%;transform:translate(calc(var(--px)*-.5),calc(var(--py)*-.5));transition:transform .25s ease-out}
 .stage .art{transform:rotateX(var(--rx)) rotateY(var(--ry));transition:transform .25s ease-out;transform-style:preserve-3d}
 .art{position:relative;width:100%;height:auto;display:block}
-.live{position:absolute;background:var(--card);color:var(--ink);border-radius:18px;padding:12px 14px;box-shadow:0 18px 40px -16px rgba(34,49,63,.55);animation:pop .6s var(--ease) both,bob 5s 1s ease-in-out infinite;min-width:164px;translate:var(--px) var(--py);transition:translate .25s ease-out}
+.live{position:absolute;background:var(--card);color:var(--ink);border-radius:18px;padding:12px 14px;box-shadow:0 18px 40px -16px rgba(34,49,63,.55);animation:live-in .6s var(--ease) backwards,bob 5s 1s ease-in-out infinite;min-width:164px;translate:var(--px) var(--py);transition:translate .25s ease-out}
 .live small{display:block;color:var(--mute);font-weight:600}
 .live.a{left:-4%;top:10%;animation-delay:.9s,1.5s}.live.b{right:-5%;bottom:-5%;animation-delay:1.15s,2s}
 .live .qrow{display:flex;align-items:center;gap:10px;margin-top:6px}
@@ -75,6 +75,7 @@ main.wrap>h2{margin-bottom:1.1rem}
 @keyframes tick{from{transform:translateY(60%);opacity:0}}
 @keyframes chg{0%{transform:translateY(8px) scale(.6);opacity:0}15%,70%{transform:none;opacity:1}100%{transform:translateY(-8px);opacity:0}}
 @keyframes pop{from{transform:scale(.6) translateY(14px);opacity:0}}
+@keyframes live-in{from{scale:.94;opacity:0}}
 @keyframes bob{50%{transform:translateY(-7px)}}
 @keyframes rise{from{transform:translateY(22px);opacity:0}}
 @media(max-width:860px){.hero2 .wrap{grid-template-columns:1fr;padding-top:36px}.stage{order:-1;max-width:300px}.hero2 h1{max-width:16ch}.live{min-width:0;padding:9px 11px;font-size:.88rem}.live.a{left:-12%}.live.b{right:-12%}.live .num{font-size:1.2rem}.live .rp{font-size:1rem}}
@@ -640,17 +641,17 @@ html[data-scrolled] .top .wrap{min-height:52px;background:rgba(255,253,248,.9);b
 .hero2::before{z-index:1}
 .hero2 .awning,.hero2 .wrap{z-index:2}.ticker{z-index:2}
 .aurora{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}
-.aurora i{position:absolute;display:block;border-radius:50%;filter:blur(64px);will-change:transform}
-.aurora i:nth-child(1){width:480px;height:480px;left:-150px;top:18%;background:var(--or);opacity:.4;animation:drift 18s ease-in-out infinite alternate}
-.aurora i:nth-child(2){width:430px;height:430px;right:-120px;top:-70px;background:var(--cr);opacity:.9;animation:drift 22s -6s ease-in-out infinite alternate-reverse}
-.aurora i:nth-child(3){width:380px;height:380px;left:36%;bottom:-130px;background:var(--cr);opacity:.95;animation:drift 20s -3s ease-in-out infinite alternate}
+.aurora i{position:absolute;display:block;background:radial-gradient(circle closest-side,var(--cahaya),transparent);will-change:transform}
+.aurora i:nth-child(1){width:480px;height:480px;left:-150px;top:18%;--cahaya:var(--or);opacity:.4;animation:drift 18s ease-in-out infinite alternate}
+.aurora i:nth-child(2){width:430px;height:430px;right:-120px;top:-70px;--cahaya:var(--cr);opacity:.9;animation:drift 22s -6s ease-in-out infinite alternate-reverse}
+.aurora i:nth-child(3){width:380px;height:380px;left:36%;bottom:-130px;--cahaya:var(--cr);opacity:.95;animation:drift 20s -3s ease-in-out infinite alternate}
 .aurora b{position:absolute;inset:0;background:radial-gradient(380px circle at var(--gx,72%) var(--gy,34%),rgba(255,255,255,.55),transparent 62%);mix-blend-mode:soft-light}
 .aurora::after{content:"";position:absolute;inset:0;opacity:.13;mix-blend-mode:multiply;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .13 0 0 0 0 .19 0 0 0 0 .25 0 0 0 .6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
 @keyframes drift{to{transform:translate3d(70px,-44px,0) scale(1.16)}}
 .stage::before{animation:morph 14s ease-in-out infinite}
-@keyframes morph{0%,100%{border-radius:50%}33%{border-radius:58% 42% 52% 48%/46% 56% 44% 54%}66%{border-radius:44% 56% 46% 54%/56% 44% 58% 42%}}
+@keyframes morph{33%{scale:1.04 .97}66%{scale:.98 1.04}}
 .hstats{display:flex;gap:10px;flex-wrap:wrap;list-style:none;margin:28px 0 0;padding:0;animation:rise .8s 1.3s var(--ease) both}
-.hstats li{display:inline-flex;align-items:baseline;gap:6px;padding:7px 16px;border-radius:99px;background:rgba(255,253,248,.62);border:1px solid rgba(34,49,63,.1);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font-weight:600;font-size:.92rem}
+.hstats li{display:inline-flex;align-items:baseline;gap:6px;padding:7px 16px;border-radius:99px;background:rgba(255,253,248,.72);border:1px solid rgba(34,49,63,.1);font-weight:600;font-size:.92rem}
 .hstats b{font:800 1.2rem var(--f-disp);letter-spacing:-.03em;min-width:1.2ch;text-align:right}
 .ticker .ticker-group{font-size:1rem}
 @supports (animation-timeline:view()){
@@ -988,13 +989,13 @@ input[type=file]:hover::file-selector-button{background:var(--ye)}
 /* ---------- tirai pembuka beranda ---------- */
 .curtain{display:none}
 @media(prefers-reduced-motion:no-preference){
-  .curtain{display:grid;position:fixed;inset:0;z-index:200;place-items:center;background:var(--ye);pointer-events:none;animation:tirai .85s .55s cubic-bezier(.45,0,.25,1) forwards}
+  .curtain{display:grid;position:fixed;inset:0;z-index:200;place-items:center;background:var(--ye);pointer-events:none;animation:tirai .85s .55s cubic-bezier(.45,0,.25,1) forwards;will-change:transform}
   .curtain::before,.curtain::after{content:"";position:absolute;left:0;right:0}
   .curtain::before{bottom:0;height:46px;background:var(--stripe)}
   .curtain::after{top:100%;height:18px;background:var(--stripe);-webkit-mask:radial-gradient(circle at 18px 0,#000 17.5px,transparent 18px) 0 0/36px 18px repeat-x;mask:radial-gradient(circle at 18px 0,#000 17.5px,transparent 18px) 0 0/36px 18px repeat-x}
   .curtain .brand{font-size:clamp(2rem,8.7vw,5.6rem);animation:merek .5s var(--ease) both}
   @keyframes merek{from{transform:translateY(16px) scale(.96);opacity:0}}
-  @keyframes tirai{to{transform:translateY(-118%);visibility:hidden}}
+  @keyframes tirai{to{transform:translate3d(0,calc(-100% - 18px),0);visibility:hidden}}
 }
 
 /* ---------- pegas di tempat yang menjawab tindakan ---------- */
@@ -1074,8 +1075,8 @@ input[type=file]:hover::file-selector-button{background:var(--ye)}
 
 /* ---------- kartu produk: cincin warna berputar saat disorot ---------- */
 @media(hover:hover) and (pointer:fine){
-  .prod::before{content:"";position:absolute;inset:0;z-index:2;border-radius:inherit;padding:2px;pointer-events:none;opacity:0;transition:opacity .35s;background:conic-gradient(from var(--a),var(--or),var(--ye),var(--bl),var(--or));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);mask-composite:exclude;animation:putar 4s linear infinite}
-  .prod:hover::before{opacity:1}
+  .prod::before{content:"";position:absolute;inset:0;z-index:2;border-radius:inherit;padding:2px;pointer-events:none;opacity:0;transition:opacity .35s;background:conic-gradient(from var(--a),var(--or),var(--ye),var(--bl),var(--or));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);mask-composite:exclude}
+  .prod:hover::before{opacity:1;animation:putar 4s linear infinite}
 }
 
 /* ---------- judul hero: kilau sekali lewat setelah kata-katanya masuk ---------- */
