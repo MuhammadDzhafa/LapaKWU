@@ -295,16 +295,8 @@ export default function Beranda() {
           <div className="cari">
             <input type="search" aria-label="Cari produk, lapak, atau nomor tenant" placeholder="Cari produk, lapak, atau tenant" value={q} onChange={(e) => { setQ(e.target.value); setLapak(''); setBatasProduk(PRODUK_PER_TAMPIL); }} />
           </div>
-          {kat.length > 8 ? (
-            <div className="kategori-katalog field">
-              <label htmlFor="kategori-katalog">Kategori produk</label>
-              <select id="kategori-katalog" value={kategori} onChange={(e) => pilihKategori(e.target.value)}>
-                <option value="">Semua kategori</option>
-                {kat.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          ) : kat.length > 0 && (
-            <div className="chips" role="group" aria-label="Kategori produk">
+          {kat.length > 0 && (
+            <div className="kategori-katalog" role="group" aria-label="Kategori produk" tabIndex={0}>
               {['', ...kat].map((c) => <button type="button" key={c} className={'chip' + (c === kategori ? ' on' : '')} aria-pressed={c === kategori} onClick={() => pilihKategori(c)}>{c || 'Semua'}</button>)}
             </div>
           )}
