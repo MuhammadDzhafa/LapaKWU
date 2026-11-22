@@ -8,7 +8,7 @@ import Footer from '@/components/Footer';
 import Motion from '@/components/Motion';
 import Ikon from '@/components/Ikon';
 import Notifikasi from '@/components/Notifikasi';
-import { itemCocok } from '@/lib/add-on';
+import { hargaSatuanProduk, itemCocok } from '@/lib/add-on';
 import { bacaKeranjangLokal, simpanKeranjangLokal } from '@/lib/keranjang-lokal';
 
 const Ctx = createContext({});
@@ -94,6 +94,7 @@ export default function Shell({ children }) {
     const cur = keranjang.find(cocok);
     const curJml = cur?.jumlah || 0;
     const targetJml = Math.max(0, Math.min(curJml + delta, p.stok));
+    const subtotal = targetJml * hargaSatuanProduk(p, addOn);
 
     // Update optimistik di state lokal
     setKeranjang((prev) => {
@@ -102,9 +103,9 @@ export default function Shell({ children }) {
       }
       const existing = prev.find(cocok);
       if (existing) {
-        return prev.map((i) => (cocok(i) ? { ...i, jumlah: targetJml, subtotal: targetJml * p.harga } : i));
+        return prev.map((i) => (cocok(i) ? { ...i, jumlah: targetJml, subtotal } : i));
       }
-      return [...prev, { id_produk: p.$id, add_on: addOn, catatan_item: catatan, id_keranjang: s.akun.$id, jumlah: targetJml, subtotal: targetJml * p.harga }];
+      return [...prev, { id_produk: p.$id, add_on: addOn, catatan_item: catatan, id_keranjang: s.akun.$id, jumlah: targetJml, subtotal }];
     });
 
     try {

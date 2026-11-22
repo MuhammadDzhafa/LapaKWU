@@ -1,6 +1,6 @@
 // Lapisan API sisi browser; data hanya diakses melalui route Next.js.
 
-import { itemCocok } from './add-on';
+import { hargaSatuanProduk, itemCocok } from './add-on';
 
 export const BUCKET = 'gambar-produk';
 
@@ -158,7 +158,7 @@ export async function ubahJumlahKeranjang(uid, p, delta = 1, addOn = '', catatan
     return 0;
   }
 
-  const data = { jumlah: newJml, subtotal: newJml * p.harga };
+  const data = { jumlah: newJml, subtotal: newJml * hargaSatuanProduk(p, addOn) };
   if (it) await ubah('item_keranjang', it.$id, data);
   else await buat('item_keranjang', { id_keranjang: uid, id_produk: p.$id, add_on: addOn, catatan_item: catatan, ...data });
   await hitungKeranjang(uid);

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { list, ambil, api, storage, Query, rp } from '@/lib/aw';
 import { MAKS_BUKTI_PEMBAYARAN, PESAN_UKURAN_BUKTI } from '@/lib/bukti-pembayaran';
-import { addOnValid, namaDenganAddOn } from '@/lib/add-on';
+import { addOnValid, hargaSatuanProduk, namaDenganAddOn } from '@/lib/add-on';
 import { formatJadwalAmbil, MULAI_PRE_ORDER, TANGGAL_PRE_ORDER, waktuPreOrder } from '@/lib/waktu';
 import StatusMuat from '@/components/StatusMuat';
 import { useSaya } from '@/components/Shell';
@@ -39,7 +39,8 @@ export default function Checkout() {
         setLg({ id: p.$id, jumlah, add_on });
         const mt = await ambil('mitra', p.id_mitra).catch(() => null);
         if (mt) setMitras({ [p.id_mitra]: mt });
-        return setIt([{ $id: 'langsung', id_produk: p.$id, id_mitra: p.id_mitra, nama: p.nama, add_on, jumlah, harga: p.harga, subtotal: jumlah * p.harga }]);
+        const harga = hargaSatuanProduk(p, add_on);
+        return setIt([{ $id: 'langsung', id_produk: p.$id, id_mitra: p.id_mitra, nama: p.nama, add_on, jumlah, harga, subtotal: jumlah * harga }]);
       }
       const x = await list('item_keranjang', [Query.equal('id_keranjang', akun.$id)]);
       const ps = x.length ? await list('produk', [Query.equal('$id', x.map((i) => i.id_produk)), Query.limit(500)]) : [];
@@ -49,12 +50,13 @@ export default function Checkout() {
       const produk = new Map(ps.map((p) => [p.$id, p]));
       setIt(x.map((i) => {
         const prod = produk.get(i.id_produk);
+        const harga = prod ? hargaSatuanProduk(prod, i.add_on) : 0;
         return {
           ...i,
           id_mitra: prod?.id_mitra,
           nama: prod?.nama || 'Produk',
-          harga: prod?.harga || 0,
-          subtotal: i.jumlah * (prod?.harga || 0),
+          harga,
+          subtotal: i.jumlah * harga,
         };
       }));
     })().catch((e) => setMsg(e.message));

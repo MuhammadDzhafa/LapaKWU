@@ -2,7 +2,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSaya } from '@/components/Shell';
-import { addOnValid, MAKS_CATATAN_ITEM } from '@/lib/add-on';
+import { addOnValid, hargaAddOn, hargaSatuanProduk, MAKS_CATATAN_ITEM } from '@/lib/add-on';
 import { rp } from '@/lib/aw';
 
 export default function PilihAddOn({ produk, jumlah = 1, onTutup, onBeli }) {
@@ -60,6 +60,7 @@ export default function PilihAddOn({ produk, jumlah = 1, onTutup, onBeli }) {
             <label key={nama}>
               <input type="radio" name="varian" value={nama} checked={pilihan === nama} onChange={() => setPilihan(nama)} required />
               {nama}
+              {hargaAddOn(produk, nama) > 0 && <b className="add-on-tambahan">+{rp(hargaAddOn(produk, nama))}</b>}
             </label>
           ))}
         </fieldset>
@@ -70,7 +71,7 @@ export default function PilihAddOn({ produk, jumlah = 1, onTutup, onBeli }) {
         {pesan && <p className="msg err" role="alert">{pesan}</p>}
         <button className="btn sun" disabled={!valid || sibuk || memuat}>
           {sibuk ? 'Menambahkan…' : onBeli ? 'Beli sekarang' : 'Tambah pembelian'}
-          <b>{rp(jumlah * produk.harga)}</b>
+          <b>{rp(jumlah * hargaSatuanProduk(produk, pilihan))}</b>
         </button>
       </form>
     </dialog>

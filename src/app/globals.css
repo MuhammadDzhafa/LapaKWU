@@ -752,6 +752,12 @@ html[data-scrolled] .top .wrap{min-height:52px;background:rgba(255,253,248,.9);b
 .input-varian .row>:is(input,select){flex:1 1 0;min-width:0}
 .input-varian .row>.btn{flex:none;align-self:center;white-space:nowrap;overflow-wrap:normal}
 .input-varian .btn{align-self:flex-start}
+.varian-harga{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,.9fr) auto;gap:8px;align-items:end}
+.varian-harga :is(input,label){min-width:0}
+.varian-harga label{display:grid;gap:4px}
+.varian-harga .btn{align-self:center;white-space:nowrap;overflow-wrap:normal}
+.add-on-tambahan{margin-inline-start:auto;white-space:nowrap}
+@media(max-width:560px){.varian-harga{grid-template-columns:minmax(0,1fr) auto}.varian-harga>input{grid-column:1/-1}}
 .modal-varian{max-height:90dvh;overflow:auto}
 .catatan-item{display:block;white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:560px){.denah-modal.add-on-dialog{width:100%;margin:auto 0 0;border-radius:24px 24px 0 0;padding-bottom:max(20px,env(safe-area-inset-bottom))}}

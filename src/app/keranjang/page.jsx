@@ -42,7 +42,7 @@ export default function Keranjang() {
       if (j < 1) await hapus('item_keranjang', i.$id);
       else if (!i.p) return setMsg('Produk ini sudah dihapus mitra. Hapus dari keranjang.');
       else if (j > i.p.stok) return setMsg(`Stok ${i.p.nama} tersisa ${i.p.stok}.`);
-      else await ubah('item_keranjang', i.$id, { jumlah: j, subtotal: j * i.p.harga });
+      else await ubah('item_keranjang', i.$id, { jumlah: j });
       await hitungKeranjang(akun.$id);
       setMsg('');
       await muatKeranjang(akun.$id);
@@ -60,7 +60,7 @@ export default function Keranjang() {
       <div className="stack">
         {it.map((i) => (
           <div key={i.$id ?? (`produk:${i.id_produk}:${i.add_on ?? ''}:${i.catatan_item ?? ''}`)} className="card pad row" style={{ justifyContent: 'space-between' }}>
-            <div><b>{namaDenganAddOn(i.p?.nama || (produkDimuat === idsProduk ? 'Produk dihapus' : 'Memuat produk…'), i.add_on)}</b><br /><small className="muted">{rp(i.p?.harga)} per item</small>
+            <div><b>{namaDenganAddOn(i.p?.nama || (produkDimuat === idsProduk ? 'Produk dihapus' : 'Memuat produk…'), i.add_on)}</b><br /><small className="muted">{rp(i.subtotal / i.jumlah)} per item</small>
               {i.catatan_item && <small className="catatan-item">Catatan: {i.catatan_item}</small>}
               {i.p && !addOnValid(i.p, i.add_on) && <p className="msg err">Pilihan add-on berubah. Hapus item ini lalu <Link className="link" href={`/produk/${i.id_produk}`}>pilih ulang</Link>.</p>}</div>
             <div className="row">

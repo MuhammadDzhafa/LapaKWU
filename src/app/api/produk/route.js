@@ -38,7 +38,11 @@ export async function POST(req) {
   if (!(await getRow(db, 'mitra', u.$id).catch(() => null))) return err('Hanya mitra yang bisa mengelola produk.', 403);
 
   const pilihanAddOn = b.pilihan_add_on === undefined ? [] : bacaPilihanAddOn(b.pilihan_add_on);
-  if (!pilihanAddOn) return err('Isi maksimal 20 pilihan add-on yang berbeda, masing-masing hingga 60 karakter.');
+  if (!pilihanAddOn) return err('Isi maksimal 20 nama add-on yang berbeda (maksimal 60 karakter) dan harga bulat dari Rp0 hingga Rp999.999.999.');
+  const dataAddOn = {
+    pilihan_add_on: pilihanAddOn.map(({ nama }) => nama),
+    harga_add_on: Object.fromEntries(pilihanAddOn.map(({ nama, harga }) => [nama, harga])),
+  };
 
   const adaKategori = b.kategori_list !== undefined || b.kategori !== undefined;
   const kategoriList = bacaKategori(b.kategori_list ?? b.kategori);
@@ -50,7 +54,7 @@ export async function POST(req) {
     if (!nama || harga == null || !kategoriList?.length || stok == null) return err('Data produk tidak lengkap.');
     if (!hargaValid(harga) || !stokValid(stok)) return err('Harga atau stok tidak valid.');
     if (id_gambar && !(await cariSatu('unggahan_file', { _id: id_gambar, id_pengguna: u.$id, jenis: 'gambar' }))) return err('Gambar tidak ditemukan atau bukan milik akun ini.', 403);
-    const data = { id_mitra: u.$id, nama, harga: +harga, kategori: kategoriList[0], kategori_list: kategoriList, deskripsi: deskripsi || '', stok: +stok, pilihan_add_on: pilihanAddOn };
+    const data = { id_mitra: u.$id, nama, harga: +harga, kategori: kategoriList[0], kategori_list: kategoriList, deskripsi: deskripsi || '', stok: +stok, ...dataAddOn };
     if (id_gambar) data.id_gambar = id_gambar;
     const row = await put(db, 'produk', ID.unique(), data);
     return Response.json({ ok: true, id: row.$id });
@@ -62,7 +66,7 @@ export async function POST(req) {
     if (!p || p.diarsipkan || p.id_mitra !== u.$id) return err('Produk tidak ditemukan.', 404);
     if ((b.harga != null && !hargaValid(b.harga)) || (b.stok != null && !stokValid(b.stok))) return err('Harga atau stok tidak valid.');
     const data = {};
-    if (b.pilihan_add_on !== undefined) data.pilihan_add_on = pilihanAddOn;
+    if (b.pilihan_add_on !== undefined) Object.assign(data, dataAddOn);
     if (b.nama != null) data.nama = b.nama;
     if (b.harga != null) data.harga = +b.harga;
     if (b.stok != null) data.stok = +b.stok;

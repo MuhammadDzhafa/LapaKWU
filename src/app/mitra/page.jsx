@@ -8,6 +8,7 @@ import { periodeJakarta } from '@/lib/waktu';
 import StatusMuat from '@/components/StatusMuat';
 import Modal from '@/components/Modal';
 import { kategoriProduk } from '@/lib/kategori';
+import { hargaAddOn } from '@/lib/add-on';
 import PilihKategoriProduk from '@/components/PilihKategoriProduk';
 import InputVarian from '@/components/InputVarian';
 import Ikon from '@/components/Ikon';
@@ -17,13 +18,16 @@ const Pesanan = dynamic(() => import('@/components/Pesanan'), { loading: () => <
 const DompetMitra = dynamic(() => import('@/components/DompetMitra'), { loading: () => <StatusMuat teks="Memuat dompet…" /> });
 const Rekap = dynamic(() => import('@/components/Rekap'), { loading: () => <StatusMuat teks="Memuat rekap penjualan…" /> });
 
+const varianKosong = () => [{ nama: '', harga: 0 }];
+const siapkanVarian = (daftar) => daftar.map(({ nama, harga }) => ({ nama, harga: Number(harga) }));
+
 export default function Lapak() {
   const { akun, peran, pengguna, mitra, memuat, muat: muatSaya, toast } = useSaya();
   const [tab, setTab] = useState('produk');
   const [ps, setPs] = useState(null);
   const [cariProduk, setCariProduk] = useState('');
   const [msg, setMsg] = useState('');
-  const [f, setF] = useState({ nama: '', harga: '', kategori_list: [''], deskripsi: '', stok: '', pilihan_add_on: [''] });
+  const [f, setF] = useState({ nama: '', harga: '', kategori_list: [''], deskripsi: '', stok: '', pilihan_add_on: varianKosong() });
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [st, setSt] = useState(null);
@@ -103,8 +107,8 @@ export default function Lapak() {
     try {
       let id_gambar;
       if (file) id_gambar = (await storage.createFile({ bucketId: BUCKET, fileId: ID.unique(), file })).$id;
-      await api('/api/produk', { aksi: 'tambah', nama: f.nama, harga: +f.harga, kategori_list: f.kategori_list, deskripsi: f.deskripsi, stok: +f.stok, pilihan_add_on: f.pilihan_add_on, ...(id_gambar ? { id_gambar } : {}) });
-      setF({ nama: '', harga: '', kategori_list: [''], deskripsi: '', stok: '', pilihan_add_on: [''] }); setFile(null); setPreview(null); e.target.reset(); toast('Produk berhasil ditambahkan.'); await muat();
+      await api('/api/produk', { aksi: 'tambah', nama: f.nama, harga: +f.harga, kategori_list: f.kategori_list, deskripsi: f.deskripsi, stok: +f.stok, pilihan_add_on: siapkanVarian(f.pilihan_add_on), ...(id_gambar ? { id_gambar } : {}) });
+      setF({ nama: '', harga: '', kategori_list: [''], deskripsi: '', stok: '', pilihan_add_on: varianKosong() }); setFile(null); setPreview(null); e.target.reset(); toast('Produk berhasil ditambahkan.'); await muat();
     } catch (er) { setMsg(er.message); }
   };
   const segarkanStat = () => list('rekap_penjualan', [Query.equal('id_mitra', akun.$id)]).then((rk) => setSt((s) => s && ({ ...s, jual: rk.find((x) => x.periode === bln())?.total_penjualan || 0 }))).catch(() => {});
@@ -177,13 +181,13 @@ export default function Lapak() {
       tipe: 'input',
       inputType: 'varian',
       inputLabel: 'Pilihan add-on (opsional)',
-      inputDefault: p.pilihan_add_on?.length ? p.pilihan_add_on : [''],
+      inputDefault: p.pilihan_add_on?.length ? p.pilihan_add_on.map((nama) => ({ nama, harga: hargaAddOn(p, nama) })) : varianKosong(),
       inputOpsional: true,
       tombolOk: 'Simpan add-on',
       onOk: async (nilai) => {
         setBusyModal(true);
         try {
-          await api('/api/produk', { aksi: 'ubah', id: p.$id, pilihan_add_on: nilai });
+          await api('/api/produk', { aksi: 'ubah', id: p.$id, pilihan_add_on: siapkanVarian(nilai) });
           await muat();
           setModalInfo(null);
           toast('Add-on berhasil disimpan.');
@@ -401,7 +405,10 @@ export default function Lapak() {
             <div key={p.$id} className="card pad row" style={{ justifyContent: 'space-between' }}>
               <div className="row">{p.id_gambar && <img src={img(p.id_gambar)} alt="" loading="lazy" decoding="async" width="56" height="56" style={{ objectFit: 'cover', borderRadius: 8 }} />}
                 <div><b>{p.nama}</b><br /><small className="muted">{kategoriProduk(p).join(' · ')} • {rp(p.harga)}</small>
-                  {p.pilihan_add_on?.length > 0 && <small className="muted" style={{ display: 'block' }}>{p.pilihan_add_on.join(', ')}</small>}</div></div>
+                  {p.pilihan_add_on?.length > 0 && <small className="muted" style={{ display: 'block' }}>{p.pilihan_add_on.map((nama) => {
+                    const harga = hargaAddOn(p, nama);
+                    return harga > 0 ? `${nama} (+${rp(harga)})` : nama;
+                  }).join(', ')}</small>}</div></div>
               <div className="row"><span className="qty" role="group" aria-label={`Stok ${p.nama}`}><button className="qb" aria-label={`Kurangi stok ${p.nama} (terjual offline)`} disabled={p.stok < 1} onClick={() => ketuk(p, 'jual')}>−</button><b key={p.stok} className="qn" aria-live="polite">{p.stok}</b><button className="qb add" aria-label={`Tambah stok ${p.nama}`} onClick={() => ketuk(p, 'tambah')}>+</button></span>
                 <button className="link" onClick={() => harga(p)}>Ubah harga</button><button className="link" onClick={() => stok(p)}>Ubah stok</button><button className="link" onClick={() => ubahKategori(p)}>Ubah kategori</button><button className="link" onClick={() => ubahAddOn(p)}>Ubah add-on</button><button className="link" onClick={() => hapusP(p)}>Hapus</button></div>
             </div>))}

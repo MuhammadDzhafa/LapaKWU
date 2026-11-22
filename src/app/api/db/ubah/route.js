@@ -1,7 +1,7 @@
 import { siapa, err } from '@/lib/server';
 import { cariBanyak, cariSatu, denganTransaksi, kunciProduk, pastikanPembeli, ubahData } from '@/lib/db';
 
-import { addOnValid } from '@/lib/add-on';
+import { addOnValid, hargaSatuanProduk } from '@/lib/add-on';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +35,7 @@ export async function POST(req) {
         const items = await cariBanyak(tabel, { id_keranjang: u.$id, id_produk: item.id_produk }, { limit: 5000 });
         const jumlahProduk = items.reduce((total, baris) => total + (baris.id === id ? 0 : baris.jumlah), data.jumlah);
         if (jumlahProduk > produk.stok) return err('Stok tidak cukup untuk semua pilihan produk ini.', 409);
-        const result = await ubahData(tabel, filter, { jumlah: data.jumlah, subtotal: data.jumlah * produk.harga });
+        const result = await ubahData(tabel, filter, { jumlah: data.jumlah, subtotal: data.jumlah * hargaSatuanProduk(produk, item.add_on) });
         if (!result.matchedCount) return err('Item tidak ditemukan.', 404);
         return Response.json({ ok: true });
       });

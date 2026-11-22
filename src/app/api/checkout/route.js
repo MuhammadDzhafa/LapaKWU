@@ -4,7 +4,7 @@ import { FORMAT_ID_BUKTI, MAKS_BUKTI_PEMBAYARAN, PESAN_UKURAN_BUKTI } from '@/li
 import { bacaBukti, periksaBukti } from '@/lib/ocr-bukti';
 import { unduhFile } from '@/lib/backblaze';
 
-import { addOnValid, namaDenganAddOn } from '@/lib/add-on';
+import { addOnValid, hargaSatuanProduk, namaDenganAddOn } from '@/lib/add-on';
 
 import { formatJadwalAmbil, MULAI_PRE_ORDER, waktuPreOrder } from '@/lib/waktu';
 
@@ -78,7 +78,8 @@ export async function POST(req) {
         if (p.stok < jumlah) return { error: 'Stok ' + p.nama + ' tidak cukup.' };
         jumlahPerProduk.set(p.$id, jumlah);
         const grup = perMitra.get(p.id_mitra) || [];
-        grup.push({ item, produk: p });
+        const hargaSen = Math.round(hargaSatuanProduk(p, item.add_on) * 100);
+        grup.push({ item, produk: p, hargaSen });
         perMitra.set(p.id_mitra, grup);
       }
 
@@ -88,7 +89,7 @@ export async function POST(req) {
         const mt = await getRow(null, 'mitra', id);
         if (antar && mt.antar_aktif !== true) return { error: mt.nama_usaha + ' sedang tidak menerima pengantaran.', status: 409 };
         mitra.set(id, mt);
-        const subtotal = grup.reduce((sum, { item, produk }) => sum + item.jumlah * Math.round(produk.harga * 100), 0);
+        const subtotal = grup.reduce((sum, { item, hargaSen }) => sum + item.jumlah * hargaSen, 0);
         totalPerMitra.set(id, subtotal + (antar ? mt.ongkir * 100 : 0));
       }
       const totalSen = [...totalPerMitra.values()].reduce((sum, nilai) => sum + nilai, 0);
@@ -132,10 +133,10 @@ export async function POST(req) {
           ...(antar ? { alamat_pengiriman: alamat, ongkir: mt.ongkir } : {}),
           ...(waktuAmbil ? { waktu_pengambilan: waktuAmbil } : {}),
         });
-        for (const { item, produk } of grup) {
+        for (const { item, produk, hargaSen } of grup) {
           await put(null, 'detail_pesanan', ID.unique(), {
             id_pesanan: pid, id_produk: produk.$id, jumlah: item.jumlah,
-            harga_satuan: produk.harga, subtotal: item.jumlah * produk.harga, add_on: item.add_on || '', catatan_item: item.catatan_item || '',
+            harga_satuan: hargaSen / 100, subtotal: item.jumlah * hargaSen / 100, add_on: item.add_on || '', catatan_item: item.catatan_item || '',
           });
         }
         await put(null, 'pembayaran', ID.unique(), {
