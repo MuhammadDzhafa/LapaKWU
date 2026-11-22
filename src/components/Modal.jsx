@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import PilihKategoriProduk from '@/components/PilihKategoriProduk';
 import InputVarian from '@/components/InputVarian';
 
@@ -39,6 +39,7 @@ export default function Modal({
   busy = false,
 }) {
   const [val, setVal] = useState(inputDefault !== undefined ? inputDefault : '');
+  const formId = useId();
 
   useEffect(() => {
     setVal(inputDefault !== undefined ? inputDefault : '');
@@ -46,6 +47,7 @@ export default function Modal({
 
   const handleSubmit = (e) => {
     e?.preventDefault();
+    if (busy) return;
     if (tipe === 'input' && !inputOpsional && (val === '' || val === null)) return;
     onOk(val);
   };
@@ -61,7 +63,7 @@ export default function Modal({
         {pesan && <p className="modal-pesan">{pesan}</p>}
 
         {tipe === 'input' && (
-          <form onSubmit={handleSubmit} style={{ marginBottom: 16 }}>
+          <form id={formId} onSubmit={handleSubmit} style={{ marginBottom: 16 }}>
             <div className="field">
               {inputLabel && !['varian', 'kategori'].includes(inputType) && <label>{inputLabel}</label>}
               {inputType === 'kategori' ? (
@@ -81,7 +83,9 @@ export default function Modal({
           {tipe !== 'pesan' && (
             <button type="button" className="btn sm out" onClick={onBatal} disabled={busy} style={{ minWidth: 70 }}>{tombolBatal}</button>
           )}
-          <button type="button" className={`btn sm ${warnaOk}`} onClick={handleSubmit} disabled={busy || (tipe === 'input' && !inputOpsional && String(val).trim() === '')} style={{ minWidth: 80 }}>
+          <button type={tipe === 'input' ? 'submit' : 'button'} form={tipe === 'input' ? formId : undefined}
+            className={`btn sm ${warnaOk}`} onClick={tipe === 'input' ? undefined : handleSubmit}
+            disabled={busy || (tipe === 'input' && !inputOpsional && String(val).trim() === '')} style={{ minWidth: 80 }}>
             {busy ? 'Memproses…' : tombolOk}
           </button>
         </div>

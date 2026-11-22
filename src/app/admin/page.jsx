@@ -67,7 +67,9 @@ export default function Admin() {
       setGalatKategori(error.message);
     }
   }, []);
-  useEffect(() => { if (peran === 'admin') void muatKategori(); }, [peran, muatKategori]);
+  useEffect(() => {
+    if (peran === 'admin' && (tab === 'produk' || tab === 'kategori')) void muatKategori();
+  }, [peran, tab, muatKategori]);
 
   const muatPencairan = useCallback(async () => {
     const data = await api('/api/admin', { aksi: 'daftar_pencairan' });
@@ -481,7 +483,7 @@ export default function Admin() {
         {galatKategori && <p role="alert">{galatKategori} <button type="button" className="link" onClick={muatKategori}>Coba lagi</button></p>}
         <div className="scroll"><table><thead><tr><th>Produk</th><th>Mitra</th><th>Kategori</th><th>Harga</th><th>Stok</th><th>Tindakan</th></tr></thead><tbody>
           {produkCocok.map((x) => <tr key={x.$id}>
-            <td>{x.nama}{x.diarsipkan && <small className="muted"> · Diarsipkan</small>}</td>
+            <td><span>{x.nama}{x.diarsipkan && <small className="muted"> · Diarsipkan</small>}</span></td>
             <td>{nama[x.id_mitra]}</td><td>{kategoriProduk(x).join(' · ')}</td><td>{rp(x.harga)}</td><td>{x.stok}</td>
             <td><div className="row">
               <button type="button" className="link" disabled={!namaKategori.length} onClick={() => setModalInfo({

@@ -1,25 +1,32 @@
 import { nanoid } from 'nanoid';
-import { queryDatabase } from '@/lib/db';
+import { databaseTidakTersedia, queryDatabase } from '@/lib/db';
 import { bacaKategori } from '@/lib/kategori';
 import { dataKategoriProduk, transaksiKategori } from '@/lib/kategori-db';
-import { err, getRow, siapa, upd } from '@/lib/server';
+import { err, siapa, upd } from '@/lib/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const { rows } = await queryDatabase('SELECT nama FROM kategori_produk ORDER BY lower(nama)');
-  return Response.json({ kategori: rows.map(({ nama }) => nama) });
+  try {
+    const { rows } = await queryDatabase('SELECT nama FROM kategori_produk ORDER BY lower(nama)');
+    return Response.json({ kategori: rows.map(({ nama }) => nama) });
+  } catch (error) {
+    if (databaseTidakTersedia(error)) return err('Database belum dapat dihubungi. Coba lagi sebentar.', 503);
+    console.error('[/api/kategori]', error.message);
+    return err('Daftar kategori gagal dimuat.', 500);
+  }
 }
 
 export async function POST(req) {
   try {
     const akun = await siapa(req);
     if (!akun) return err('Belum masuk.', 401);
-    const peran = (tabel) => getRow(null, tabel, akun.$id).catch((error) => {
-      if (error.code === 404) return null;
-      throw error;
-    });
-    if (await peran('mitra') || !await peran('admin')) return err('Khusus admin.', 403);
+    const { rows: [akses] } = await queryDatabase(
+      `SELECT EXISTS (SELECT 1 FROM admin WHERE id = $1)
+        AND NOT EXISTS (SELECT 1 FROM mitra WHERE id = $1) AS diizinkan`,
+      [akun.$id],
+    );
+    if (!akses.diizinkan) return err('Khusus admin.', 403);
 
     const b = await req.json().catch(() => null);
     const aksi = b?.aksi;
@@ -60,7 +67,7 @@ export async function POST(req) {
         );
         if (dipakai.rowCount) return err('Pindahkan semua produk dari kategori ini sebelum menghapusnya.', 409);
         await queryDatabase('DELETE FROM kategori_produk WHERE id = $1', [id]);
-      } else {
+      } else if (nama !== lama.nama) {
         await queryDatabase('UPDATE kategori_produk SET nama = $2 WHERE id = $1', [id, nama]);
         await queryDatabase(
           `WITH terdampak AS (
@@ -81,6 +88,7 @@ export async function POST(req) {
       return Response.json({ ok: true });
     });
   } catch (error) {
+    if (databaseTidakTersedia(error)) return err('Database belum dapat dihubungi. Coba lagi sebentar.', 503);
     if (error.code === '23505') return err('Nama kategori sudah digunakan.', 409);
     if (error.code === 409) return err(error.message, 409);
     console.error('[/api/kategori]', error.message);
