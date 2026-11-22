@@ -150,9 +150,9 @@ export default function Checkout() {
   const totalSen = (it || []).reduce((sum, item) => sum + item.jumlah * Math.round(item.harga * 100), ongkir * 100);
   const total = totalSen / 100;
   const opsi = (k, v, t) => (
-    <label className="row">
-      <input type="radio" style={{ width: 'auto' }} name={k} checked={f[k] === v} onChange={() => setF({ ...f, [k]: v })} />
-      {t}
+    <label className="opsi-checkout">
+      <input type="radio" name={k} checked={f[k] === v} onChange={() => setF({ ...f, [k]: v })} />
+      <span>{t}</span>
     </label>
   );
 
@@ -167,16 +167,16 @@ export default function Checkout() {
 
         <fieldset className="card pad stack"><legend><b>Terima pesanan</b></legend>
           {opsi('pengantaran', 'AMBIL', 'Ambil di lapak')}
-          {bisaAntar ? <label className="row"><input type="radio" style={{ width: 'auto' }} name="pengantaran"
-            checked={antar} onChange={() => setF({ ...f, pengantaran: 'ANTAR', metode: 'QRIS' })} /> Antar ke alamat</label>
+          {bisaAntar ? <label className="opsi-checkout"><input type="radio" name="pengantaran"
+            checked={antar} onChange={() => setF({ ...f, pengantaran: 'ANTAR', metode: 'QRIS' })} /><span>Antar ke alamat</span></label>
             : <small className="muted">Pengantaran tersedia jika semua mitra dalam checkout menerima pesanan antar.</small>}
           {!antar && <fieldset className="stack">
             <legend>Waktu pengambilan</legend>
-            <label className="row"><input type="radio" name="jadwal-ambil" style={{ width: 'auto' }}
-              checked={!preOrder} onChange={() => setPreOrder(false)} /> Ambil hari ini</label>
-            <label className="row"><input type="radio" name="jadwal-ambil" style={{ width: 'auto' }}
+            <label className="opsi-checkout"><input type="radio" name="jadwal-ambil"
+              checked={!preOrder} onChange={() => setPreOrder(false)} /><span>Ambil hari ini</span></label>
+            <label className="opsi-checkout"><input type="radio" name="jadwal-ambil"
               checked={preOrder} disabled={!waktuAmbil} onChange={() => setPreOrder(true)} />
-              Pre-order · {formatJadwalAmbil(MULAI_PRE_ORDER)}
+              <span>Pre-order · {formatJadwalAmbil(MULAI_PRE_ORDER)}</span>
             </label>
             {!waktuAmbil && <small className="muted">Jadwal pre-order sudah ditutup.</small>}
           </fieldset>}

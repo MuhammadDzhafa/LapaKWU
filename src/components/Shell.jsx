@@ -191,7 +191,7 @@ export default function Shell({ children }) {
         </div></div>
       )}
       <div id="konten-utama" tabIndex={-1}>{children}</div>
-      <Footer />
+      <Footer tampilkanTautanTamu={!s.memuat && !s.akun} />
 
       {!tanpaDock && !s.memuat && (
         <nav className="dock" aria-label="Menu cepat" style={{ '--n': dock.length }}>

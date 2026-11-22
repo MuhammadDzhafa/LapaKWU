@@ -122,7 +122,7 @@ main.wrap>h2{margin-bottom:1.1rem}
 .stall div{padding:12px 14px 14px;overflow-wrap:anywhere}.stall b{display:block;line-height:1.25;font-weight:700}.stall small{color:var(--mute)}
 .stall.on{background:var(--ink);color:#fff;border-color:var(--ink)}.stall.on small{color:rgba(255,255,255,.7)}
 .judul-katalog{scroll-margin-top:95px;overflow-wrap:anywhere}
-.hapus-filter-lapak{margin-top:8px}
+.hapus-filter-lapak{margin-block:8px 12px}
 .navigasi-produk{display:flex;align-items:center;gap:8px;margin-top:12px}
 .navigasi-produk small{margin-right:auto}
 .navigasi-produk .chip{display:grid;place-items:center;width:44px;height:44px;padding:0;flex:none}
@@ -161,6 +161,8 @@ main.wrap>h2{margin-bottom:1.1rem}
 input,select,textarea{font:inherit;padding:12px 15px;border:1.5px solid var(--line);border-radius:14px;background:#fff;width:100%;color:var(--ink);transition:border-color .2s,box-shadow .2s}
 input:focus,select:focus,textarea:focus{border-color:var(--or-d);outline:none;box-shadow:0 0 0 4px rgba(184,80,10,.16)}
 fieldset{border:0;padding:0;margin:0}
+.opsi-checkout{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:baseline;gap:10px}
+.opsi-checkout input[type=radio]{width:auto}
 .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .opsi{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px}
 .opsi label{display:flex;flex-direction:column;gap:2px;border:1.5px solid var(--line);border-radius:18px;padding:14px 16px;cursor:pointer;background:#fff;transition:border-color .2s,background .2s,transform .2s}
@@ -795,7 +797,9 @@ html[data-scrolled] .top .wrap{min-height:52px;background:rgba(255,253,248,.9);b
 .split>.card.ph{transition:transform .5s var(--ease)}.split>.card.ph:hover{transform:rotate(-1.2deg) scale(1.015)}
 
 @media(max-width:560px){
-  .hstats{gap:8px}.hstats li{font-size:.84rem;padding:6px 12px}
+  .hstats{gap:clamp(4px,1.4vw,8px);flex-wrap:nowrap}
+  .hstats li{font-size:clamp(.7rem,3vw,.84rem);padding:6px clamp(5px,1.6vw,9px);gap:4px;white-space:nowrap}
+  .hstats b{font-size:clamp(.9rem,3.6vw,1.2rem)}
   .auth>.card.pad{--pad:16px}
 }
 @media (prefers-reduced-motion:reduce){

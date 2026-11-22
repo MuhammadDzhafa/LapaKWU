@@ -4,7 +4,7 @@ import { LABEL_WA, TAUTAN_WA } from '@/lib/kontak';
 
 const EM = process.env.NEXT_PUBLIC_KONTAK_EMAIL?.trim() || 'lapakwu@gmail.com';
 
-export default function Footer() {
+export default function Footer({ tampilkanTautanTamu }) {
   return (
     <footer className="foot">
       <div className="wrap fgrid">
@@ -20,8 +20,10 @@ export default function Footer() {
         </div>
         <div>
           <h4>Akun</h4>
-          <Link href="/masuk">Masuk atau daftar</Link>
-          <Link href="/masuk?daftar=mitra">Buka lapak sebagai mitra</Link>
+          {tampilkanTautanTamu && <>
+            <Link href="/masuk">Masuk atau daftar</Link>
+            <Link href="/mitra/tata-cara">Buka lapak sebagai mitra</Link>
+          </>}
           <Link href="/profil">Profil saya</Link>
           <Link href="/pesanan">Pesanan saya</Link>
         </div>
