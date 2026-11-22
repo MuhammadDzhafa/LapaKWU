@@ -7,6 +7,8 @@ import { useSaya } from '@/components/Shell';
 import { periodeJakarta } from '@/lib/waktu';
 import StatusMuat from '@/components/StatusMuat';
 import Modal from '@/components/Modal';
+import { kategoriProduk } from '@/lib/kategori';
+import PilihKategoriProduk from '@/components/PilihKategoriProduk';
 import InputVarian from '@/components/InputVarian';
 import Ikon from '@/components/Ikon';
 import { Hitung } from '@/components/Motion';
@@ -21,7 +23,7 @@ export default function Lapak() {
   const [ps, setPs] = useState(null);
   const [cariProduk, setCariProduk] = useState('');
   const [msg, setMsg] = useState('');
-  const [f, setF] = useState({ nama: '', harga: '', kategori: '', deskripsi: '', stok: '', pilihan_add_on: [''] });
+  const [f, setF] = useState({ nama: '', harga: '', kategori_list: [''], deskripsi: '', stok: '', pilihan_add_on: [''] });
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [st, setSt] = useState(null);
@@ -69,7 +71,7 @@ export default function Lapak() {
       <p className="msg">{pengguna?.status_akun === 'DITOLAK' ? `Datamu perlu diperbaiki: ${mitra?.catatan_verifikasi}` : pengguna?.status_akun === 'DIBLOKIR' ? 'Akunmu diblokir admin.' : 'Akunmu menunggu verifikasi email dan persetujuan admin. Setelah disetujui, kamu bisa menambah produk di sini.'}</p></main>);
 
   const kataProduk = cariProduk.trim().toLowerCase();
-  const produkCocok = (ps ?? []).filter((p) => [p.nama, p.kategori, ...(p.pilihan_add_on ?? [])].some((nilai) => nilai?.toLowerCase().includes(kataProduk)));
+  const produkCocok = (ps ?? []).filter((p) => [p.nama, ...kategoriProduk(p), ...(p.pilihan_add_on ?? [])].some((nilai) => nilai?.toLowerCase().includes(kataProduk)));
   const pengantaran = layanan ?? { antar_aktif: mitra?.antar_aktif === true, ongkir: mitra?.ongkir ?? 0 };
   const simpanPengantaran = async (e) => {
     e.preventDefault();
@@ -101,8 +103,8 @@ export default function Lapak() {
     try {
       let id_gambar;
       if (file) id_gambar = (await storage.createFile({ bucketId: BUCKET, fileId: ID.unique(), file })).$id;
-      await api('/api/produk', { aksi: 'tambah', nama: f.nama, harga: +f.harga, kategori: f.kategori, deskripsi: f.deskripsi, stok: +f.stok, pilihan_add_on: f.pilihan_add_on, ...(id_gambar ? { id_gambar } : {}) });
-      setF({ nama: '', harga: '', kategori: '', deskripsi: '', stok: '', pilihan_add_on: [''] }); setFile(null); setPreview(null); e.target.reset(); toast('Produk berhasil ditambahkan.'); await muat();
+      await api('/api/produk', { aksi: 'tambah', nama: f.nama, harga: +f.harga, kategori_list: f.kategori_list, deskripsi: f.deskripsi, stok: +f.stok, pilihan_add_on: f.pilihan_add_on, ...(id_gambar ? { id_gambar } : {}) });
+      setF({ nama: '', harga: '', kategori_list: [''], deskripsi: '', stok: '', pilihan_add_on: [''] }); setFile(null); setPreview(null); e.target.reset(); toast('Produk berhasil ditambahkan.'); await muat();
     } catch (er) { setMsg(er.message); }
   };
   const segarkanStat = () => list('rekap_penjualan', [Query.equal('id_mitra', akun.$id)]).then((rk) => setSt((s) => s && ({ ...s, jual: rk.find((x) => x.periode === bln())?.total_penjualan || 0 }))).catch(() => {});
@@ -187,6 +189,30 @@ export default function Lapak() {
           toast('Add-on berhasil disimpan.');
         } catch (e) {
           toast(e.message, true);
+        } finally {
+          setBusyModal(false);
+        }
+      },
+    });
+  };
+
+  const ubahKategori = (p) => {
+    const kategori = kategoriProduk(p);
+    setModalInfo({
+      judul: `Ubah kategori ${p.nama}`,
+      tipe: 'input',
+      inputType: 'kategori',
+      inputDefault: kategori.length ? kategori : [''],
+      tombolOk: 'Simpan kategori',
+      onOk: async (nilai) => {
+        setBusyModal(true);
+        try {
+          await api('/api/produk', { aksi: 'ubah', id: p.$id, kategori_list: nilai });
+          await muat();
+          setModalInfo(null);
+          toast('Kategori produk berhasil disimpan.');
+        } catch (e) {
+          setModalInfo((info) => info && ({ ...info, pesan: e.message }));
         } finally {
           setBusyModal(false);
         }
@@ -354,7 +380,7 @@ export default function Lapak() {
           <div className="field"><label htmlFor="pn">Nama</label><input id="pn" required value={f.nama} onChange={set('nama')} /></div>
           <div className="two"><div className="field"><label htmlFor="ph">Harga (Rp)</label><input id="ph" type="number" min="0" required value={f.harga} onChange={set('harga')} /></div>
             <div className="field"><label htmlFor="ps">Stok</label><input id="ps" type="number" min="0" required value={f.stok} onChange={set('stok')} /></div></div>
-          <div className="field"><label htmlFor="pk">Kategori</label><input id="pk" required placeholder="Makanan, Fashion, Kerajinan…" value={f.kategori} onChange={set('kategori')} /></div>
+          <PilihKategoriProduk nilai={f.kategori_list} onUbah={(kategori_list) => setF((prev) => ({ ...prev, kategori_list }))} />
           <div className="field"><label htmlFor="pd">Deskripsi</label><textarea id="pd" rows="3" value={f.deskripsi} onChange={set('deskripsi')} /></div>
           <InputVarian judul="Pilihan add-on (opsional)" nilai={f.pilihan_add_on} onUbah={(pilihan_add_on) => setF((prev) => ({ ...prev, pilihan_add_on }))} />
           <div className="field"><label htmlFor="pg">Foto (jpg, png, webp, maks 5 MB)</label><input id="pg" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} />
@@ -374,10 +400,10 @@ export default function Lapak() {
           {produkCocok.map((p) => (
             <div key={p.$id} className="card pad row" style={{ justifyContent: 'space-between' }}>
               <div className="row">{p.id_gambar && <img src={img(p.id_gambar)} alt="" loading="lazy" decoding="async" width="56" height="56" style={{ objectFit: 'cover', borderRadius: 8 }} />}
-                <div><b>{p.nama}</b><br /><small className="muted">{p.kategori} • {rp(p.harga)}</small>
+                <div><b>{p.nama}</b><br /><small className="muted">{kategoriProduk(p).join(' · ')} • {rp(p.harga)}</small>
                   {p.pilihan_add_on?.length > 0 && <small className="muted" style={{ display: 'block' }}>{p.pilihan_add_on.join(', ')}</small>}</div></div>
               <div className="row"><span className="qty" role="group" aria-label={`Stok ${p.nama}`}><button className="qb" aria-label={`Kurangi stok ${p.nama} (terjual offline)`} disabled={p.stok < 1} onClick={() => ketuk(p, 'jual')}>−</button><b key={p.stok} className="qn" aria-live="polite">{p.stok}</b><button className="qb add" aria-label={`Tambah stok ${p.nama}`} onClick={() => ketuk(p, 'tambah')}>+</button></span>
-                <button className="link" onClick={() => harga(p)}>Ubah harga</button><button className="link" onClick={() => stok(p)}>Ubah stok</button><button className="link" onClick={() => ubahAddOn(p)}>Ubah add-on</button><button className="link" onClick={() => hapusP(p)}>Hapus</button></div>
+                <button className="link" onClick={() => harga(p)}>Ubah harga</button><button className="link" onClick={() => stok(p)}>Ubah stok</button><button className="link" onClick={() => ubahKategori(p)}>Ubah kategori</button><button className="link" onClick={() => ubahAddOn(p)}>Ubah add-on</button><button className="link" onClick={() => hapusP(p)}>Hapus</button></div>
             </div>))}
         </div></div>}
 

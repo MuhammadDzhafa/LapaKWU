@@ -3,21 +3,6 @@ import { useEffect, useRef, useState } from 'react';
 
 const kurangiGerak = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/* Elemen yang muncul pelan-pelan saat masuk layar. Jenis gerakannya beda per elemen,
-   supaya tidak semuanya "naik sambil memudar" dengan cara yang sama. */
-const REVEAL = [
-  ['.sec > .wrap > h2, .sec > .wrap > .sub, main.wrap > h2', 'head'],
-  ['.grid > .prod', 'pop'],
-  ['.step', 'tilt'],
-  ['.stall', 'slide'],
-  ['.band', 'rise'],
-  ['.stat', 'rise'],
-  ['.stack > .card, .scroll', 'rise'],
-  ['.fgrid > div', 'rise'],
-];
-const SEMUA = REVEAL.map(([s]) => s).join(',');
-const jenis = (el) => REVEAL.find(([s]) => el.matches(s))?.[1] || 'rise';
-
 /* Bola kecil terbang dari tombol "+" menuju keranjang. */
 export function terbang(dari) {
   if (!dari || kurangiGerak()) return;
@@ -71,7 +56,7 @@ export function percik(dari) {
 /* Angka yang berhitung naik saat terlihat. */
 export function Hitung({ ke, durasi = 1100 }) {
   const ref = useRef(null);
-  const [n, setN] = useState(kurangiGerak() ? ke : 0);
+  const [n, setN] = useState(0);
   const dari = useRef(0);
   useEffect(() => {
     if (kurangiGerak()) { setN(ke); return; }
@@ -95,7 +80,6 @@ export default function Motion() {
   const progress = useRef(null);
   useEffect(() => {
     const html = document.documentElement;
-    const gerak = !kurangiGerak();
     let y0 = scrollY, rafScroll = 0;
     let gulir = html.hasAttribute('data-scrolled');
     let navTersembunyi = html.getAttribute('data-nav') === 'hide';
@@ -130,82 +114,13 @@ export default function Motion() {
     };
     addEventListener('keydown', kunci);
 
-    if (!gerak) return () => { removeEventListener('scroll', onScroll); removeEventListener('keydown', kunci); cancelAnimationFrame(rafScroll); };
-
-    /* reveal saat scroll */
-    const io = new IntersectionObserver((es) => es.forEach((e) => {
-      if (!e.isIntersecting) return;
-      const el = e.target; io.unobserve(el);
-      el.setAttribute('data-in', '');
-      const tunda = parseFloat(el.style.getPropertyValue('--d')) || 0;
-      setTimeout(() => { el.removeAttribute('data-rv'); el.removeAttribute('data-in'); el.style.removeProperty('--d'); }, 1300 + tunda); // kembalikan transisi hover milik komponen
-    }), { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
-
-    const tandai = (el, awal) => {
-      if (el.hasAttribute('data-rv') || el.closest('[data-rv-skip]')) return;
-      // konten yang sudah terlihat saat halaman pertama dimuat sudah punya animasi masuk sendiri
-      if (awal && el.getBoundingClientRect().top < innerHeight * 0.92) return;
-      const sib = [...(el.parentElement?.children || [])].filter((c) => c.matches(SEMUA));
-      const i = Math.max(0, sib.indexOf(el));
-      el.style.setProperty('--d', `${(i % 4) * 70}ms`);
-      el.style.setProperty('--r', i % 2 ? '3deg' : '-3deg');
-      el.setAttribute('data-rv', jenis(el));
-      io.observe(el);
-    };
-    const pindai = (akar, awal) => {
-      if (akar.nodeType !== 1) return;
-      if (akar.matches(SEMUA)) tandai(akar, awal);
-      akar.querySelectorAll(SEMUA).forEach((el) => tandai(el, awal));
-    };
-    pindai(document.body, true);
-    // MutationObserver berjalan sebelum frame digambar, jadi konten baru tidak sempat berkedip
-    const mo = new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => pindai(n, false))));
-    mo.observe(document.body, { childList: true, subtree: true });
-
-    /* spotlight kursor di kartu + cahaya di hero + tombol magnetik */
-    let raf = 0, magnet = null;
-    const bergerak = (e) => {
-      if (e.pointerType === 'touch') return;
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const t = e.target.closest?.('.prod,.step,.stat,.stack>.card,.pcard,.stall,.idcard');
-        if (t) { const r = t.getBoundingClientRect(); t.style.setProperty('--mx', `${e.clientX - r.left}px`); t.style.setProperty('--my', `${e.clientY - r.top}px`); }
-        const pr = e.target.closest?.('.prod');
-        if (pr) { const r = pr.getBoundingClientRect(); pr.style.setProperty('--ty', `${(((e.clientX - r.left) / r.width - 0.5) * 9).toFixed(2)}deg`); pr.style.setProperty('--tx', `${((0.5 - (e.clientY - r.top) / r.height) * 9).toFixed(2)}deg`); }
-        const h = e.target.closest?.('.hero2');
-        if (h) { const r = h.getBoundingClientRect(); h.style.setProperty('--gx', `${e.clientX - r.left}px`); h.style.setProperty('--gy', `${e.clientY - r.top}px`); }
-        const btn = e.target.closest?.('.btn.lg');
-        if (magnet && magnet !== btn) { magnet.style.removeProperty('translate'); magnet = null; }
-        if (btn) {
-          const r = btn.getBoundingClientRect();
-          btn.style.translate = `${((e.clientX - r.left) / r.width - 0.5) * 10}px ${((e.clientY - r.top) / r.height - 0.5) * 8}px`;
-          magnet = btn;
-        }
-      });
-    };
-    if (matchMedia('(hover:hover) and (pointer:fine)').matches) addEventListener('pointermove', bergerak, { passive: true });
-    const lepas = (e) => { const pr = e.target.closest?.('.prod'); if (pr && !pr.contains(e.relatedTarget)) { pr.style.removeProperty('--tx'); pr.style.removeProperty('--ty'); } };
-    addEventListener('pointerout', lepas, { passive: true });
     const klikTambah = (e) => { const t = e.target.closest?.('.plus,.step-btn.plus-btn'); if (t && !t.disabled) percik(t); };
     addEventListener('click', klikTambah);
 
-    /* riak air saat menekan tombol */
-    const tekan = (e) => {
-      const el = e.target.closest?.('.btn,.chip,.plus,.step-btn,.qb,.br-btn');
-      if (!el || el.disabled) return;
-      const r = el.getBoundingClientRect(), s = Math.max(r.width, r.height) * 2;
-      const dot = document.createElement('span');
-      dot.className = 'riak'; dot.setAttribute('aria-hidden', 'true');
-      dot.style.cssText = `width:${s}px;height:${s}px;left:${e.clientX - r.left - s / 2}px;top:${e.clientY - r.top - s / 2}px`;
-      el.appendChild(dot);
-      dot.addEventListener('animationend', () => dot.remove());
-    };
-    addEventListener('pointerdown', tekan, { passive: true });
-
     return () => {
       removeEventListener('scroll', onScroll); removeEventListener('keydown', kunci);
-      removeEventListener('pointermove', bergerak); removeEventListener('pointerdown', tekan); removeEventListener('pointerout', lepas); removeEventListener('click', klikTambah);
-      io.disconnect(); mo.disconnect(); cancelAnimationFrame(raf); cancelAnimationFrame(rafScroll);
+      removeEventListener('click', klikTambah);
+      cancelAnimationFrame(rafScroll);
     };
   }, []);
 

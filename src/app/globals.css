@@ -683,8 +683,6 @@ html[data-scrolled] .top .wrap{min-height:52px;background:rgba(255,253,248,.9);b
 .btn.lg{will-change:translate}
 .btn.lg:not(:hover){transition:transform 110ms var(--ease),box-shadow 110ms var(--ease),background 120ms,color 120ms,translate 140ms var(--ease)}
 .chip,.step-btn,.qb,.br-btn,.plus{position:relative;overflow:hidden}
-.riak{position:absolute;border-radius:50%;background:currentColor;opacity:.22;transform:scale(0);animation:riak .6s var(--ease) forwards;pointer-events:none}
-@keyframes riak{to{transform:scale(1);opacity:0}}
 
 /* ---------- pencarian ---------- */
 .searchcard{transition:box-shadow .35s,transform .45s var(--ease)}
@@ -720,14 +718,6 @@ html[data-scrolled] .top .wrap{min-height:52px;background:rgba(255,253,248,.9);b
 .badge[data-s^=MENUNGGU]::before,.badge[data-s=DIAJUKAN]::before{animation:denyut 1.5s ease-in-out infinite}
 
 /* ---------- animasi muncul saat scroll (dipasang oleh Motion.jsx) ---------- */
-[data-rv]{transition:opacity .75s var(--ease) var(--d,0ms),transform .85s var(--ease) var(--d,0ms),filter .75s var(--ease) var(--d,0ms)}
-[data-rv]:not([data-in]){opacity:0}
-[data-rv=pop]:not([data-in]){transform:translateY(30px) scale(.93);filter:blur(7px)}
-[data-rv=head]:not([data-in]){transform:translateY(26px);filter:blur(5px)}
-[data-rv=tilt]:not([data-in]){transform:translateY(36px) rotate(var(--r,-3deg))}
-[data-rv=slide]:not([data-in]){transform:translateX(44px)}
-[data-rv=rise]:not([data-in]){transform:translateY(32px)}
-.band[data-rv]:not([data-in]){transform:translateY(40px) scale(.96)}
 
 /* ---------- ajakan jadi mitra: bentuk melayang ---------- */
 .band::before{animation:float 9s ease-in-out infinite alternate}
@@ -759,7 +749,7 @@ html[data-scrolled] .top .wrap{min-height:52px;background:rgba(255,253,248,.9);b
 .input-varian{min-width:0;border:0;padding:0;margin-inline:0}
 .input-varian legend{font-weight:700;padding:0}
 .input-varian .row{flex-wrap:nowrap}
-.input-varian input{min-width:0}
+.input-varian :is(input,select){min-width:0}
 .input-varian .btn{align-self:flex-start}
 .modal-varian{max-height:90dvh;overflow:auto}
 .catatan-item{display:block;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -803,14 +793,14 @@ html[data-scrolled] .top .wrap{min-height:52px;background:rgba(255,253,248,.9);b
 }
 @media (prefers-reduced-motion:reduce){
   .aurora i,.stage::before,.band::before,.band::after,.buah,.kilau,.jumbai,.auth::before,.auth::after,.sisa::before,.denah-stand-aktif rect{animation:none}
-  .progress{display:none}[data-rv]{transition:none!important}
+  .progress{display:none}
   .hero2 .wrap{animation:none}
 }
 
 /* 4 langkah tampil 2x2, bukan 3 + 1 yatim */
 @media(min-width:761px){.steps:has(.step:nth-child(4)){grid-template-columns:repeat(2,1fr)}}
 /* jaring pengaman: tanpa JavaScript atau saat dicetak, semua konten tetap terlihat */
-@media print{[data-rv]{opacity:1!important;transform:none!important;filter:none!important;transition:none!important}.progress,.aurora{display:none}}
+@media print{.progress,.aurora{display:none}}
 .denah-beranda{margin-top:clamp(28px,6vw,64px);scroll-margin-top:100px}
 .top .toast{position:absolute;top:calc(100% + 8px);bottom:auto;width:max-content;max-width:min(92vw,520px);text-align:center}
 html[data-nav=hide] .top:has(.toast){transform:none}
@@ -972,7 +962,6 @@ input[type=file]:hover::file-selector-button{background:var(--ye)}
 }
 
 /* ---------- pegas di tempat yang menjawab tindakan ---------- */
-[data-rv]{transition:opacity .6s ease var(--d,0ms),transform 1.05s var(--spring) var(--d,0ms),filter .7s ease var(--d,0ms)}
 .modal-box,.denah-modal[open]{animation:modalpop 180ms var(--ease)}
 @keyframes modalpop{from{opacity:0;transform:translateY(40px) scale(.9)}}
 .toast{animation:toastin .7s var(--spring)}

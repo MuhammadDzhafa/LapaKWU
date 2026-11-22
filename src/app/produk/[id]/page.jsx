@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ambil, rp, img } from '@/lib/aw';
+import { kategoriProduk } from '@/lib/kategori';
 import PilihAddOn from '@/components/PilihAddOn';
 import { useSaya } from '@/components/Shell';
 
@@ -89,7 +90,7 @@ export default function Detail() {
       <div className="card ph">{p.id_gambar ? <img src={img(p.id_gambar)} alt={p.nama} /> : <span>{p.nama[0]}</span>}</div>
       <div className="stack">
         <h2 style={{ marginBottom: 0 }}>{p.nama}</h2>
-        <p className="muted">{p.kategori} • dijual oleh <b>{mt?.nama_usaha || 'Mitra'}</b></p>
+        <p className="muted">{kategoriProduk(p).join(' · ')} • dijual oleh <b>{mt?.nama_usaha || 'Mitra'}</b></p>
         <p className="muted">{mt?.antar_aktif ? 'Siap diantar + ' + rp(mt.ongkir) + ' ongkir per pesanan' : 'Ambil di lapak'}</p>
         <span className="tag" style={{ fontSize: '1.4rem' }}>{rp(p.harga)}</span>
         <p>{p.deskripsi || 'Belum ada deskripsi.'}</p>

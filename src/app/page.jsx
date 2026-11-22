@@ -6,6 +6,7 @@ import { useSaya } from '@/components/Shell';
 import { PetaTenant } from '@/components/DenahTenant';
 import Lapak from '@/components/Lapak';
 import PilihAddOn from '@/components/PilihAddOn';
+import { kategoriProduk } from '@/lib/kategori';
 import Ikon from '@/components/Ikon';
 import { Hitung, terbang } from '@/components/Motion';
 
@@ -175,21 +176,31 @@ export default function Beranda() {
   }, []);
 
   const layananMitra = useMemo(() => new Map(m.map((mitra) => [mitra.$id, mitra])), [m]);
-  const kat = useMemo(() => [...new Set((p || []).map((x) => x.kategori).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id')), [p]);
-  const jumlahPerLapak = useMemo(() => {
-    const jumlah = new Map();
-    for (const produk of p || []) jumlah.set(produk.id_mitra, (jumlah.get(produk.id_mitra) || 0) + 1);
-    return jumlah;
-  }, [p]);
-  const lapakAda = useMemo(() => m.filter((x) => jumlahPerLapak.has(x.$id)), [m, jumlahPerLapak]);
+  const kategoriPerProduk = useMemo(() => new Map((p ?? []).map((produk) => [produk.$id, kategoriProduk(produk)])), [p]);
+  const kat = useMemo(() => [...new Set([...kategoriPerProduk.values()].flat())].sort((a, b) => a.localeCompare(b, 'id')), [kategoriPerProduk]);
+  const lapakAda = useMemo(() => {
+    const ids = new Set((p ?? []).map((produk) => produk.id_mitra));
+    return m.filter((mitra) => ids.has(mitra.$id));
+  }, [p, m]);
   const lapakDipilih = layananMitra.get(lapak);
   const kategori = kat.includes(k) ? k : '';
   const kataCari = q.trim().toLowerCase();
   const nomorCari = kataCari.match(/^(?:tenant\s*)?(\d+)$/)?.[1];
-  const lapakCocok = new Set(lapakAda.filter((x) => x.nama_usaha.toLowerCase().includes(kataCari) || (nomorCari && x.nomor_tenant === Number(nomorCari))).map((x) => x.$id));
-  const produkCocok = (p || []).filter((x) => (!kategori || x.kategori === kategori) && (lapakCocok.has(x.id_mitra) || x.nama.toLowerCase().includes(kataCari)));
-  const lapakDariProduk = new Set(produkCocok.map((x) => x.id_mitra));
-  const hasilLapak = lapakAda.filter((x) => lapakCocok.has(x.$id) || lapakDariProduk.has(x.$id));
+  const { produkCocok, jumlahPerLapak } = useMemo(() => {
+    const lapakCocok = new Set(m.filter((x) => x.nama_usaha.toLowerCase().includes(kataCari)
+      || (nomorCari && x.nomor_tenant === Number(nomorCari))).map((x) => x.$id));
+    const jumlahPerLapak = new Map();
+    const produkCocok = (p ?? []).filter((x) => {
+      const kelompok = kategoriPerProduk.get(x.$id);
+      if (kategori && !kelompok.includes(kategori)) return false;
+      if (!lapakCocok.has(x.id_mitra) && !x.nama.toLowerCase().includes(kataCari)
+        && !kelompok.some((nama) => nama.toLowerCase().includes(kataCari))) return false;
+      jumlahPerLapak.set(x.id_mitra, (jumlahPerLapak.get(x.id_mitra) ?? 0) + 1);
+      return true;
+    });
+    return { produkCocok, jumlahPerLapak };
+  }, [p, m, kategoriPerProduk, kategori, kataCari, nomorCari]);
+  const hasilLapak = m.filter((x) => jumlahPerLapak.has(x.$id));
   const tampil = lapakDipilih ? produkCocok.filter((x) => x.id_mitra === lapak) : produkCocok;
   const ukuranHalaman = kolomProduk * 3;
   const produkTerlihat = Math.min(tampil.length, batasProduk);
@@ -204,7 +215,7 @@ export default function Beranda() {
 
   useEffect(() => {
     if (relLapak.current) relLapak.current.scrollLeft = 0;
-  }, [kataCari]);
+  }, [kataCari, kategori]);
 
   useEffect(() => {
     const rel = relProduk.current;
@@ -228,7 +239,6 @@ export default function Beranda() {
     setLapak(id);
     if (id) {
       setQ('');
-      setK('');
     }
     setBatasProduk(PRODUK_PER_TAMPIL);
     judulProduk.current?.focus({ preventScroll: true });
@@ -328,7 +338,7 @@ export default function Beranda() {
                 <article key={x.$id} className="card prod" style={{ '--i': Math.min(n, 12) }}>
                   <Link href={`/produk/${x.$id}`} className="ph" aria-label={x.nama}>
                     {x.id_gambar ? <img src={img(x.id_gambar)} alt="" loading="lazy" decoding="async" /> : <span>{x.nama[0]}</span>}
-                    {x.kategori && <span className="kat">{x.kategori}</span>}
+                    {kategoriPerProduk.get(x.$id)?.length > 0 && <span className="kat">{kategori || kategoriPerProduk.get(x.$id)[0]}</span>}
                     {x.stok < 1 && <em className="habis">Habis</em>}
                     {x.stok > 0 && x.stok <= 5 && <em className="sisa">Sisa {x.stok}</em>}
                   </Link>

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import PilihKategoriProduk from '@/components/PilihKategoriProduk';
 import InputVarian from '@/components/InputVarian';
 
 /**
@@ -50,7 +51,7 @@ export default function Modal({
 
   return (
     <div role="dialog" aria-modal="true" aria-label={judul} className="modal-back" onClick={onBatal}>
-      <div className={inputType === 'varian' ? 'modal-box modal-varian' : 'modal-box'} onClick={(e) => e.stopPropagation()}>
+      <div className={['varian', 'kategori'].includes(inputType) ? 'modal-box modal-varian' : 'modal-box'} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <b>{judul}</b>
           <button type="button" className="modal-x" aria-label="Tutup" onClick={onBatal}>✕</button>
@@ -61,8 +62,10 @@ export default function Modal({
         {tipe === 'input' && (
           <form onSubmit={handleSubmit} style={{ marginBottom: 16 }}>
             <div className="field">
-              {inputLabel && inputType !== 'varian' && <label>{inputLabel}</label>}
-              {inputType === 'varian' ? (
+              {inputLabel && !['varian', 'kategori'].includes(inputType) && <label>{inputLabel}</label>}
+              {inputType === 'kategori' ? (
+                <PilihKategoriProduk nilai={val} onUbah={setVal} nonaktif={busy} />
+              ) : inputType === 'varian' ? (
                 <InputVarian judul={inputLabel} nilai={val} onUbah={setVal} nonaktif={busy} />
               ) : inputType === 'textarea' ? (
                 <textarea rows={3} required={!inputOpsional} placeholder={inputPlaceholder} value={val} onChange={(e) => setVal(e.target.value)} style={{ width: '100%', resize: 'vertical' }} autoFocus />

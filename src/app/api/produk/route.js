@@ -3,6 +3,7 @@ import { arsipProduk } from '@/lib/arsip-produk';
 import { hapusFile } from '@/lib/backblaze';
 import { cariBanyak, cariSatu, hapusData } from '@/lib/db';
 import { bacaPilihanAddOn } from '@/lib/add-on';
+import { bacaKategori } from '@/lib/kategori';
 export const dynamic = 'force-dynamic';
 
 // Kelola produk mitra: tambah, ubah, hapus.
@@ -39,13 +40,17 @@ export async function POST(req) {
   const pilihanAddOn = b.pilihan_add_on === undefined ? [] : bacaPilihanAddOn(b.pilihan_add_on);
   if (!pilihanAddOn) return err('Isi maksimal 20 pilihan add-on yang berbeda, masing-masing hingga 60 karakter.');
 
+  const adaKategori = b.kategori_list !== undefined || b.kategori !== undefined;
+  const kategoriList = bacaKategori(b.kategori_list ?? b.kategori);
+  if (adaKategori && !kategoriList?.length) return err('Pilih minimal satu kategori yang valid.');
+
   // ── Tambah produk ──────────────────────────────────────────────────
   if (b.aksi === 'tambah') {
-    const { nama, harga, kategori, deskripsi, stok, id_gambar } = b;
-    if (!nama || harga == null || !kategori || stok == null) return err('Data produk tidak lengkap.');
+    const { nama, harga, deskripsi, stok, id_gambar } = b;
+    if (!nama || harga == null || !kategoriList?.length || stok == null) return err('Data produk tidak lengkap.');
     if (!hargaValid(harga) || !stokValid(stok)) return err('Harga atau stok tidak valid.');
     if (id_gambar && !(await cariSatu('unggahan_file', { _id: id_gambar, id_pengguna: u.$id, jenis: 'gambar' }))) return err('Gambar tidak ditemukan atau bukan milik akun ini.', 403);
-    const data = { id_mitra: u.$id, nama, harga: +harga, kategori, deskripsi: deskripsi || '', stok: +stok, pilihan_add_on: pilihanAddOn };
+    const data = { id_mitra: u.$id, nama, harga: +harga, kategori: kategoriList[0], kategori_list: kategoriList, deskripsi: deskripsi || '', stok: +stok, pilihan_add_on: pilihanAddOn };
     if (id_gambar) data.id_gambar = id_gambar;
     const row = await put(db, 'produk', ID.unique(), data);
     return Response.json({ ok: true, id: row.$id });
@@ -62,7 +67,10 @@ export async function POST(req) {
     if (b.harga != null) data.harga = +b.harga;
     if (b.stok != null) data.stok = +b.stok;
     if (b.deskripsi != null) data.deskripsi = b.deskripsi;
-    if (b.kategori != null) data.kategori = b.kategori;
+    if (adaKategori) {
+      data.kategori = kategoriList[0];
+      data.kategori_list = kategoriList;
+    }
     if (b.id_gambar != null) data.id_gambar = b.id_gambar;
     if (b.id_gambar != null && b.id_gambar !== p.id_gambar && !(await cariSatu('unggahan_file', { _id: b.id_gambar, id_pengguna: u.$id, jenis: 'gambar' }))) return err('Gambar tidak ditemukan atau bukan milik akun ini.', 403);
     await upd(db, 'produk', p.$id, data);
