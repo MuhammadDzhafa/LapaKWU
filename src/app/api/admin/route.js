@@ -41,7 +41,7 @@ export async function POST(req) {
     const [uRows, mRows, prRows, adRows, pbRows, rfRows] = await Promise.all([
       rows(null, 'pengguna', halaman('pengguna')),
       rows(null, 'mitra', halaman('mitra')),
-      rows(null, 'produk', [Query.equal('diarsipkan', false), ...halaman('produk')]),
+      rows(null, 'produk', [Query.orderAsc('diarsipkan'), ...halaman('produk')]),
       rows(null, 'admin', halaman('admin')),
       rows(null, 'pembeli', halaman('pembeli')),
       rows(null, 'pembayaran', [Query.equal('status_pembayaran', ['MENUNGGU', 'REFUND_DIAJUKAN']), ...halaman('pembayaran')]),

@@ -4,6 +4,7 @@ import { hapusFile } from '@/lib/backblaze';
 import { cariBanyak, cariSatu, hapusData } from '@/lib/db';
 import { bacaPilihanAddOn } from '@/lib/add-on';
 import { bacaKategori } from '@/lib/kategori';
+import { dataKategoriProduk, transaksiKategori } from '@/lib/kategori-db';
 export const dynamic = 'force-dynamic';
 
 // Kelola produk mitra: tambah, ubah, hapus.
@@ -54,9 +55,10 @@ export async function POST(req) {
     if (!nama || harga == null || !kategoriList?.length || stok == null) return err('Data produk tidak lengkap.');
     if (!hargaValid(harga) || !stokValid(stok)) return err('Harga atau stok tidak valid.');
     if (id_gambar && !(await cariSatu('unggahan_file', { _id: id_gambar, id_pengguna: u.$id, jenis: 'gambar' }))) return err('Gambar tidak ditemukan atau bukan milik akun ini.', 403);
-    const data = { id_mitra: u.$id, nama, harga: +harga, kategori: kategoriList[0], kategori_list: kategoriList, deskripsi: deskripsi || '', stok: +stok, ...dataAddOn };
+    const data = { id_mitra: u.$id, nama, harga: +harga, deskripsi: deskripsi || '', stok: +stok, ...dataAddOn };
     if (id_gambar) data.id_gambar = id_gambar;
-    const row = await put(db, 'produk', ID.unique(), data);
+    const row = await transaksiKategori(async () =>
+      put(db, 'produk', ID.unique(), { ...data, ...await dataKategoriProduk(kategoriList) }));
     return Response.json({ ok: true, id: row.$id });
   }
 
@@ -71,13 +73,13 @@ export async function POST(req) {
     if (b.harga != null) data.harga = +b.harga;
     if (b.stok != null) data.stok = +b.stok;
     if (b.deskripsi != null) data.deskripsi = b.deskripsi;
-    if (adaKategori) {
-      data.kategori = kategoriList[0];
-      data.kategori_list = kategoriList;
-    }
     if (b.id_gambar != null) data.id_gambar = b.id_gambar;
     if (b.id_gambar != null && b.id_gambar !== p.id_gambar && !(await cariSatu('unggahan_file', { _id: b.id_gambar, id_pengguna: u.$id, jenis: 'gambar' }))) return err('Gambar tidak ditemukan atau bukan milik akun ini.', 403);
-    await upd(db, 'produk', p.$id, data);
+    if (adaKategori) {
+      await transaksiKategori(async () => upd(db, 'produk', p.$id, { ...data, ...await dataKategoriProduk(kategoriList) }));
+    } else {
+      await upd(db, 'produk', p.$id, data);
+    }
       if (b.id_gambar != null && p.id_gambar && p.id_gambar !== b.id_gambar) await hapusGambarJikaTidakDipakai(p.id_gambar, u.$id, p.$id);
     return Response.json({ ok: true });
   }

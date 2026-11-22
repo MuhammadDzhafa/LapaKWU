@@ -25,6 +25,7 @@ export default function Lapak() {
   const { akun, peran, pengguna, mitra, memuat, muat: muatSaya, toast } = useSaya();
   const [tab, setTab] = useState('produk');
   const [ps, setPs] = useState(null);
+  const [kategori, setKategori] = useState([]);
   const [cariProduk, setCariProduk] = useState('');
   const [msg, setMsg] = useState('');
   const [f, setF] = useState({ nama: '', harga: '', kategori_list: [''], deskripsi: '', stok: '', pilihan_add_on: varianKosong() });
@@ -49,10 +50,16 @@ export default function Lapak() {
   useEffect(() => {
     if (!akun || peran !== 'mitra') return;
     muat().catch((e) => setMsg(e.message));
+    const kontrol = new AbortController();
+    fetch('/api/kategori', { signal: kontrol.signal }).then(async (res) => {
+      if (!res.ok) throw new Error('Daftar kategori gagal dimuat.');
+      setKategori((await res.json()).kategori);
+    }).catch((e) => { if (e.name !== 'AbortError') setMsg(e.message); });
     Promise.all([list('pesanan', [Query.equal('id_mitra', akun.$id)]), list('rekap_penjualan', [Query.equal('id_mitra', akun.$id)])]).then(([o, rk]) => {
       const bln = new Date().toISOString().slice(0, 7), skr = rk.find((x) => x.periode === bln);
       setSt({ baru: o.filter((x) => x.status_pesanan === 'MENUNGGU_KONFIRMASI').length, jual: skr?.total_penjualan || 0 });
     }).catch(() => {});
+    return () => kontrol.abort();
   }, [akun, peran, muat]);
 
   const bln = () => periodeJakarta();
@@ -319,6 +326,7 @@ export default function Lapak() {
           inputType={modalInfo.inputType}
           inputLabel={modalInfo.inputLabel}
           inputDefault={modalInfo.inputDefault}
+          kategori={kategori}
           inputOpsional={modalInfo.inputOpsional}
           inputPlaceholder={modalInfo.inputPlaceholder}
           tombolOk={modalInfo.tombolOk}
@@ -384,7 +392,7 @@ export default function Lapak() {
           <div className="field"><label htmlFor="pn">Nama</label><input id="pn" required value={f.nama} onChange={set('nama')} /></div>
           <div className="two"><div className="field"><label htmlFor="ph">Harga (Rp)</label><input id="ph" type="number" min="0" required value={f.harga} onChange={set('harga')} /></div>
             <div className="field"><label htmlFor="ps">Stok</label><input id="ps" type="number" min="0" required value={f.stok} onChange={set('stok')} /></div></div>
-          <PilihKategoriProduk nilai={f.kategori_list} onUbah={(kategori_list) => setF((prev) => ({ ...prev, kategori_list }))} />
+          <PilihKategoriProduk kategori={kategori} nilai={f.kategori_list} onUbah={(kategori_list) => setF((prev) => ({ ...prev, kategori_list }))} />
           <div className="field"><label htmlFor="pd">Deskripsi</label><textarea id="pd" rows="3" value={f.deskripsi} onChange={set('deskripsi')} /></div>
           <InputVarian judul="Pilihan add-on (opsional)" nilai={f.pilihan_add_on} onUbah={(pilihan_add_on) => setF((prev) => ({ ...prev, pilihan_add_on }))} />
           <div className="field"><label htmlFor="pg">Foto (jpg, png, webp, maks 5 MB)</label><input id="pg" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} />

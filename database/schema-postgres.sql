@@ -133,6 +133,43 @@ CREATE INDEX IF NOT EXISTS idx_pencairan_status_waktu ON pencairan_dompet(status
 
 CREATE INDEX IF NOT EXISTS idx_notifikasi_pengguna ON notifikasi(id_pengguna, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_produk_mitra ON produk(id_mitra);
+
+CREATE OR REPLACE VIEW kategori_produk_terpakai AS
+SELECT p.id AS id_produk, lower(btrim(k.nama)) AS kunci, k.urutan, btrim(k.nama) AS nama
+FROM produk p
+CROSS JOIN LATERAL jsonb_array_elements_text(
+  COALESCE(
+    (SELECT jsonb_agg(lama.nama ORDER BY lama.urutan)
+     FROM jsonb_array_elements_text(jsonb_path_query_array(p.extra, '$.kategori_list[*] ? (@.type() == "string")'))
+       WITH ORDINALITY AS lama(nama, urutan) WHERE btrim(lama.nama) <> ''),
+    jsonb_build_array(p.kategori))
+) WITH ORDINALITY AS k(nama, urutan)
+WHERE btrim(k.nama) <> '';
+
+DO $$
+BEGIN
+  IF to_regclass('kategori_produk') IS NULL THEN
+    CREATE TABLE kategori_produk (
+      id TEXT PRIMARY KEY,
+      nama TEXT NOT NULL CHECK (char_length(nama) BETWEEN 1 AND 100)
+    );
+    CREATE UNIQUE INDEX idx_kategori_produk_nama ON kategori_produk (lower(nama));
+    INSERT INTO kategori_produk (id, nama)
+    SELECT md5(lower(nama)), nama
+    FROM unnest(ARRAY['Makanan', 'Minuman', 'Fashion', 'Kerajinan', 'Perlengkapan',
+      'Aksesori', 'Alat Tulis', 'Kecantikan', 'Dekorasi', 'Elektronik', 'Lainnya']) AS awal(nama);
+    INSERT INTO kategori_produk (id, nama)
+    SELECT md5(kunci), min(btrim(lama.nama))
+    FROM produk p
+    CROSS JOIN LATERAL jsonb_array_elements_text(
+      jsonb_build_array(p.kategori) || jsonb_path_query_array(p.extra, '$.kategori_list[*] ? (@.type() == "string")')
+    ) AS lama(nama)
+    CROSS JOIN LATERAL (SELECT lower(btrim(lama.nama)) AS kunci) AS normal
+    WHERE char_length(btrim(lama.nama)) BETWEEN 1 AND 100
+    GROUP BY kunci
+    ON CONFLICT DO NOTHING;
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_item_keranjang_keranjang ON item_keranjang(id_keranjang);
 CREATE INDEX IF NOT EXISTS idx_pesanan_pembeli ON pesanan(id_pembeli);
 CREATE INDEX IF NOT EXISTS idx_pesanan_mitra_status_waktu ON pesanan(id_mitra, status_pesanan, tanggal_pesanan);

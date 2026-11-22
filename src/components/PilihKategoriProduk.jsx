@@ -1,9 +1,7 @@
 'use client';
 
-import { KATEGORI_PRODUK } from '@/lib/kategori';
-
-export default function PilihKategoriProduk({ nilai, onUbah, nonaktif = false }) {
-  const pilihan = [...new Set([...KATEGORI_PRODUK, ...nilai.filter(Boolean)])];
+export default function PilihKategoriProduk({ nilai, onUbah, nonaktif = false, kategori = [] }) {
+  const pilihan = [...new Set([...kategori, ...nilai.filter(Boolean)])];
 
   return (
     <fieldset className="field input-varian" disabled={nonaktif}>

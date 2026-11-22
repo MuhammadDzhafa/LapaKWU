@@ -30,6 +30,7 @@ export default function Modal({
   inputDefault = '',
   inputPlaceholder = '',
   inputOpsional = false,
+  kategori,
   tombolOk = 'Ya, lanjutkan',
   tombolBatal = 'Batal',
   warnaOk = 'sun',
@@ -64,7 +65,7 @@ export default function Modal({
             <div className="field">
               {inputLabel && !['varian', 'kategori'].includes(inputType) && <label>{inputLabel}</label>}
               {inputType === 'kategori' ? (
-                <PilihKategoriProduk nilai={val} onUbah={setVal} nonaktif={busy} />
+                <PilihKategoriProduk nilai={val} onUbah={setVal} nonaktif={busy} kategori={kategori} />
               ) : inputType === 'varian' ? (
                 <InputVarian judul={inputLabel} nilai={val} onUbah={setVal} nonaktif={busy} />
               ) : inputType === 'textarea' ? (

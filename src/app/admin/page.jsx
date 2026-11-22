@@ -9,6 +9,7 @@ import Modal from '@/components/Modal';
 import Ikon from '@/components/Ikon';
 import { Hitung } from '@/components/Motion';
 import { JUMLAH_TENANT } from '@/lib/tenant';
+import { kategoriProduk } from '@/lib/kategori';
 
 const Rekap = dynamic(() => import('@/components/Rekap'), { loading: () => <StatusMuat teks="Memuat rekap penjualan…" /> });
 
@@ -18,6 +19,7 @@ const TABS = [
   ['pencairan', 'Pencairan Mitra', 'cash'],
   ['pengguna', 'Pengguna dan peran', 'users'],
   ['produk', 'Produk', 'box'],
+  ['kategori', 'Kategori', 'tag'],
   ['rekap', 'Rekap Penjualan', 'chart'],
   ['refund', 'Refund', 'undo'],
 ];
@@ -27,6 +29,9 @@ export default function Admin() {
   const [tab, setTab] = useState('mitra');
   const [d, setD] = useState({ u: [], m: [], pr: [], ad: [], pb: [], rf: [], qris: [] });
   const [cariMitra, setCariMitra] = useState('');
+  const [cariProduk, setCariProduk] = useState('');
+  const [kategori, setKategori] = useState(null);
+  const [galatKategori, setGalatKategori] = useState('');
   const [batasMitra, setBatasMitra] = useState(25);
   const [galatMuat, setGalatMuat] = useState('');
   const [muatLanjutan, setMuatLanjutan] = useState(false);
@@ -52,6 +57,17 @@ export default function Admin() {
     }
   }, [toast]);
   useEffect(() => { if (peran === 'admin') void muat(); }, [peran, muat]);
+
+  const muatKategori = useCallback(async () => {
+    setGalatKategori('');
+    try {
+      const data = await api('/api/kategori', { aksi: 'daftar' });
+      setKategori(data.kategori);
+    } catch (error) {
+      setGalatKategori(error.message);
+    }
+  }, []);
+  useEffect(() => { if (peran === 'admin') void muatKategori(); }, [peran, muatKategori]);
 
   const muatPencairan = useCallback(async () => {
     const data = await api('/api/admin', { aksi: 'daftar_pencairan' });
@@ -170,6 +186,29 @@ export default function Admin() {
     });
   };
 
+  const simpanKategori = async (data) => {
+    setBusyModal(true);
+    try {
+      await api('/api/kategori', data);
+      setModalInfo(null);
+      toast('Perubahan kategori tersimpan.');
+      await Promise.all([muatKategori(), muat()]);
+    } catch (e) {
+      toast(e.message, true);
+    } finally {
+      setBusyModal(false);
+    }
+  };
+
+  const bukaKategori = (item) => setModalInfo({
+    judul: item ? 'Ubah nama kategori' : 'Tambah kategori',
+    tipe: 'input',
+    inputLabel: 'Nama kategori',
+    inputDefault: item?.nama ?? '',
+    tombolOk: 'Simpan kategori',
+    onOk: (nama) => simpanKategori({ aksi: item ? 'ubah' : 'tambah', id: item?.id, nama }),
+  });
+
   useEffect(() => {
     if (!modalGambar) return undefined;
     const esc = (e) => e.key === 'Escape' && setModalGambar(null);
@@ -205,6 +244,11 @@ export default function Admin() {
   const nQris = (d.qris || []).length;
   const nRefund = d.rf.length;
   const nTindak = nMitra + nQris + nRefund + pencairan.length;
+  const namaKategori = (kategori ?? []).map((item) => item.nama);
+  const kataProduk = cariProduk.trim().toLowerCase();
+  const produkCocok = d.pr.filter((item) =>
+    [item.nama, nama[item.id_mitra], ...kategoriProduk(item)]
+      .some((teks) => teks?.toLowerCase().includes(kataProduk)));
   return (
     <main className="wrap">
       {modalInfo && (
@@ -215,12 +259,13 @@ export default function Admin() {
           inputType={modalInfo.inputType}
           inputLabel={modalInfo.inputLabel}
           inputDefault={modalInfo.inputDefault}
+          kategori={namaKategori}
           inputPlaceholder={modalInfo.inputPlaceholder}
           tombolOk={modalInfo.tombolOk}
           warnaOk={modalInfo.warnaOk}
           busy={busyModal}
           onOk={modalInfo.onOk}
-          onBatal={() => setModalInfo(null)}
+          onBatal={() => { if (!busyModal) setModalInfo(null); }}
         />
       )}
       <div className="dash-head">
@@ -428,10 +473,50 @@ export default function Admin() {
               <td>{x.$id !== akun.$id && <div className="row">{x.status_akun === 'DIBLOKIR' ? <button className="btn sm" onClick={() => act('aktifkan', x.$id)}>Aktifkan</button> : <button className="btn sm out" onClick={() => act('blokir', x.$id)}>Blokir</button>}
                 <button className="btn sm red" onClick={() => konfirmasiHapusPengguna(x)}>Hapus</button></div>}</td></tr>))}</tbody></table></div></div>}
 
-      {tab === 'produk' && <div className="scroll"><table><thead><tr><th>Produk</th><th>Mitra</th><th>Harga</th><th>Stok</th><th></th></tr></thead><tbody>
-        {d.pr.map((x) => <tr key={x.$id}><td>{x.nama}</td><td>{nama[x.id_mitra]}</td><td>{rp(x.harga)}</td><td>{x.stok}</td>
-          <td><button className="link" onClick={() => konfirmasiHapusProduk(x)}>Hapus</button></td></tr>)}
-        {!d.pr.length && <tr><td colSpan="5" className="muted">Belum ada produk.</td></tr>}</tbody></table></div>}
+      {tab === 'produk' && <div className="stack">
+        <div className="field saring-daftar">
+          <label htmlFor="cari-produk-admin">Cari produk</label>
+          <input id="cari-produk-admin" type="search" placeholder="Nama produk, mitra, atau kategori" value={cariProduk} onChange={(e) => setCariProduk(e.target.value)} />
+        </div>
+        {galatKategori && <p role="alert">{galatKategori} <button type="button" className="link" onClick={muatKategori}>Coba lagi</button></p>}
+        <div className="scroll"><table><thead><tr><th>Produk</th><th>Mitra</th><th>Kategori</th><th>Harga</th><th>Stok</th><th>Tindakan</th></tr></thead><tbody>
+          {produkCocok.map((x) => <tr key={x.$id}>
+            <td>{x.nama}{x.diarsipkan && <small className="muted"> · Diarsipkan</small>}</td>
+            <td>{nama[x.id_mitra]}</td><td>{kategoriProduk(x).join(' · ')}</td><td>{rp(x.harga)}</td><td>{x.stok}</td>
+            <td><div className="row">
+              <button type="button" className="link" disabled={!namaKategori.length} onClick={() => setModalInfo({
+                judul: `Ubah kategori ${x.nama}`,
+                tipe: 'input',
+                inputType: 'kategori',
+                inputDefault: kategoriProduk(x).length ? kategoriProduk(x) : [''],
+                tombolOk: 'Simpan kategori',
+                onOk: (nilai) => simpanKategori({ aksi: 'atur_produk', id: x.$id, kategori_list: nilai }),
+              })}>Ubah kategori</button>
+              {!x.diarsipkan && <button className="link" onClick={() => konfirmasiHapusProduk(x)}>Hapus</button>}
+            </div></td>
+          </tr>)}
+          {!produkCocok.length && <tr><td colSpan="6" className="muted">Produk tidak ditemukan.</td></tr>}
+        </tbody></table></div>
+      </div>}
+
+      {tab === 'kategori' && <div className="stack">
+        <button type="button" className="btn" onClick={() => bukaKategori()}>Tambah kategori</button>
+        <p className="muted">Jumlah pemakaian mencakup produk yang diarsipkan. Pindahkan produk dari kategori sebelum menghapusnya.</p>
+        {galatKategori && <p role="alert">{galatKategori} <button type="button" className="link" onClick={muatKategori}>Coba lagi</button></p>}
+        {!kategori && !galatKategori && <StatusMuat teks="Memuat kategori…" />}
+        {kategori && <div className="scroll"><table><thead><tr><th>Nama kategori</th><th>Produk</th><th>Tindakan</th></tr></thead><tbody>
+          {kategori.map((item) => <tr key={item.id}><td>{item.nama}</td><td>{item.jumlah_produk}</td><td><div className="row">
+            <button type="button" className="link" onClick={() => bukaKategori(item)}>Ubah nama</button>
+            <button type="button" className="link" disabled={item.jumlah_produk > 0} onClick={() => setModalInfo({
+              judul: `Hapus kategori ${item.nama}?`,
+              tombolOk: 'Hapus kategori',
+              warnaOk: 'red',
+              onOk: () => simpanKategori({ aksi: 'hapus', id: item.id }),
+            })}>Hapus</button>
+          </div></td></tr>)}
+          {!kategori.length && <tr><td colSpan="3">Belum ada kategori.</td></tr>}
+        </tbody></table></div>}
+      </div>}
 
       {tab === 'rekap' && <Rekap nama={nama} />}
 
@@ -439,7 +524,7 @@ export default function Admin() {
         {d.rf.map((x) => <tr key={x.$id}><td>{x.id_pesanan.slice(-6)}</td><td>{x.metode.replaceAll('_', ' ')}</td><td>{rp(x.jumlah)}</td>
           <td><button className="btn sm sun" onClick={() => act('refund', x.$id, { sudah_ditransfer: true }, 'Refund manual sudah dicatat.')}>Dana sudah ditransfer</button></td></tr>)}
         {!d.rf.length && <tr><td colSpan="4" className="muted">Tidak ada refund yang menunggu.</td></tr>}</tbody></table></div></div>}
-      {d.hasMore && <div className="row" style={{ justifyContent: 'center', marginTop: 16 }}><button className="btn out" type="button" disabled={muatLanjutan} onClick={async () => { setMuatLanjutan(true); await muat((d.offset || 0) + 500, true); setMuatLanjutan(false); }}>{muatLanjutan ? 'Memuat…' : 'Muat 500 data berikutnya'}</button></div>}
+      {tab !== 'kategori' && d.hasMore && <div className="row" style={{ justifyContent: 'center', marginTop: 16 }}><button className="btn out" type="button" disabled={muatLanjutan} onClick={async () => { setMuatLanjutan(true); await muat((d.offset || 0) + 500, true); setMuatLanjutan(false); }}>{muatLanjutan ? 'Memuat…' : 'Muat 500 data berikutnya'}</button></div>}
 
       {/* MODAL PREVIEW BUKTI TRANSFER */}
       {modalGambar && (
