@@ -1,7 +1,7 @@
-import { BATAS_BAYAR_TENANT_MS, tenggatBayarTenant } from '@/lib/pembayaran-tenant';
-import { cariBanyak, denganTransaksi, kunciPesanan, ubahData } from '@/lib/db';
+import { BATAS_BAYAR_TENANT_MS, DURASI_TANGGAL_AMBIL_MS, mulaiPengambilan, tenggatBayarTenant } from '@/lib/pembayaran-tenant';
+import { denganTransaksi, kunciPesanan, queryDatabase, ubahData } from '@/lib/db';
 import { svc, siapa, err, getRow, rows, upd, inc, notif, Query } from '@/lib/server';
-import { periodeJakarta } from '@/lib/waktu';
+import { AKHIR_PRE_ORDER, HARI_PRE_ORDER, MULAI_PRE_ORDER, periodeJakarta } from '@/lib/waktu';
 import { hitungKomisi } from '@/lib/komisi';
 export const dynamic = 'force-dynamic';
 
@@ -21,10 +21,18 @@ const ALUR = {
 async function bersihkanKedaluwarsa(db) {
   try {
     const sekarang = Date.now();
-    const batas = new Date(sekarang - BATAS_BAYAR_TENANT_MS);
-    const pembayaran = await cariBanyak('pembayaran', {
-      metode: 'BAYAR_DI_TEMPAT', status_pembayaran: 'MENUNGGU', created_at: { $lte: batas },
-    }, { limit: 25, sort: { created_at: 1 } });
+    const { rows: pembayaran } = await queryDatabase(
+      `SELECT bayar.id, bayar.id_pesanan
+       FROM pembayaran bayar JOIN pesanan ps ON ps.id = bayar.id_pesanan
+       WHERE bayar.metode = 'BAYAR_DI_TEMPAT' AND bayar.status_pembayaran = 'MENUNGGU'
+         AND ps.status_pesanan IN ('MENUNGGU_KONFIRMASI', 'DIPROSES')
+         AND ((ps.waktu_pengambilan IS NULL AND COALESCE(ps.tanggal_pesanan, ps.created_at) <= $1)
+           OR (ps.waktu_pengambilan IN ($3, $4) AND $5)
+           OR (ps.waktu_pengambilan NOT IN ($3, $4) AND ps.waktu_pengambilan <= $2))
+       ORDER BY bayar.created_at LIMIT 25`,
+      [new Date(sekarang - BATAS_BAYAR_TENANT_MS), new Date(sekarang - DURASI_TANGGAL_AMBIL_MS),
+        new Date(HARI_PRE_ORDER), new Date(MULAI_PRE_ORDER), sekarang >= AKHIR_PRE_ORDER]
+    );
     for (const calon of pembayaran) {
       await denganTransaksi(async () => {
         if (!await kunciPesanan(calon.id_pesanan)) return;
@@ -37,7 +45,7 @@ async function bersihkanKedaluwarsa(db) {
         await upd(db, 'pembayaran', by.$id, { status_pembayaran: 'GAGAL' });
         await upd(db, 'pesanan', ps.$id, {
           status_pesanan: 'DIBATALKAN',
-          alasan_pembatalan: 'Pesanan dibatalkan otomatis karena melebihi batas waktu pembayaran 1 jam di tenant.',
+          alasan_pembatalan: 'Pesanan dibatalkan otomatis karena batas pembayaran di lapak telah lewat.',
         });
         await notif(db, ps.id_pembeli, 'Pesanan dibatalkan otomatis', 'Batas pembayaran di lapak telah lewat.', true);
         await notif(db, ps.id_mitra, 'Pesanan dibatalkan otomatis', 'Batas pembayaran di lapak telah lewat. Stok dikembalikan.', true);
@@ -95,7 +103,7 @@ export async function POST(req) {
     // Aksi pembatalan karena pembayaran offline >1 jam
     if (aksi === 'batal_kedaluwarsa') {
       if (by?.metode !== 'BAYAR_DI_TEMPAT') return err('Batas waktu ini hanya berlaku untuk bayar di lapak.');
-      if (Date.now() < tenggatBayarTenant(p)) return err('Belum mencapai batas waktu 1 jam.');
+      if (Date.now() < tenggatBayarTenant(p)) return err('Batas waktu pembayaran di lapak belum lewat.');
 
       for (const d of await rows(db, 'detail_pesanan', [Query.equal('id_pesanan', id)])) {
         await inc(db, 'produk', d.id_produk, 'stok', d.jumlah);
@@ -103,11 +111,15 @@ export async function POST(req) {
       if (by) await upd(db, 'pembayaran', by.$id, { status_pembayaran: 'GAGAL' });
       await upd(db, 'pesanan', id, {
         status_pesanan: 'DIBATALKAN',
-        alasan_pembatalan: 'Pesanan dibatalkan otomatis karena melebihi batas waktu pembayaran 1 jam di tenant.',
+        alasan_pembatalan: 'Pesanan dibatalkan otomatis karena batas pembayaran di lapak telah lewat.',
       });
-      await notif(db, p.id_pembeli, 'Pesanan dibatalkan', `Pesanan ${id.slice(-6)} dibatalkan karena melebihi 1 jam tanpa konfirmasi bayar di tenant.`, true);
-      await notif(db, p.id_mitra, 'Pesanan dibatalkan', `Pesanan ${id.slice(-6)} dibatalkan otomatis karena lewat 1 jam. Stok dikembalikan.`, true);
+      await notif(db, p.id_pembeli, 'Pesanan dibatalkan', `Pesanan ${id.slice(-6)} dibatalkan karena batas pembayaran di lapak telah lewat.`, true);
+      await notif(db, p.id_mitra, 'Pesanan dibatalkan', `Pesanan ${id.slice(-6)} dibatalkan otomatis karena batas pembayaran di lapak telah lewat. Stok dikembalikan.`, true);
       return Response.json({ ok: true, dibatalkan: true });
+    }
+
+    if (['konfirmasi_bayar', 'selesai'].includes(aksi) && p.waktu_pengambilan && Date.now() < mulaiPengambilan(p)) {
+      return err('Pesanan pre-order baru bisa diselesaikan mulai jam pengambilan.');
     }
 
     // Mitra mengonfirmasi pembayaran langsung di tenant.
@@ -117,7 +129,7 @@ export async function POST(req) {
       if (by.status_pembayaran !== 'MENUNGGU') return err('Pembayaran tidak dalam status menunggu.');
 
       if (Date.now() >= tenggatBayarTenant(p)) {
-        return err('Batas waktu pembayaran di tempat (1 jam) telah kedaluwarsa.');
+        return err('Batas waktu pembayaran di lapak telah lewat.');
       }
 
       const now = new Date().toISOString();

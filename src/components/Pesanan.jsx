@@ -1,8 +1,10 @@
 'use client';
+import { namaDenganAddOn } from '@/lib/add-on';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { list, Query, rp, tgl, api, img } from '@/lib/aw';
-import { tenggatBayarTenant } from '@/lib/pembayaran-tenant';
+import { mulaiPengambilan, tenggatBayarTenant } from '@/lib/pembayaran-tenant';
 import { bolehLihatDenah, nomorTenantValid } from '@/lib/tenant';
+import { formatJadwalAmbil } from '@/lib/waktu';
 import DenahTenant from '@/components/DenahTenant';
 
 const waktuPesanan = new Intl.DateTimeFormat('id-ID', {
@@ -85,10 +87,21 @@ export default function Pesanan({ uid, sebagai }) {
   const percobaanBatal = useRef(new Map());
   const versiMuat = useRef(0);
 
+  const adaTenggat = d?.some((p) => p.bayar?.metode === 'BAYAR_DI_TEMPAT'
+    && p.bayar.status_pembayaran === 'MENUNGGU'
+    && ['MENUNGGU_KONFIRMASI', 'DIPROSES'].includes(p.status_pesanan));
+
   useEffect(() => {
-    const timer = setInterval(() => setSekarang(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+    if (!adaTenggat) return;
+    const perbarui = () => { if (!document.hidden) setSekarang(Date.now()); };
+    perbarui();
+    const timer = setInterval(perbarui, 1000);
+    document.addEventListener('visibilitychange', perbarui);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', perbarui);
+    };
+  }, [adaTenggat]);
 
   const muat = useCallback(async () => {
     const versi = ++versiMuat.current;
@@ -103,21 +116,25 @@ export default function Pesanan({ uid, sebagai }) {
     const ids = ps.map((p) => p.$id);
     const mitraIds = [...new Set(ps.map((p) => p.id_mitra))];
     const [dt, by, mitra] = await Promise.all([
-      list('detail_pesanan', [Query.equal('id_pesanan', ids)]),
+      list('detail_pesanan', [Query.equal('id_pesanan', ids), Query.limit(500)]),
       list('pembayaran', [Query.equal('id_pesanan', ids)]),
       list('mitra', [Query.equal('$id', mitraIds)]),
     ]);
     if (versi !== versiMuat.current) return;
+    setSekarang(Date.now());
     const lapak = new Map(mitra.map((m) => [m.$id, m]));
     const pembayaranPerPesanan = new Map(by.map((x) => [x.id_pesanan, x]));
+    const detailPerPesanan = new Map();
+    for (const x of dt) {
+      const items = detailPerPesanan.get(x.id_pesanan) ?? [];
+      items.push({ ...x, nama: namaDenganAddOn(x.nama_produk || 'Produk dihapus', x.add_on) });
+      detailPerPesanan.set(x.id_pesanan, items);
+    }
     setD(ps.map((p) => ({
       ...p,
       lapak: lapak.get(p.id_mitra),
       bayar: pembayaranPerPesanan.get(p.$id),
-      items: dt.filter((x) => x.id_pesanan === p.$id).map((x) => ({
-        ...x,
-        nama: x.nama_produk || 'Produk dihapus',
-      })),
+      items: detailPerPesanan.get(p.$id) ?? [],
     })));
   }, [uid, sebagai]);
 
@@ -221,6 +238,8 @@ export default function Pesanan({ uid, sebagai }) {
         const sisaMenit = Math.floor(sisaTotalDetik / 60);
         const sisaDetik = sisaTotalDetik % 60;
         const kedaluwarsa = sisaMs <= 0;
+        const jadwalAmbil = p.waktu_pengambilan;
+        const sudahTanggalAmbil = !jadwalAmbil || sekarang >= mulaiPengambilan(p);
         const lunas = p.bayar?.status_pembayaran === 'BERHASIL';
         const nomor = p.lapak?.nomor_tenant;
         const adaNomor = nomorTenantValid(nomor);
@@ -254,10 +273,11 @@ export default function Pesanan({ uid, sebagai }) {
 
             <Lacak status={p.status_pesanan} antar={antar} />
 
+            {jadwalAmbil && <p><b>Pre-order · Ambil di lapak</b><br />{formatJadwalAmbil(jadwalAmbil)}</p>}
             <ul className="lines" style={{ margin: '10px 0' }}>
               {p.items.map((i) => (
                 <li key={i.$id}>
-                  <span>{i.nama} × {i.jumlah}</span>
+                  <span>{i.nama} × {i.jumlah}{i.catatan_item && <small className="catatan-item">Catatan: {i.catatan_item}</small>}</span>
                   <span>{rp(i.subtotal)}</span>
                 </li>
               ))}
@@ -300,11 +320,13 @@ export default function Pesanan({ uid, sebagai }) {
               <div style={{ marginBottom: 12 }}>
                 {!kedaluwarsa ? (
                   <div className="msg" style={{ background: 'var(--tint)', border: '1px solid var(--ye)', color: 'var(--ink)', padding: '8px 12px', fontSize: '0.85rem' }}>
-                    ⏱️ Sisa waktu bayar di tenant <b>{sisaMenit} menit {String(sisaDetik).padStart(2, '0')} detik</b> dari batas 1 jam.
+                    {jadwalAmbil
+                      ? <>Bayar di lapak pada <b>{formatJadwalAmbil(jadwalAmbil)}</b>.</>
+                      : <>⏱️ Sisa waktu bayar di tenant <b>{sisaMenit} menit {String(sisaDetik).padStart(2, '0')} detik</b> dari batas 1 jam.</>}
                   </div>
                 ) : (
                   <div className="msg err" style={{ padding: '8px 12px', fontSize: '0.85rem' }}>
-                    ⚠️ Batas pembayaran 1 jam sudah habis. Pembatalan sedang diproses.
+                    ⚠️ Batas pembayaran sudah habis. Pembatalan sedang diproses.
                   </div>
                 )}
               </div>
@@ -340,7 +362,7 @@ export default function Pesanan({ uid, sebagai }) {
                 {/* MITRA ACTIONS */}
                 {sebagai === 'mitra' && (
                   <>
-                    {isMenungguBayar && isOffline && isActiveOrder && !kedaluwarsa &&
+                    {isMenungguBayar && isOffline && isActiveOrder && sudahTanggalAmbil && !kedaluwarsa &&
                       tombol(p, 'konfirmasi_bayar', 'Konfirmasi bayar dan selesaikan', 'sun')}
                     {p.status_pesanan === 'MENUNGGU_KONFIRMASI' && (
                       <>
@@ -354,7 +376,7 @@ export default function Pesanan({ uid, sebagai }) {
                         {tombol(p, 'tolak', 'Batalkan', 'red')}
                       </>
                     )}
-                    {lunas && (['DIKIRIM', 'SIAP_DIAMBIL'].includes(p.status_pesanan) || (isOffline && isActiveOrder)) && (
+                    {lunas && sudahTanggalAmbil && (['DIKIRIM', 'SIAP_DIAMBIL'].includes(p.status_pesanan) || (isOffline && isActiveOrder)) && (
                       tombol(p, 'selesai', 'Selesaikan pesanan', 'sun')
                     )}
                   </>
@@ -489,6 +511,7 @@ export default function Pesanan({ uid, sebagai }) {
               <div>
                 <span className="muted" style={{ display: 'block', fontSize: '0.78rem' }}>TANGGAL TRANSAKSI</span>
                 <b>{tgl(modalInvoice.tanggal_pesanan)}</b>
+                {modalInvoice.waktu_pengambilan && <small className="catatan-item">Ambil {formatJadwalAmbil(modalInvoice.waktu_pengambilan)}</small>}
               </div>
               <div>
                 <span className="muted" style={{ display: 'block', fontSize: '0.78rem' }}>METODE PEMBAYARAN</span>
@@ -510,7 +533,7 @@ export default function Pesanan({ uid, sebagai }) {
               <ul className="lines" style={{ margin: 0 }}>
                 {modalInvoice.items.map((i) => (
                   <li key={i.$id} style={{ padding: '6px 0', fontSize: '0.9rem' }}>
-                    <span>{i.nama} × {i.jumlah}</span>
+                    <span>{i.nama} × {i.jumlah}{i.catatan_item && <small className="catatan-item">Catatan: {i.catatan_item}</small>}</span>
                     <b>{rp(i.subtotal)}</b>
                   </li>
                 ))}

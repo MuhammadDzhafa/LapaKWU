@@ -92,22 +92,29 @@ export function Hitung({ ke, durasi = 1100 }) {
 }
 
 export default function Motion() {
+  const progress = useRef(null);
   useEffect(() => {
     const html = document.documentElement;
     const gerak = !kurangiGerak();
-    let y0 = scrollY, tick = false;
+    let y0 = scrollY, rafScroll = 0;
+    let gulir = html.hasAttribute('data-scrolled');
+    let navTersembunyi = html.getAttribute('data-nav') === 'hide';
 
     /* progres scroll + status header (mengecil, bersembunyi saat turun, muncul lagi saat naik) */
     const onScroll = () => {
-      if (tick) return; tick = true;
-      requestAnimationFrame(() => {
-        tick = false;
+      if (rafScroll) return;
+      rafScroll = requestAnimationFrame(() => {
+        rafScroll = 0;
         const y = scrollY, maks = html.scrollHeight - innerHeight;
-        html.style.setProperty('--sp', maks > 0 ? (y / maks).toFixed(4) : '0');
-        y > 24 ? html.setAttribute('data-scrolled', '') : html.removeAttribute('data-scrolled');
+        progress.current?.style.setProperty('--sp', maks > 0 ? (y / maks).toFixed(4) : '0');
+        if (gulir !== (y > 24)) html.toggleAttribute('data-scrolled', gulir = y > 24);
         const turun = y > y0 + 6, naik = y < y0 - 6;
-        if (y < 220 || naik) html.removeAttribute('data-nav');
-        else if (turun) html.setAttribute('data-nav', 'hide');
+        const sembunyi = y >= 220 && !naik && (turun || navTersembunyi);
+        if (sembunyi !== navTersembunyi) {
+          navTersembunyi = sembunyi;
+          if (sembunyi) html.setAttribute('data-nav', 'hide');
+          else html.removeAttribute('data-nav');
+        }
         if (turun || naik) y0 = y;
       });
     };
@@ -123,7 +130,7 @@ export default function Motion() {
     };
     addEventListener('keydown', kunci);
 
-    if (!gerak) return () => { removeEventListener('scroll', onScroll); removeEventListener('keydown', kunci); };
+    if (!gerak) return () => { removeEventListener('scroll', onScroll); removeEventListener('keydown', kunci); cancelAnimationFrame(rafScroll); };
 
     /* reveal saat scroll */
     const io = new IntersectionObserver((es) => es.forEach((e) => {
@@ -176,7 +183,7 @@ export default function Motion() {
         }
       });
     };
-    addEventListener('pointermove', bergerak, { passive: true });
+    if (matchMedia('(hover:hover) and (pointer:fine)').matches) addEventListener('pointermove', bergerak, { passive: true });
     const lepas = (e) => { const pr = e.target.closest?.('.prod'); if (pr && !pr.contains(e.relatedTarget)) { pr.style.removeProperty('--tx'); pr.style.removeProperty('--ty'); } };
     addEventListener('pointerout', lepas, { passive: true });
     const klikTambah = (e) => { const t = e.target.closest?.('.plus,.step-btn.plus-btn'); if (t && !t.disabled) percik(t); };
@@ -198,7 +205,7 @@ export default function Motion() {
     return () => {
       removeEventListener('scroll', onScroll); removeEventListener('keydown', kunci);
       removeEventListener('pointermove', bergerak); removeEventListener('pointerdown', tekan); removeEventListener('pointerout', lepas); removeEventListener('click', klikTambah);
-      io.disconnect(); mo.disconnect(); cancelAnimationFrame(raf);
+      io.disconnect(); mo.disconnect(); cancelAnimationFrame(raf); cancelAnimationFrame(rafScroll);
     };
   }, []);
 
@@ -206,9 +213,13 @@ export default function Motion() {
   useEffect(() => {
     /* Tabel jadi kartu di layar sempit: tiap sel membawa nama kolomnya (data-label). */
     let rafT = 0;
+    const tabelBerubah = new Set(document.querySelectorAll('table'));
     const beriLabel = () => {
       rafT = 0;
-      document.querySelectorAll('table').forEach((t) => {
+      const tabel = [...tabelBerubah];
+      tabelBerubah.clear();
+      tabel.forEach((t) => {
+        if (!t.isConnected) return;
         const kolom = [...t.querySelectorAll('thead th')].map((th) => th.textContent.trim());
         if (!kolom.length) return;
         t.setAttribute('data-kartu', '');
@@ -222,9 +233,19 @@ export default function Motion() {
         });
       });
     };
-    const jadwal = () => { if (!rafT) rafT = requestAnimationFrame(beriLabel); };
+    const jadwal = () => { if (tabelBerubah.size && !rafT) rafT = requestAnimationFrame(beriLabel); };
     jadwal();
-    const moT = new MutationObserver(jadwal);
+    const moT = new MutationObserver((perubahan) => {
+      for (const { target, addedNodes } of perubahan) {
+        const tabel = target.closest?.('table');
+        if (tabel) tabelBerubah.add(tabel);
+        for (const node of addedNodes) {
+          if (node.matches?.('table')) tabelBerubah.add(node);
+          node.querySelectorAll?.('table').forEach((item) => tabelBerubah.add(item));
+        }
+      }
+      jadwal();
+    });
     moT.observe(document.body, { childList: true, subtree: true });
 
     /* Tab yang diketuk digeser ke tengah supaya tab di sebelahnya kelihatan. */
@@ -257,7 +278,11 @@ export default function Motion() {
     };
     const jadwalG = () => { if (!rafG) rafG = requestAnimationFrame(luncur); };
     jadwalG();
-    const moG = new MutationObserver(jadwalG);
+    const menu = '.tabs, .dock';
+    const moG = new MutationObserver((perubahan) => {
+      if (perubahan.some(({ target, addedNodes }) => target.closest?.(menu)
+        || [...addedNodes].some((node) => node.matches?.(menu) || node.querySelector?.(menu)))) jadwalG();
+    });
     moG.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'aria-current'] });
     addEventListener('resize', jadwalG);
     document.fonts?.ready?.then(jadwalG);
@@ -298,5 +323,5 @@ export default function Motion() {
     return () => { moG.disconnect(); cancelAnimationFrame(rafG); removeEventListener('resize', jadwalG); bersih(); };
   }, []);
 
-  return <div className="progress" aria-hidden="true" />;
+  return <div ref={progress} className="progress" aria-hidden="true" />;
 }

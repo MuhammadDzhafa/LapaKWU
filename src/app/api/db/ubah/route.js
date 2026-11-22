@@ -1,5 +1,7 @@
 import { siapa, err } from '@/lib/server';
-import { cariSatu, pastikanPembeli, ubahData } from '@/lib/db';
+import { cariBanyak, cariSatu, denganTransaksi, kunciProduk, pastikanPembeli, ubahData } from '@/lib/db';
+
+import { addOnValid } from '@/lib/add-on';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,9 +27,18 @@ export async function POST(req) {
       const item = await cariSatu(tabel, filter);
       if (!item) return err('Item tidak ditemukan.', 404);
       if (!Number.isSafeInteger(data.jumlah) || data.jumlah < 1) return err('Jumlah tidak valid.');
-      const produk = await cariSatu('produk', { _id: item.id_produk, diarsipkan: false });
-      if (!produk || data.jumlah > produk.stok) return err('Stok tidak cukup.', 409);
-      await ubahData(tabel, filter, { jumlah: data.jumlah, subtotal: data.jumlah * produk.harga });
+      return await denganTransaksi(async () => {
+        await kunciProduk(item.id_produk);
+        const produk = await cariSatu('produk', { _id: item.id_produk, diarsipkan: false });
+        if (!produk) return err('Produk tidak tersedia.', 409);
+        if (!addOnValid(produk, item.add_on)) return err('Pilihan add-on sudah berubah. Hapus item ini dan pilih ulang.', 409);
+        const items = await cariBanyak(tabel, { id_keranjang: u.$id, id_produk: item.id_produk }, { limit: 5000 });
+        const jumlahProduk = items.reduce((total, baris) => total + (baris.id === id ? 0 : baris.jumlah), data.jumlah);
+        if (jumlahProduk > produk.stok) return err('Stok tidak cukup untuk semua pilihan produk ini.', 409);
+        const result = await ubahData(tabel, filter, { jumlah: data.jumlah, subtotal: data.jumlah * produk.harga });
+        if (!result.matchedCount) return err('Item tidak ditemukan.', 404);
+        return Response.json({ ok: true });
+      });
     }
     return Response.json({ ok: true });
   } catch (e) {

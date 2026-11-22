@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import StatusMuat from '@/components/StatusMuat';
 import { useSaya } from '@/components/Shell';
 import Pesanan from '@/components/Pesanan';
 
 export default function PesananSaya() {
   const { akun, memuat } = useSaya();
 
-  if (memuat) return <main className="wrap" />;
+  if (memuat) return <main className="wrap"><StatusMuat teks="Memuat pesanan…" /></main>;
   if (!akun) return <main className="wrap"><p className="kosong"><Link className="link" href="/masuk">Masuk</Link> untuk melihat pesananmu.</p></main>;
 
   return <main className="wrap">

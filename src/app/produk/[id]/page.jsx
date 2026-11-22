@@ -3,19 +3,21 @@ import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ambil, rp, img } from '@/lib/aw';
+import PilihAddOn from '@/components/PilihAddOn';
 import { useSaya } from '@/components/Shell';
 
 export default function Detail() {
   const { id } = useParams();
   const r = useRouter();
-  const { akun, peran, toast, keranjang, ubahItemKeranjang } = useSaya();
+  const { akun, keranjang, ubahItemKeranjang } = useSaya();
   const [p, setP] = useState(null);
   const [mt, setMt] = useState(null);
   const [n, setN] = useState(1);
+  const [modeAddOn, setModeAddOn] = useState(null);
   const [inputVal, setInputVal] = useState('1');
 
   const inCartQty = useMemo(() => {
-    return (keranjang || []).find((i) => i.id_produk === id)?.jumlah || 0;
+    return (keranjang || []).reduce((total, i) => total + (i.id_produk === id ? i.jumlah : 0), 0);
   }, [keranjang, id]);
 
   useEffect(() => {
@@ -56,26 +58,28 @@ export default function Detail() {
     }
   };
 
-  const cek = () => {
-    return true;
-  };
+  const bisaPesan = p && p.stok >= n;
   const tambahKeKeranjang = async () => {
+    if (!bisaPesan) return;
+    if (p.pilihan_add_on?.length) return setModeAddOn('keranjang');
     if (!akun) {
+      sessionStorage.removeItem('lapakwu_add_on_intent');
       sessionStorage.setItem('lapakwu_checkout_intent', JSON.stringify({ productId: id, quantity: n }));
       r.push('/masuk');
       return;
     }
-    if (!cek()) return;
     await ubahItemKeranjang(p, n);
   };
-  const beli = () => {
+  const beli = (addOn = '') => {
+    if (!bisaPesan) return;
     if (!akun) {
-      sessionStorage.setItem('lapakwu_checkout_intent', JSON.stringify({ productId: id, quantity: n }));
+      sessionStorage.removeItem('lapakwu_add_on_intent');
+      sessionStorage.setItem('lapakwu_checkout_intent', JSON.stringify({ productId: id, quantity: n, addOn }));
       r.push('/masuk');
       return;
     }
-    if (!cek()) return;
-    r.push(`/checkout?beli=${id}&jml=${n}`);
+    const checkout = new URLSearchParams({ beli: id, jml: String(n), add_on: addOn });
+    r.push(`/checkout?${checkout}`);
   };
 
   if (p === null) return <main className="wrap"><div className="skel" style={{ maxWidth: 420 }} /></main>;
@@ -91,6 +95,7 @@ export default function Detail() {
         <p>{p.deskripsi || 'Belum ada deskripsi.'}</p>
         <p><span className="badge" data-s={p.stok > 0 ? 'AKTIF' : 'DIBATALKAN'}>{p.stok > 0 ? `Stok ${p.stok}` : 'Stok habis'}</span></p>
         {p.stok > 0 ? (<>
+          {modeAddOn && <PilihAddOn produk={p} jumlah={n} onTutup={() => setModeAddOn(null)} onBeli={modeAddOn === 'langsung' ? beli : undefined} />}
           <div className="row">
             <label htmlFor="jml"><b>Jumlah</b></label>
             <button type="button" className="btn out sm" aria-label="Kurangi" disabled={n <= 1} onClick={() => updateQty(n - 1)}>−</button>
@@ -114,8 +119,8 @@ export default function Detail() {
             </div>
           )}
           <div className="row">
-            <button className="btn sun lg" onClick={beli}>Beli sekarang</button>
-            <button className="btn out lg" onClick={tambahKeKeranjang}>+ Tambah ke keranjang</button>
+            <button className="btn sun lg" onClick={() => p.pilihan_add_on?.length ? setModeAddOn('langsung') : beli()} disabled={!bisaPesan}>Beli sekarang</button>
+            <button className="btn out lg" onClick={tambahKeKeranjang} disabled={!bisaPesan}>+ Tambah ke keranjang</button>
           </div>
         </>) : <p className="msg err">Produk ini sedang habis.</p>}
       </div>

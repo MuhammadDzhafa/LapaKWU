@@ -53,17 +53,23 @@ export async function hapusSesiCookie() {
 }
 
 // Ambil userId dari cookie sesi (server-side)
-export async function getUserIdDariCookie() {
+export async function getSesiDariCookie() {
   const jar = await cookies();
   const token = jar.get(COOKIE)?.value;
   if (!token) return null;
   const payload = await verifyToken(token);
   if (!payload?.sub) return null;
-  const akun = await cariAkunById(payload.sub);
+  const [akun, pengguna] = await Promise.all([
+    cariAkunById(payload.sub),
+    cariSatu('pengguna', { _id: payload.sub }),
+  ]);
   if (!akun || (payload.sv ?? 0) !== (akun.session_version || 0)) return null;
-  const profil = await cariSatu('pengguna', { _id: payload.sub });
-  if (!profil || profil.status_akun === 'DIBLOKIR') return null;
-  return payload.sub;
+  if (!pengguna || pengguna.status_akun === 'DIBLOKIR') return null;
+  return { akun, pengguna };
+}
+
+export async function getUserIdDariCookie() {
+  return (await getSesiDariCookie())?.akun.id ?? null;
 }
 
 // ── Operasi akun di tabel `users` ─────────────────────────

@@ -1,22 +1,27 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { list, api, storage, ID, Query, BUCKET, rp, img } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
 import { periodeJakarta } from '@/lib/waktu';
-import Pesanan from '@/components/Pesanan';
-import DompetMitra from '@/components/DompetMitra';
-import Rekap from '@/components/Rekap';
+import StatusMuat from '@/components/StatusMuat';
 import Modal from '@/components/Modal';
+import InputVarian from '@/components/InputVarian';
 import Ikon from '@/components/Ikon';
 import { Hitung } from '@/components/Motion';
+
+const Pesanan = dynamic(() => import('@/components/Pesanan'), { loading: () => <StatusMuat teks="Memuat pesanan…" /> });
+const DompetMitra = dynamic(() => import('@/components/DompetMitra'), { loading: () => <StatusMuat teks="Memuat dompet…" /> });
+const Rekap = dynamic(() => import('@/components/Rekap'), { loading: () => <StatusMuat teks="Memuat rekap penjualan…" /> });
 
 export default function Lapak() {
   const { akun, peran, pengguna, mitra, memuat, muat: muatSaya, toast } = useSaya();
   const [tab, setTab] = useState('produk');
   const [ps, setPs] = useState(null);
+  const [cariProduk, setCariProduk] = useState('');
   const [msg, setMsg] = useState('');
-  const [f, setF] = useState({ nama: '', harga: '', kategori: '', deskripsi: '', stok: '' });
+  const [f, setF] = useState({ nama: '', harga: '', kategori: '', deskripsi: '', stok: '', pilihan_add_on: [''] });
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [st, setSt] = useState(null);
@@ -44,27 +49,37 @@ export default function Lapak() {
     }).catch(() => {});
   }, [akun, peran, muat]);
 
-const bln = () => periodeJakarta();
+  const bln = () => periodeJakarta();
   const muatOff = useCallback(() => list('penjualan_offline', [Query.equal('id_mitra', akun.$id), Query.equal('periode', bln()), Query.limit(500)]).then(setOff).catch(() => setOff([])), [akun]);
   useEffect(() => { if (akun && peran === 'mitra' && tab === 'offline') muatOff(); }, [akun, peran, tab, muatOff]);
   useEffect(() => {
     const bukaPesanan = () => { if (location.hash === '#pesanan') setTab('pesanan'); };
     bukaPesanan();
     window.addEventListener('hashchange', bukaPesanan);
-    return () => window.removeEventListener('hashchange', bukaPesanan);
+    window.addEventListener('popstate', bukaPesanan);
+    return () => {
+      window.removeEventListener('hashchange', bukaPesanan);
+      window.removeEventListener('popstate', bukaPesanan);
+    };
   }, []);
-  if (memuat) return <main className="wrap" />;
+  if (memuat) return <main className="wrap"><StatusMuat teks="Memuat lapak…" /></main>;
   if (peran !== 'mitra') return <main className="wrap"><p className="kosong">Halaman ini khusus mitra. <Link className="link" href="/masuk">Masuk atau daftar sebagai mitra</Link></p></main>;
   if (pengguna?.status_akun !== 'AKTIF') return (
     <main className="wrap" style={{ maxWidth: 620 }}><h2>Lapak {mitra?.nama_usaha}</h2>
       <p className="msg">{pengguna?.status_akun === 'DITOLAK' ? `Datamu perlu diperbaiki: ${mitra?.catatan_verifikasi}` : pengguna?.status_akun === 'DIBLOKIR' ? 'Akunmu diblokir admin.' : 'Akunmu menunggu verifikasi email dan persetujuan admin. Setelah disetujui, kamu bisa menambah produk di sini.'}</p></main>);
 
+  const kataProduk = cariProduk.trim().toLowerCase();
+  const produkCocok = (ps ?? []).filter((p) => [p.nama, p.kategori, ...(p.pilihan_add_on ?? [])].some((nilai) => nilai?.toLowerCase().includes(kataProduk)));
   const pengantaran = layanan ?? { antar_aktif: mitra?.antar_aktif === true, ongkir: mitra?.ongkir ?? 0 };
   const simpanPengantaran = async (e) => {
     e.preventDefault();
     setSimpanLayanan(true);
     try {
-      await api('/api/profil', { aksi: 'pengantaran', ...pengantaran, ongkir: Number(pengantaran.ongkir) });
+      await api('/api/profil', {
+        aksi: 'pengantaran',
+        antar_aktif: pengantaran.antar_aktif,
+        ...(pengantaran.antar_aktif ? { ongkir: Number(pengantaran.ongkir) } : {}),
+      });
       await muatSaya();
       setLayanan(null);
       toast('Pengaturan pengantaran disimpan.');
@@ -86,8 +101,8 @@ const bln = () => periodeJakarta();
     try {
       let id_gambar;
       if (file) id_gambar = (await storage.createFile({ bucketId: BUCKET, fileId: ID.unique(), file })).$id;
-      await api('/api/produk', { aksi: 'tambah', nama: f.nama, harga: +f.harga, kategori: f.kategori, deskripsi: f.deskripsi, stok: +f.stok, ...(id_gambar ? { id_gambar } : {}) });
-      setF({ nama: '', harga: '', kategori: '', deskripsi: '', stok: '' }); setFile(null); setPreview(null); e.target.reset(); toast('Produk berhasil ditambahkan.'); await muat();
+      await api('/api/produk', { aksi: 'tambah', nama: f.nama, harga: +f.harga, kategori: f.kategori, deskripsi: f.deskripsi, stok: +f.stok, pilihan_add_on: f.pilihan_add_on, ...(id_gambar ? { id_gambar } : {}) });
+      setF({ nama: '', harga: '', kategori: '', deskripsi: '', stok: '', pilihan_add_on: [''] }); setFile(null); setPreview(null); e.target.reset(); toast('Produk berhasil ditambahkan.'); await muat();
     } catch (er) { setMsg(er.message); }
   };
   const segarkanStat = () => list('rekap_penjualan', [Query.equal('id_mitra', akun.$id)]).then((rk) => setSt((s) => s && ({ ...s, jual: rk.find((x) => x.periode === bln())?.total_penjualan || 0 }))).catch(() => {});
@@ -150,6 +165,31 @@ const bln = () => periodeJakarta();
           setModalInfo(null);
         }
         setBusyModal(false);
+      },
+    });
+  };
+
+  const ubahAddOn = (p) => {
+    setModalInfo({
+      judul: `Ubah add-on ${p.nama}`,
+      tipe: 'input',
+      inputType: 'varian',
+      inputLabel: 'Pilihan add-on (opsional)',
+      inputDefault: p.pilihan_add_on?.length ? p.pilihan_add_on : [''],
+      inputOpsional: true,
+      tombolOk: 'Simpan add-on',
+      onOk: async (nilai) => {
+        setBusyModal(true);
+        try {
+          await api('/api/produk', { aksi: 'ubah', id: p.$id, pilihan_add_on: nilai });
+          await muat();
+          setModalInfo(null);
+          toast('Add-on berhasil disimpan.');
+        } catch (e) {
+          toast(e.message, true);
+        } finally {
+          setBusyModal(false);
+        }
       },
     });
   };
@@ -249,6 +289,7 @@ const bln = () => periodeJakarta();
           inputType={modalInfo.inputType}
           inputLabel={modalInfo.inputLabel}
           inputDefault={modalInfo.inputDefault}
+          inputOpsional={modalInfo.inputOpsional}
           inputPlaceholder={modalInfo.inputPlaceholder}
           tombolOk={modalInfo.tombolOk}
           warnaOk={modalInfo.warnaOk}
@@ -295,7 +336,7 @@ const bln = () => periodeJakarta();
 
       {msg && <p className="msg" role="status">{msg}</p>}
 
-      {tab === 'produk' && <form className="card pad stack" onSubmit={simpanPengantaran}>
+      {tab === 'produk' && <form className="card pad stack pengaturan-antar" onSubmit={simpanPengantaran}>
         <h3>Pengantaran pesanan</h3>
         <label className="row"><input type="checkbox" role="switch" style={{ width: 'auto' }}
           checked={pengantaran.antar_aktif} disabled={simpanLayanan}
@@ -303,7 +344,7 @@ const bln = () => periodeJakarta();
         <div className="field">
           <label htmlFor="ongkir">Ongkir per pesanan (Rp)</label>
           <input id="ongkir" type="number" required min="0" max="999999999" step="1"
-            value={pengantaran.ongkir} disabled={simpanLayanan}
+            value={pengantaran.ongkir} disabled={!pengantaran.antar_aktif || simpanLayanan}
             onChange={(e) => setLayanan({ ...pengantaran, ongkir: e.target.value })} />
         </div>
         <button className="btn sm sun" disabled={simpanLayanan}>Simpan pengantaran</button>
@@ -315,18 +356,28 @@ const bln = () => periodeJakarta();
             <div className="field"><label htmlFor="ps">Stok</label><input id="ps" type="number" min="0" required value={f.stok} onChange={set('stok')} /></div></div>
           <div className="field"><label htmlFor="pk">Kategori</label><input id="pk" required placeholder="Makanan, Fashion, Kerajinan…" value={f.kategori} onChange={set('kategori')} /></div>
           <div className="field"><label htmlFor="pd">Deskripsi</label><textarea id="pd" rows="3" value={f.deskripsi} onChange={set('deskripsi')} /></div>
+          <InputVarian judul="Pilihan add-on (opsional)" nilai={f.pilihan_add_on} onUbah={(pilihan_add_on) => setF((prev) => ({ ...prev, pilihan_add_on }))} />
           <div className="field"><label htmlFor="pg">Foto (jpg, png, webp, maks 5 MB)</label><input id="pg" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} />
             {preview && <img src={preview} alt="Preview foto produk" style={{ marginTop: 8, width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8, border: '1px solid #F0DEB0' }} />}
           </div>
           <button className="btn">Simpan produk</button>
         </form>
-        <div className="stack">{ps && !ps.length && <p className="kosong">Belum ada produk. Isi formulir untuk menambah produk pertamamu.</p>}
-          {(ps || []).map((p) => (
+        <div className="stack">
+          {ps === null && !msg && <StatusMuat teks="Memuat produk…" />}
+          {ps === null && msg && <button className="btn out sm" type="button" onClick={() => { setMsg(''); muat().catch((e) => setMsg(e.message)); }}>Muat ulang produk</button>}
+          {ps && !ps.length && <p className="kosong">Belum ada produk. Isi formulir untuk menambah produk pertamamu.</p>}
+          {ps?.length > 0 && <div className="field saring-daftar">
+            <label htmlFor="cari-produk-mitra">Cari produk lapak</label>
+            <input id="cari-produk-mitra" type="search" placeholder="Nama, kategori, atau varian" value={cariProduk} onChange={(e) => setCariProduk(e.target.value)} />
+          </div>}
+          {ps?.length > 0 && !produkCocok.length && <p className="kosong">Produk tidak ditemukan.</p>}
+          {produkCocok.map((p) => (
             <div key={p.$id} className="card pad row" style={{ justifyContent: 'space-between' }}>
-              <div className="row">{p.id_gambar && <img src={img(p.id_gambar)} alt="" width="56" height="56" style={{ objectFit: 'cover', borderRadius: 8 }} />}
-                <div><b>{p.nama}</b><br /><small className="muted">{p.kategori} • {rp(p.harga)}</small></div></div>
+              <div className="row">{p.id_gambar && <img src={img(p.id_gambar)} alt="" loading="lazy" decoding="async" width="56" height="56" style={{ objectFit: 'cover', borderRadius: 8 }} />}
+                <div><b>{p.nama}</b><br /><small className="muted">{p.kategori} • {rp(p.harga)}</small>
+                  {p.pilihan_add_on?.length > 0 && <small className="muted" style={{ display: 'block' }}>{p.pilihan_add_on.join(', ')}</small>}</div></div>
               <div className="row"><span className="qty" role="group" aria-label={`Stok ${p.nama}`}><button className="qb" aria-label={`Kurangi stok ${p.nama} (terjual offline)`} disabled={p.stok < 1} onClick={() => ketuk(p, 'jual')}>−</button><b key={p.stok} className="qn" aria-live="polite">{p.stok}</b><button className="qb add" aria-label={`Tambah stok ${p.nama}`} onClick={() => ketuk(p, 'tambah')}>+</button></span>
-                <button className="link" onClick={() => harga(p)}>Ubah harga</button><button className="link" onClick={() => stok(p)}>Ubah stok</button><button className="link" onClick={() => hapusP(p)}>Hapus</button></div>
+                <button className="link" onClick={() => harga(p)}>Ubah harga</button><button className="link" onClick={() => stok(p)}>Ubah stok</button><button className="link" onClick={() => ubahAddOn(p)}>Ubah add-on</button><button className="link" onClick={() => hapusP(p)}>Hapus</button></div>
             </div>))}
         </div></div>}
 

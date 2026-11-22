@@ -5,6 +5,7 @@ import { list, Query, rp, img } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
 import { PetaTenant } from '@/components/DenahTenant';
 import Lapak from '@/components/Lapak';
+import PilihAddOn from '@/components/PilihAddOn';
 import Ikon from '@/components/Ikon';
 import { Hitung, terbang } from '@/components/Motion';
 
@@ -43,14 +44,21 @@ function Panggung({ children }) {
 const JUDUL = ['Belanja', 'di', 'lapak', 'teman', 'sekampus.'];
 const TICKER_ITEMS = Array.from({ length: 6 }, () => ['Ambil di lapak', 'QRIS', 'Bayar di tempat', 'Produk mitra KWU']).flat();
 const PRODUK_PER_TAMPIL = 24;
+let katalogTerakhir;
+let permintaanKatalog;
 
 async function muatKatalog(tabel) {
-  const hasil = [];
   const batas = 500;
-  for (let offset = 0; ; offset += batas) {
-    const batch = await list(tabel, [Query.limit(batas), Query.offset(offset)]);
-    hasil.push(...batch);
-    if (batch.length < batas) return hasil;
+  const ambilHalaman = (offset) => list(tabel, [Query.limit(batas), Query.offset(offset)]);
+  const hasil = [...await ambilHalaman(0)];
+  if (hasil.length < batas) return hasil;
+  const paralel = 4;
+  for (let offset = batas; ; offset += batas * paralel) {
+    const halaman = await Promise.all(Array.from({ length: paralel }, (_, i) => ambilHalaman(offset + i * batas)));
+    for (const batch of halaman) {
+      hasil.push(...batch);
+      if (batch.length < batas) return hasil;
+    }
   }
 }
 
@@ -73,6 +81,21 @@ function perbaruiUrutan(sebelum, acak) {
     terbaru.delete($id);
   }
   return [...urut, ...terbaru.values()];
+}
+
+function segarkanKatalog() {
+  if (katalogTerakhir && Date.now() - katalogTerakhir.diambil < 10000) return Promise.resolve(katalogTerakhir);
+  permintaanKatalog ??= Promise.all([muatKatalog('produk'), muatKatalog('mitra')])
+    .then(([ps, ms]) => {
+      katalogTerakhir = {
+        diambil: Date.now(),
+        produk: perbaruiUrutan(katalogTerakhir?.produk, acakDaftar(ps)),
+        mitra: perbaruiUrutan(katalogTerakhir?.mitra, acakDaftar(ms)),
+      };
+      return katalogTerakhir;
+    })
+    .finally(() => { permintaanKatalog = undefined; });
+  return permintaanKatalog;
 }
 
 function NavigasiKatalog({ rel, label, jumlah }) {
@@ -118,6 +141,7 @@ export default function Beranda() {
   const [k, setK] = useState('');
   const [lapak, setLapak] = useState('');
   const [batasProduk, setBatasProduk] = useState(PRODUK_PER_TAMPIL);
+  const [produkAddOn, setProdukAddOn] = useState(null);
   const [baru, setBaru] = useState(null);
   const judulProduk = useRef(null);
   const relLapak = useRef(null);
@@ -127,23 +151,19 @@ export default function Beranda() {
 
   useEffect(() => {
     let aktif = true;
-    let memuat = false;
+    if (katalogTerakhir) {
+      setP(katalogTerakhir.produk);
+      setM(katalogTerakhir.mitra);
+    }
     const muat = async () => {
-      if (memuat) return;
-      memuat = true;
       try {
-        const [ps, ms] = await Promise.all([muatKatalog('produk'), muatKatalog('mitra')]);
-        if (aktif) {
-          const produkAcak = acakDaftar(ps);
-          const lapakAcak = acakDaftar(ms);
-          setP((sebelum) => perbaruiUrutan(sebelum, produkAcak));
-          setM((sebelum) => perbaruiUrutan(sebelum, lapakAcak));
-          setGalatKatalog('');
-        }
+        const { produk, mitra } = await segarkanKatalog();
+        if (!aktif) return;
+        setP(produk);
+        setM(mitra);
+        setGalatKatalog('');
       } catch (error) {
         if (aktif) setGalatKatalog(error.message);
-      } finally {
-        memuat = false;
       }
     };
     muat();
@@ -176,7 +196,7 @@ export default function Beranda() {
   const halamanProduk = Array.from({ length: Math.ceil(produkTerlihat / ukuranHalaman) },
     (_, i) => tampil.slice(i * ukuranHalaman, Math.min((i + 1) * ukuranHalaman, produkTerlihat)));
   const jumlahHalaman = Math.ceil(tampil.length / ukuranHalaman);
-  const keranjangMap = useMemo(() => Object.fromEntries((keranjang || []).map((i) => [i.id_produk, i.jumlah])), [keranjang]);
+  const keranjangMap = useMemo(() => Object.fromEntries((keranjang || []).filter((i) => !i.add_on).map((i) => [i.id_produk, i.jumlah])), [keranjang]);
 
   useEffect(() => {
     if (relProduk.current) relProduk.current.scrollLeft = 0;
@@ -226,6 +246,7 @@ export default function Beranda() {
 
   return (
     <>
+      {produkAddOn && <PilihAddOn produk={produkAddOn} onTutup={() => setProdukAddOn(null)} />}
       <section className="hero2">
         <div className="aurora" aria-hidden="true"><i /><i /><i /><b /></div>
         <div className="awning" aria-hidden="true" />
@@ -306,7 +327,7 @@ export default function Beranda() {
               {halaman.map((x, n) => (
                 <article key={x.$id} className="card prod" style={{ '--i': Math.min(n, 12) }}>
                   <Link href={`/produk/${x.$id}`} className="ph" aria-label={x.nama}>
-                    {x.id_gambar ? <img src={img(x.id_gambar)} alt="" loading="lazy" /> : <span>{x.nama[0]}</span>}
+                    {x.id_gambar ? <img src={img(x.id_gambar)} alt="" loading="lazy" decoding="async" /> : <span>{x.nama[0]}</span>}
                     {x.kategori && <span className="kat">{x.kategori}</span>}
                     {x.stok < 1 && <em className="habis">Habis</em>}
                     {x.stok > 0 && x.stok <= 5 && <em className="sisa">Sisa {x.stok}</em>}
@@ -319,7 +340,11 @@ export default function Beranda() {
                     <div className="pf">
                       <span className="tag">{rp(x.harga)}</span>
                       {x.stok > 0 && (
-                        keranjangMap[x.$id] > 0 ? (
+                        x.pilihan_add_on?.length ? (
+                          <button type="button" className="plus" aria-label={`Tambah ${x.nama} dan pilih add-on`} onClick={() => setProdukAddOn(x)}>
+                            <Ikon n="plus" size={20} />
+                          </button>
+                        ) : keranjangMap[x.$id] > 0 ? (
                           <div className="stepper-card" onClick={(e) => e.stopPropagation()}>
                             <button
                               type="button"

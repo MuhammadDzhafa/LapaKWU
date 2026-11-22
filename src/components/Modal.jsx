@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import InputVarian from '@/components/InputVarian';
 
 /**
  * Modal serbaguna pengganti alert(), confirm(), prompt() bawaan browser ("localhost says...").
@@ -27,6 +28,7 @@ export default function Modal({
   inputLabel = 'Keterangan',
   inputDefault = '',
   inputPlaceholder = '',
+  inputOpsional = false,
   tombolOk = 'Ya, lanjutkan',
   tombolBatal = 'Batal',
   warnaOk = 'sun',
@@ -42,13 +44,13 @@ export default function Modal({
 
   const handleSubmit = (e) => {
     e?.preventDefault();
-    if (tipe === 'input' && (val === '' || val === null)) return;
+    if (tipe === 'input' && !inputOpsional && (val === '' || val === null)) return;
     onOk(val);
   };
 
   return (
     <div role="dialog" aria-modal="true" aria-label={judul} className="modal-back" onClick={onBatal}>
-      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+      <div className={inputType === 'varian' ? 'modal-box modal-varian' : 'modal-box'} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <b>{judul}</b>
           <button type="button" className="modal-x" aria-label="Tutup" onClick={onBatal}>✕</button>
@@ -59,11 +61,13 @@ export default function Modal({
         {tipe === 'input' && (
           <form onSubmit={handleSubmit} style={{ marginBottom: 16 }}>
             <div className="field">
-              {inputLabel && <label>{inputLabel}</label>}
-              {inputType === 'textarea' ? (
-                <textarea rows={3} required placeholder={inputPlaceholder} value={val} onChange={(e) => setVal(e.target.value)} style={{ width: '100%', resize: 'vertical' }} autoFocus />
+              {inputLabel && inputType !== 'varian' && <label>{inputLabel}</label>}
+              {inputType === 'varian' ? (
+                <InputVarian judul={inputLabel} nilai={val} onUbah={setVal} nonaktif={busy} />
+              ) : inputType === 'textarea' ? (
+                <textarea rows={3} required={!inputOpsional} placeholder={inputPlaceholder} value={val} onChange={(e) => setVal(e.target.value)} style={{ width: '100%', resize: 'vertical' }} autoFocus />
               ) : (
-                <input type={inputType} required placeholder={inputPlaceholder} value={val} onChange={(e) => setVal(e.target.value)} style={{ width: '100%' }} autoFocus />
+                <input type={inputType} required={!inputOpsional} placeholder={inputPlaceholder} value={val} onChange={(e) => setVal(e.target.value)} style={{ width: '100%' }} autoFocus />
               )}
             </div>
           </form>
@@ -73,7 +77,7 @@ export default function Modal({
           {tipe !== 'pesan' && (
             <button type="button" className="btn sm out" onClick={onBatal} disabled={busy} style={{ minWidth: 70 }}>{tombolBatal}</button>
           )}
-          <button type="button" className={`btn sm ${warnaOk}`} onClick={handleSubmit} disabled={busy || (tipe === 'input' && String(val).trim() === '')} style={{ minWidth: 80 }}>
+          <button type="button" className={`btn sm ${warnaOk}`} onClick={handleSubmit} disabled={busy || (tipe === 'input' && !inputOpsional && String(val).trim() === '')} style={{ minWidth: 80 }}>
             {busy ? 'Memproses…' : tombolOk}
           </button>
         </div>

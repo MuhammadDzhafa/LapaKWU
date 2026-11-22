@@ -1,5 +1,7 @@
 // Lapisan API sisi browser; data hanya diakses melalui route Next.js.
 
+import { itemCocok } from './add-on';
+
 export const BUCKET = 'gambar-produk';
 
 // ── Format helper ──────────────────────────────────────────
@@ -110,7 +112,7 @@ export const buat = async (tabel, data) => {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ tabel, data }),
   });
-  if (!r.ok) throw new Error('Gagal buat data.');
+  if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || 'Gagal buat data.');
   return r.json();
 };
 
@@ -120,7 +122,7 @@ export const ubah = async (tabel, id, data) => {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ tabel, id, data }),
   });
-  if (!r.ok) throw new Error('Gagal ubah data.');
+  if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || 'Gagal ubah data.');
   return r.json();
 };
 
@@ -143,15 +145,12 @@ export async function hitungKeranjang(uid) {
   return total;
 }
 
-export async function ubahJumlahKeranjang(uid, p, delta = 1) {
-  try {
-    await buat('keranjang', { id: uid, id_pembeli: uid, total_harga: 0 });
-  } catch {}
-
+export async function ubahJumlahKeranjang(uid, p, delta = 1, addOn = '', catatan = '') {
   const itList = await list('item_keranjang', [{ type: 'eq', col: 'id_keranjang', val: uid }]);
-  const it = itList.find((i) => i.id_produk === p.$id);
+  const it = itList.find((i) => itemCocok(i, p.$id, addOn, catatan));
   const curJml = it?.jumlah || 0;
-  const newJml = Math.min(curJml + delta, p.stok || 9999);
+  if (addOn && delta > 0 && curJml + delta > p.stok) throw new Error('Stok produk tidak cukup.');
+  const newJml = Math.min(curJml + delta, p.stok);
 
   if (newJml <= 0) {
     if (it) await hapus('item_keranjang', it.$id);
@@ -161,7 +160,7 @@ export async function ubahJumlahKeranjang(uid, p, delta = 1) {
 
   const data = { jumlah: newJml, subtotal: newJml * p.harga };
   if (it) await ubah('item_keranjang', it.$id, data);
-  else await buat('item_keranjang', { id_keranjang: uid, id_produk: p.$id, ...data });
+  else await buat('item_keranjang', { id_keranjang: uid, id_produk: p.$id, add_on: addOn, catatan_item: catatan, ...data });
   await hitungKeranjang(uid);
   return newJml;
 }

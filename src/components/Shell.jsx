@@ -8,6 +8,7 @@ import Footer from '@/components/Footer';
 import Motion from '@/components/Motion';
 import Ikon from '@/components/Ikon';
 import Notifikasi from '@/components/Notifikasi';
+import { itemCocok } from '@/lib/add-on';
 import { bacaKeranjangLokal, simpanKeranjangLokal } from '@/lib/keranjang-lokal';
 
 const Ctx = createContext({});
@@ -20,7 +21,6 @@ export default function Shell({ children }) {
   const versiKeranjang = useRef(0);
   const pil = useRef(null);
   const timer = useRef();
-  const pulih = useRef(false);
   const path = usePathname();
   const router = useRouter();
 
@@ -84,30 +84,31 @@ export default function Shell({ children }) {
   useEffect(() => { muat(); }, [muat]);
 
   // Fungsi tambah / kurangi item keranjang secara instan & reaktif
-  const ubahItemKeranjang = useCallback(async (p, delta = 1) => {
+  const ubahItemKeranjang = useCallback(async (p, delta = 1, addOn = '', catatan = '') => {
     if (!s.akun) {
       router.push('/masuk');
       return 0;
     }
 
-    const cur = keranjang.find((i) => i.id_produk === p.$id);
+    const cocok = (i) => itemCocok(i, p.$id, addOn, catatan);
+    const cur = keranjang.find(cocok);
     const curJml = cur?.jumlah || 0;
-    const targetJml = Math.max(0, Math.min(curJml + delta, p.stok || 9999));
+    const targetJml = Math.max(0, Math.min(curJml + delta, p.stok));
 
     // Update optimistik di state lokal
     setKeranjang((prev) => {
       if (targetJml <= 0) {
-        return prev.filter((i) => i.id_produk !== p.$id);
+        return prev.filter((i) => !cocok(i));
       }
-      const existing = prev.find((i) => i.id_produk === p.$id);
+      const existing = prev.find(cocok);
       if (existing) {
-        return prev.map((i) => (i.id_produk === p.$id ? { ...i, jumlah: targetJml, subtotal: targetJml * p.harga } : i));
+        return prev.map((i) => (cocok(i) ? { ...i, jumlah: targetJml, subtotal: targetJml * p.harga } : i));
       }
-      return [...prev, { id_produk: p.$id, id_keranjang: s.akun.$id, jumlah: targetJml, subtotal: targetJml * p.harga }];
+      return [...prev, { id_produk: p.$id, add_on: addOn, catatan_item: catatan, id_keranjang: s.akun.$id, jumlah: targetJml, subtotal: targetJml * p.harga }];
     });
 
     try {
-      const hasilJml = await ubahJumlahKeranjang(s.akun.$id, p, delta);
+      const hasilJml = await ubahJumlahKeranjang(s.akun.$id, p, delta, addOn, catatan);
       if (hasilJml > 0 && delta > 0) {
         toast(`${p.nama} (${hasilJml}) ada di keranjang`);
       } else if (hasilJml === 0 && delta < 0) {
@@ -119,7 +120,7 @@ export default function Shell({ children }) {
     } catch (err) {
       toast(err.message || 'Gagal memperbarui keranjang', true);
       muatKeranjang(s.akun.$id);
-      return curJml;
+      return null;
     }
   }, [s.akun, s.peran, keranjang, toast, router, muatKeranjang]);
 
@@ -151,35 +152,9 @@ export default function Shell({ children }) {
     ['/pesanan', 'Pesanan', 'receipt'],
     ['/profil', 'Saya', 'user'],
   ] : [['/', 'Katalog', 'home'], ['/masuk', 'Masuk', 'login']];
-  const menuCepat = dock.filter(([href]) => href !== '/' || path !== '/');
 
-  const NavMenu = () => (
-    <>
-      {path !== '/' && <Link href="/">Katalog</Link>}
-      {s.peran === 'pembeli' && (
-        <>
-          <Link href="/keranjang" aria-current={aktif('/keranjang')}>Keranjang</Link>
-          <Link href="/pesanan" aria-current={aktif('/pesanan')}>Pesanan</Link>
-        </>
-      )}
-      {s.peran === 'mitra' && (
-        <>
-          <Link href="/mitra" aria-current={aktif('/mitra')}>Lapak saya</Link>
-          <Link href="/keranjang" aria-current={aktif('/keranjang')}>Keranjang</Link>
-          <Link href="/pesanan" aria-current={aktif('/pesanan')}>Pesanan</Link>
-        </>
-      )}
-      {s.peran === 'admin' && (
-        <>
-          <Link href="/admin" aria-current={aktif('/admin')}>Admin</Link>
-          <Link href="/keranjang" aria-current={aktif('/keranjang')}>Keranjang</Link>
-          <Link href="/pesanan" aria-current={aktif('/pesanan')}>Pesanan</Link>
-        </>
-      )}
-    </>
-  );
-
-  const NavUserDesktop = () => (
+  const menuDesktop = dock.filter(([href]) => href !== '/masuk' && href !== '/profil');
+  const menuPengguna = (
     s.akun ? (
       <Link href="/profil" className="me" aria-current={aktif('/profil')} aria-label={`Profil ${nama}`}>
         <i>{awal}</i><span>{nama.split(' ')[0]}</span>
@@ -191,6 +166,7 @@ export default function Shell({ children }) {
 
   return (
     <Ctx.Provider value={{ ...s, muat, toast, keluar, keranjang, totalKeranjang, jumlahKeranjang, ubahItemKeranjang, muatKeranjang, selesaiCheckout }}>
+      <a className="lewati-navigasi" href="#konten-utama">Langsung ke konten</a>
       <Motion />
       {/* ── Desktop header ── */}
       <header className="top">
@@ -199,8 +175,8 @@ export default function Shell({ children }) {
           {/* Nav desktop */}
           <nav aria-label="Menu utama" className="nav-desktop" onPointerOver={sorot} onPointerLeave={redup} onFocus={sorot} onBlur={redup}>
             <span className="nav-pill" ref={pil} aria-hidden="true" />
-            <NavMenu />
-            <NavUserDesktop />
+            {menuDesktop.map(([href, label]) => <Link key={href} href={href} aria-current={aktif(href)}>{href === '/mitra' ? 'Lapak saya' : label}</Link>)}
+            {menuPengguna}
           </nav>
           {s.akun && <Notifikasi key={s.akun.$id} uid={s.akun.$id} peran={s.peran} />}
         </div>
@@ -213,12 +189,12 @@ export default function Shell({ children }) {
           <Link href="/verifikasi" className="btn sm out">Verifikasi sekarang</Link>
         </div></div>
       )}
-      <div key={path} className="page">{children}</div>
+      <div id="konten-utama" tabIndex={-1}>{children}</div>
       <Footer />
 
       {!tanpaDock && !s.memuat && (
-        <nav className="dock" aria-label="Menu cepat" style={{ '--n': menuCepat.length }}>
-          {menuCepat.map(([h, l, ic]) => (
+        <nav className="dock" aria-label="Menu cepat" style={{ '--n': dock.length }}>
+          {dock.map(([h, l, ic]) => (
             <Link key={h} href={h} className="dock-i" aria-current={aktif(h)}>
               <span className="dock-ic">
                 <Ikon n={ic} size={22} />

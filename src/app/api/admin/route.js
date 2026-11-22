@@ -59,15 +59,16 @@ export async function POST(req) {
 
     const rf = rfRows.filter((x) => x.status_pembayaran === 'REFUND_DIAJUKAN');
     const qrisPending = rfRows.filter((x) => x.metode === 'QRIS' && x.status_pembayaran === 'MENUNGGU');
-    const qrisOrders = qrisPending.length ? await rows(null, 'pesanan', [Query.equal('id', qrisPending.map((q) => q.id_pesanan)), Query.limit(500)]) : [];
     const idsBukti = [...new Set(qrisPending.map((by) => by.id_bukti_checkout).filter(Boolean))];
-    const buktiCheckout = idsBukti.length
-      ? await cariBanyak('bukti_checkout', { _id: { $in: idsBukti } }, { limit: 5000 })
-      : [];
+    const [qrisOrders, buktiCheckout] = await Promise.all([
+      qrisPending.length ? rows(null, 'pesanan', [Query.equal('id', qrisPending.map((q) => q.id_pesanan)), Query.limit(500)]) : [],
+      idsBukti.length ? cariBanyak('bukti_checkout', { _id: { $in: idsBukti } }, { limit: 5000 }) : [],
+    ]);
+    const pesananPerId = new Map(qrisOrders.map((pesanan) => [pesanan.$id, pesanan]));
     const buktiPerId = new Map(buktiCheckout.map((bukti) => [bukti.id, bukti]));
     const qris = qrisPending.map((by) => ({
       ...by,
-      pesanan: qrisOrders.find((p) => p.$id === by.id_pesanan) || null,
+      pesanan: pesananPerId.get(by.id_pesanan) || null,
       dana_terdeteksi: Boolean(buktiPerId.get(by.id_bukti_checkout)?.waktu_dana_masuk),
     }));
 

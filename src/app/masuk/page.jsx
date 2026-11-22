@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { account } from '@/lib/aw';
+import { account, ambil, ubahJumlahKeranjang } from '@/lib/aw';
 
 const EyeIcon = ({ show }) => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -31,11 +31,26 @@ export default function Masuk() {
         return;
       }
 
+      const tambahan = sessionStorage.getItem('lapakwu_add_on_intent');
+      if (tambahan) {
+        sessionStorage.removeItem('lapakwu_add_on_intent');
+        try {
+          const { id, jumlah, pilihan, catatan } = JSON.parse(tambahan);
+          const produk = await ambil('produk', id);
+          await ubahJumlahKeranjang(me.$id, produk, jumlah, pilihan, catatan);
+        } catch (e) {
+          sessionStorage.setItem('lapakwu_pesan_add_on', e.message || 'Produk gagal ditambahkan.');
+        }
+        location.href = '/keranjang';
+        return;
+      }
+
       const intent = sessionStorage.getItem('lapakwu_checkout_intent');
       if (intent) {
-        const { productId, quantity } = JSON.parse(intent);
+        const { productId, quantity, addOn = '' } = JSON.parse(intent);
         sessionStorage.removeItem('lapakwu_checkout_intent');
-        location.href = `/checkout?beli=${productId}&jml=${quantity}`;
+        const checkout = new URLSearchParams({ beli: productId, jml: String(quantity), add_on: addOn });
+        location.href = `/checkout?${checkout}`;
         return;
       }
 

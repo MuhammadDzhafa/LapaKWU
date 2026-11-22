@@ -137,7 +137,9 @@ export default function Notifikasi({ uid, peran }) {
       {!akhir && terbaru?.length === HALAMAN && <button className="link" type="button" disabled={memuatLagi} onClick={muatLagi}>
         {memuatLagi ? 'Memuat…' : 'Muat notifikasi lama'}
       </button>}
-      {peran === 'mitra' && <a className="link" href="/mitra#pesanan" onClick={() => setTerbuka(false)}>Lihat pesanan</a>}
+      {peran === 'mitra' && (path === '/mitra'
+        ? <a className="link" href="#pesanan" onClick={() => setTerbuka(false)}>Lihat pesanan</a>
+        : <Link className="link" href="/mitra#pesanan" onClick={() => setTerbuka(false)}>Lihat pesanan</Link>)}
       {peran === 'pembeli' && <Link className="link" href="/pesanan" onClick={() => setTerbuka(false)}>Lihat pesanan</Link>}
     </section>}
   </div>;

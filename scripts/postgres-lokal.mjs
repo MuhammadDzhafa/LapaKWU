@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, openSync, closeSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { setTimeout as tunggu } from 'node:timers/promises';
 import pg from 'pg';
@@ -25,26 +25,34 @@ if (process.env.LAPAKWU_POSTGRES_LOCAL === '1') {
   url.pathname = '/postgres';
   if (!await siap(url)) {
     const folder = resolve(process.env.LAPAKWU_POSTGRES_DIR?.trim() || join('data', 'postgres-dev'));
-    const postgres = join(folder, 'node_modules', '@embedded-postgres', 'windows-x64', 'native', 'bin', 'postgres.exe');
+    const pgCtl = join(folder, 'node_modules', '@embedded-postgres', 'windows-x64', 'native', 'bin', 'pg_ctl.exe');
     const cluster = join(folder, 'cluster');
-    if (!existsSync(postgres) || !existsSync(join(cluster, 'PG_VERSION'))) {
+    if (!existsSync(pgCtl) || !existsSync(join(cluster, 'PG_VERSION'))) {
       throw new Error('PostgreSQL belum berjalan. Arahkan LAPAKWU_POSTGRES_DIR ke folder PostgreSQL portabel yang memuat node_modules dan cluster.');
     }
     const logPath = join(folder, 'postgres.log');
-    const log = openSync(logPath, 'a');
-    const child = spawn(postgres, ['-D', cluster, '-h', url.hostname, '-p', url.port], {
-      detached: true, windowsHide: true, stdio: ['ignore', log, log],
+    // Backend PostgreSQL di Windows mewarisi konsol induknya. Berikan satu
+    // konsol tersembunyi agar setiap koneksi tidak membuat tab terminal baru.
+    const mulai = `
+      $ErrorActionPreference = 'Stop'
+      $argumen = 'start -D "' + $env:LAPAKWU_PG_CLUSTER + '" -l "' + $env:LAPAKWU_PG_LOG + '" -o "-h 127.0.0.1 -p 25432"'
+      Start-Process -FilePath $env:LAPAKWU_PG_CTL -ArgumentList $argumen -WindowStyle Hidden
+    `;
+    await new Promise((resolve, reject) => {
+      const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', mulai], {
+        windowsHide: true,
+        stdio: ['ignore', 'ignore', 'inherit'],
+        env: { ...process.env, LAPAKWU_PG_CTL: pgCtl, LAPAKWU_PG_CLUSTER: cluster, LAPAKWU_PG_LOG: logPath },
+      });
+      child.once('error', reject);
+      child.once('exit', (code) => code === 0 ? resolve() : reject(new Error('Peluncur PostgreSQL gagal dimulai.')));
     });
-    closeSync(log);
-    let gagal;
-    child.on('error', (error) => { gagal = error; });
-    child.unref();
 
     let terhubung = false;
-    for (let attempt = 0; attempt < 120 && !gagal; attempt++) {
+    for (let attempt = 0; attempt < 120; attempt++) {
       await tunggu(400);
       if (await siap(url)) { terhubung = true; break; }
     }
-    if (!terhubung) throw gagal || new Error('PostgreSQL lokal gagal dimulai. Lihat ' + logPath);
+    if (!terhubung) throw new Error('PostgreSQL lokal gagal dimulai. Lihat ' + logPath);
   }
 }

@@ -161,8 +161,8 @@ main.wrap>h2{margin-bottom:1.1rem}
 input,select,textarea{font:inherit;padding:12px 15px;border:1.5px solid var(--line);border-radius:14px;background:#fff;width:100%;color:var(--ink);transition:border-color .2s,box-shadow .2s}
 input:focus,select:focus,textarea:focus{border-color:var(--or-d);outline:none;box-shadow:0 0 0 4px rgba(184,80,10,.16)}
 fieldset{border:0;padding:0;margin:0}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.opsi{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.opsi{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px}
 .opsi label{display:flex;flex-direction:column;gap:2px;border:1.5px solid var(--line);border-radius:18px;padding:14px 16px;cursor:pointer;background:#fff;transition:border-color .2s,background .2s,transform .2s}
 .opsi label:hover{transform:translateY(-2px)}
 .opsi label:has(input:checked){border-color:var(--or-d);background:var(--tint);box-shadow:0 0 0 3px rgba(184,80,10,.14)}
@@ -181,6 +181,11 @@ fieldset{border:0;padding:0;margin:0}
 .badge[data-s=DIBATALKAN],.badge[data-s=DIBLOKIR],.badge[data-s=DITOLAK]{background:#FBE1D9;color:#9E2F18}
 .badge[data-s=MENUNGGU_KONFIRMASI],.badge[data-s=MENUNGGU_VERIFIKASI],.badge[data-s=MENUNGGU],.badge[data-s=DIAJUKAN],.badge[data-s=REFUND_DIAJUKAN]{background:#FFE9A9;color:#5A4300}
 .stack>*+*{margin-top:14px}
+.pengaturan-antar{margin-block-end:clamp(16px,2vw,24px)}
+.pengaturan-antar input:disabled{background:var(--tint);color:var(--mute);cursor:not-allowed}
+main.wrap{overflow-wrap:anywhere}
+main.wrap :is(.field,.row,.stack,.card,.scroll){min-width:0}
+main.wrap :is(input,select,textarea){max-width:100%}
 table{width:100%;border-collapse:collapse;background:#fff}
 th,td{text-align:left;padding:13px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
 th{background:var(--tint);font-size:.85rem;font-weight:700;color:var(--mute);white-space:nowrap}
@@ -246,8 +251,11 @@ html[data-nav=hide] .top:has(.panel-notifikasi){transform:none}
 .fbawah{border-top:1px solid rgba(255,255,255,.14);padding-top:18px;padding-bottom:28px;opacity:.7}
 
 /* ===== tambahan: animasi + responsif ===== */
-.page{animation:pagein .55s var(--ease)}
-@keyframes pagein{from{opacity:0;transform:translateY(14px)}}
+.lewati-navigasi{position:fixed;inset:12px auto auto 12px;z-index:150;background:var(--ink);color:var(--cr);padding:10px 16px;border-radius:10px;transform:translateY(calc(-100% - 20px))}
+.lewati-navigasi:focus{transform:none}
+.saring-daftar{width:min(100%,420px)}
+.status-muat .skel-box{min-height:120px;margin-top:12px}
+#konten-utama:focus{outline:none}
 .hero2 :focus-visible{outline-color:var(--ink)}.foot :focus-visible{outline-color:var(--ye)}
 .hero2::after{content:"";position:absolute;width:340px;height:340px;right:-90px;top:-120px;border-radius:50%;border:44px solid rgba(255,147,62,.16);animation:spin 40s linear infinite;pointer-events:none}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -741,6 +749,21 @@ html[data-scrolled] .top .wrap{min-height:52px;background:rgba(255,253,248,.9);b
 .foot::after{content:"LapaKWU"/"";display:block;text-align:center;font:800 clamp(4.5rem,21vw,17rem)/.78 var(--f-disp);letter-spacing:-.07em;color:color-mix(in srgb,var(--cr) 9%,transparent);transform:translateY(20%);user-select:none;pointer-events:none;white-space:nowrap}
 
 /* ---------- modal & denah ---------- */
+.add-on-dialog{width:min(100% - 24px,460px);max-height:90dvh}
+.add-on-pilihan{display:grid;gap:8px;border:0;padding:0;margin:0}
+.add-on-pilihan legend{padding:0;margin-bottom:8px;font-weight:700}
+.add-on-pilihan label{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;cursor:pointer}
+.add-on-pilihan label:has(:checked){border-color:var(--ink);background:var(--tint)}
+.add-on-pilihan input{width:auto;margin:0}
+.add-on-dialog form > .btn{width:100%;justify-content:space-between}
+.input-varian{min-width:0;border:0;padding:0;margin-inline:0}
+.input-varian legend{font-weight:700;padding:0}
+.input-varian .row{flex-wrap:nowrap}
+.input-varian input{min-width:0}
+.input-varian .btn{align-self:flex-start}
+.modal-varian{max-height:90dvh;overflow:auto}
+.catatan-item{display:block;white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:560px){.denah-modal.add-on-dialog{width:100%;margin:auto 0 0;border-radius:24px 24px 0 0;padding-bottom:max(20px,env(safe-area-inset-bottom))}}
 .modal-back{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(34,49,63,.6);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);animation:fadeIn .25s ease-out}
 .modal-box{width:100%;max-width:440px;padding:26px;background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:0 40px 80px -30px rgba(34,49,63,.7);animation:modalpop .45s var(--ease)}
 .modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
@@ -940,29 +963,13 @@ input[type=file]:hover::file-selector-button{background:var(--ye)}
 
 /* =====================================================================
    LAPISAN v4: gerak yang lebih hidup.
-   Satu momen utama (tirai tenda saat pertama masuk), sisanya gerak yang
-   menjawab tindakan: pegas, tilt 3D, percikan, cincin warna, parallax.
+   Umpan balik interaksi untuk tombol, kartu, dan navigasi.
    Palet tetap; semua warna dari variabel :root.
    ===================================================================== */
 :root{--spring:var(--ease)}
 @supports (transition-timing-function:linear(0,1)){
   :root{--spring:linear(0,.1 2.2%,.38 6%,.72 11%,.98 17%,1.12 22%,1.15 26%,1.1 31%,1.03 38%,.98 45%,.99 53%,1.005 63%,1)}
 }
-
-/* ---------- tirai tenda: sekali per sesi ---------- */
-.curtain{display:none}
-html[data-intro] .curtain{display:grid;position:fixed;inset:0;z-index:200;place-items:center;background:var(--ye);pointer-events:none;animation:tirai .95s .8s cubic-bezier(.77,0,.18,1) forwards}
-.curtain::before,.curtain::after{content:"";position:absolute;left:0;right:0}
-.curtain::before{bottom:0;height:46px;background:var(--stripe)}
-.curtain::after{top:100%;height:18px;background:var(--stripe);-webkit-mask:radial-gradient(circle at 18px 0,#000 17.5px,transparent 18px) 0 0/36px 18px repeat-x;mask:radial-gradient(circle at 18px 0,#000 17.5px,transparent 18px) 0 0/36px 18px repeat-x}
-.curtain .brand{font-size:clamp(2rem,8.7vw,5.6rem);animation:merek .9s .05s var(--spring) both}
-.curtain .brand b{animation:merekb .9s .25s var(--spring) both}
-@keyframes merek{from{transform:translateY(40px) scale(.6);opacity:0}}
-@keyframes merekb{from{transform:rotate(-24deg) scale(.4);opacity:0}}
-@keyframes tirai{to{transform:translateY(-118%);visibility:hidden}}
-/* hero menunggu tirai terangkat, lalu masuk berurutan */
-html[data-hold] .hero2 *,html[data-hold] .hero2 *::after,html[data-hold] .hero2::after{animation-play-state:paused!important}
-
 
 /* ---------- pegas di tempat yang menjawab tindakan ---------- */
 [data-rv]{transition:opacity .6s ease var(--d,0ms),transform 1.05s var(--spring) var(--d,0ms),filter .7s ease var(--d,0ms)}
@@ -1008,7 +1015,6 @@ html[data-hold] .hero2 *,html[data-hold] .hero2 *::after,html[data-hold] .hero2:
 }
 
 @media (prefers-reduced-motion:reduce){
-  .curtain{display:none!important}
   .cart-bar-icon-wrap::after,.searchcard::before,.prod::before{animation:none}
   .prod:hover{transform:none}
   .ph img{animation:none}

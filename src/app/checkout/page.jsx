@@ -1,17 +1,22 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { list, ambil, api, storage, Query, rp } from '@/lib/aw';
 import { MAKS_BUKTI_PEMBAYARAN, PESAN_UKURAN_BUKTI } from '@/lib/bukti-pembayaran';
+import { addOnValid, namaDenganAddOn } from '@/lib/add-on';
+import { formatJadwalAmbil, MULAI_PRE_ORDER, TANGGAL_PRE_ORDER, waktuPreOrder } from '@/lib/waktu';
+import StatusMuat from '@/components/StatusMuat';
 import { useSaya } from '@/components/Shell';
 
 export default function Checkout() {
-  const { akun, pengguna, selesaiCheckout, toast } = useSaya();
+  const { akun, pengguna, memuat, selesaiCheckout, toast } = useSaya();
   const [lg, setLg] = useState(null); // beli langsung: { id, jumlah }
   const r = useRouter();
   const [it, setIt] = useState(null);
   const [mitras, setMitras] = useState({});
   const [f, setF] = useState({ metode: 'QRIS', pengantaran: 'AMBIL', alamat: '', catatan: '' });
+  const [preOrder, setPreOrder] = useState(false);
   const [fileBukti, setFileBukti] = useState(null);
   const [previewBukti, setPreviewBukti] = useState(null);
   const [qrisError, setQrisError] = useState(false);
@@ -29,20 +34,21 @@ export default function Checkout() {
       if (q.get('beli')) {
         const p = await ambil('produk', q.get('beli'));
         const jumlah = Math.max(1, Math.min(+q.get('jml') || 1, p.stok));
-        setLg({ id: p.$id, jumlah });
+        const add_on = q.get('add_on') ?? '';
+        if (!addOnValid(p, add_on)) throw new Error('Pilihan add-on sudah berubah. Kembali ke halaman produk dan pilih ulang.');
+        setLg({ id: p.$id, jumlah, add_on });
         const mt = await ambil('mitra', p.id_mitra).catch(() => null);
         if (mt) setMitras({ [p.id_mitra]: mt });
-        return setIt([{ $id: 'langsung', id_produk: p.$id, id_mitra: p.id_mitra, nama: p.nama, jumlah, harga: p.harga, subtotal: jumlah * p.harga }]);
+        return setIt([{ $id: 'langsung', id_produk: p.$id, id_mitra: p.id_mitra, nama: p.nama, add_on, jumlah, harga: p.harga, subtotal: jumlah * p.harga }]);
       }
       const x = await list('item_keranjang', [Query.equal('id_keranjang', akun.$id)]);
       const ps = x.length ? await list('produk', [Query.equal('$id', x.map((i) => i.id_produk)), Query.limit(500)]) : [];
       const mIds = [...new Set(ps.map((p) => p.id_mitra).filter(Boolean))];
-      const mList = await Promise.all(mIds.map((mid) => ambil('mitra', mid).catch(() => null)));
-      const mMap = {};
-      mList.filter(Boolean).forEach((m) => { mMap[m.$id] = m; });
-      setMitras(mMap);
+      const mList = mIds.length ? await list('mitra', [Query.equal('$id', mIds), Query.limit(500)]).catch(() => []) : [];
+      setMitras(Object.fromEntries(mList.map((m) => [m.$id, m])));
+      const produk = new Map(ps.map((p) => [p.$id, p]));
       setIt(x.map((i) => {
-        const prod = ps.find((p) => p.$id === i.id_produk);
+        const prod = produk.get(i.id_produk);
         return {
           ...i,
           id_mitra: prod?.id_mitra,
@@ -80,6 +86,7 @@ export default function Checkout() {
   const pesan = async (e) => {
     e.preventDefault();
     if (mengirim.current) return;
+    if (jadwalAmbil && !waktuAmbil) return setMsg('Jadwal pre-order sudah ditutup.');
     mengirim.current = true;
     setBusy(f.metode === 'QRIS' ? 'Mengunggah bukti…' : 'Membuat pesanan…');
     setMsg('');
@@ -110,7 +117,7 @@ export default function Checkout() {
       checkoutId.current ||= sessionStorage.getItem('lapakwu_checkout_request') || crypto.randomUUID();
       sessionStorage.setItem('lapakwu_checkout_request', checkoutId.current);
       const { alamat, ...data } = f;
-      const hasil = await api('/api/checkout', { ...data, ...(antar ? { alamat } : {}), id_bukti, langsung: lg, request_id: checkoutId.current, total_diharapkan: totalSen });
+      const hasil = await api('/api/checkout', { ...data, ...(antar ? { alamat } : jadwalAmbil ? { tanggal_ambil: TANGGAL_PRE_ORDER } : {}), id_bukti, langsung: lg, request_id: checkoutId.current, total_diharapkan: totalSen });
       sessionStorage.removeItem('lapakwu_checkout_request');
       checkoutId.current = null;
       selesaiCheckout(akun.$id, hasil.itemTerpesan);
@@ -123,10 +130,11 @@ export default function Checkout() {
     setBusy('');
   };
 
+  if (memuat) return <main className="wrap"><StatusMuat teks="Memuat checkout…" /></main>;
   if (!akun) {
     return (
       <main className="wrap">
-        <p className="kosong">Silakan <a href="/masuk" className="link">masuk</a> terlebih dahulu untuk melakukan checkout.</p>
+        <p className="kosong">Silakan <Link href="/masuk" className="link">masuk</Link> terlebih dahulu untuk melakukan checkout.</p>
       </main>
     );
   }
@@ -134,6 +142,8 @@ export default function Checkout() {
   const idsMitra = [...new Set((it || []).map((item) => item.id_mitra))];
   const bisaAntar = idsMitra.length > 0 && idsMitra.every((id) => mitras[id]?.antar_aktif === true);
   const antar = f.pengantaran === 'ANTAR';
+  const jadwalAmbil = !antar && preOrder;
+  const waktuAmbil = waktuPreOrder(TANGGAL_PRE_ORDER);
   const ongkir = antar ? idsMitra.reduce((sum, id) => sum + (mitras[id]?.ongkir ?? 0), 0) : 0;
   const totalSen = (it || []).reduce((sum, item) => sum + item.jumlah * Math.round(item.harga * 100), ongkir * 100);
   const total = totalSen / 100;
@@ -150,7 +160,7 @@ export default function Checkout() {
         <h2>{lg ? 'Beli sekarang' : 'Checkout'}</h2>
         {lg && <p className="msg">Kamu membeli langsung satu produk. Isi keranjangmu tidak berubah.</p>}
         {pengguna && pengguna.status_akun !== 'AKTIF' && (
-          <p className="msg err">Akunmu belum aktif. <a className="link" href="/verifikasi">Verifikasi dulu</a> sebelum memesan.</p>
+          <p className="msg err">Akunmu belum aktif. <Link className="link" href="/verifikasi">Verifikasi dulu</Link> sebelum memesan.</p>
         )}
 
         <fieldset className="card pad stack"><legend><b>Terima pesanan</b></legend>
@@ -158,6 +168,16 @@ export default function Checkout() {
           {bisaAntar ? <label className="row"><input type="radio" style={{ width: 'auto' }} name="pengantaran"
             checked={antar} onChange={() => setF({ ...f, pengantaran: 'ANTAR', metode: 'QRIS' })} /> Antar ke alamat</label>
             : <small className="muted">Pengantaran tersedia jika semua mitra dalam checkout menerima pesanan antar.</small>}
+          {!antar && <fieldset className="stack">
+            <legend>Waktu pengambilan</legend>
+            <label className="row"><input type="radio" name="jadwal-ambil" style={{ width: 'auto' }}
+              checked={!preOrder} onChange={() => setPreOrder(false)} /> Ambil hari ini</label>
+            <label className="row"><input type="radio" name="jadwal-ambil" style={{ width: 'auto' }}
+              checked={preOrder} disabled={!waktuAmbil} onChange={() => setPreOrder(true)} />
+              Pre-order · {formatJadwalAmbil(MULAI_PRE_ORDER)}
+            </label>
+            {!waktuAmbil && <small className="muted">Jadwal pre-order sudah ditutup.</small>}
+          </fieldset>}
           {antar && <div className="field">
             <label htmlFor="alamat-antar">Alamat pengiriman</label>
             <textarea id="alamat-antar" required maxLength={500} value={f.alamat} onChange={set('alamat')} />
@@ -265,8 +285,9 @@ export default function Checkout() {
                   Ketentuan Pembayaran Offline di Lapak / Tenant
                 </b>
                 <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--ink)', lineHeight: 1.5 }}>
-                  Setelah checkout, kamu diberikan <b>waktu 1 jam</b> untuk datang dan membayar langsung di tenant/lapak mitra.
-                  Jika melebihi 1 jam dan pembayaran belum dikonfirmasi oleh mitra, pesanan akan <b>otomatis dibatalkan</b> oleh sistem.
+                  {jadwalAmbil
+                    ? <>Bayar saat mengambil pesanan. Pesanan dibatalkan otomatis jika pembayaran belum dikonfirmasi sebelum pukul 18.00 WIB.</>
+                    : <>Setelah checkout, kamu punya <b>1 jam</b> untuk datang dan membayar di lapak. Pesanan dibatalkan otomatis jika pembayaran belum dikonfirmasi dalam waktu itu.</>}
                 </p>
               </div>
             </div>
@@ -274,7 +295,7 @@ export default function Checkout() {
         )}
 
         {msg && <p className="msg err" role="alert">{msg}</p>}
-        <button className="btn sun" disabled={busy || !it?.length || pengguna?.status_akun !== 'AKTIF' || (antar && !bisaAntar)}>
+        <button className="btn sun" disabled={busy || !it?.length || pengguna?.status_akun !== 'AKTIF' || (antar && !bisaAntar) || (jadwalAmbil && !waktuAmbil)}>
           {busy || `Bayar dan pesan ${rp(total)}`}
         </button>
       </form>
@@ -288,7 +309,7 @@ export default function Checkout() {
           <ul className="lines" style={{ margin: '8px 0' }}>
             {(it || []).map((i) => (
               <li key={i.$id} style={{ padding: '6px 0' }}>
-                <span style={{ fontSize: '0.92rem' }}>{i.nama} × {i.jumlah}</span>
+                <span style={{ fontSize: '0.92rem' }}>{namaDenganAddOn(i.nama, i.add_on)} × {i.jumlah}{i.catatan_item && <small className="catatan-item">Catatan: {i.catatan_item}</small>}</span>
                 <b style={{ fontSize: '0.92rem' }}>{rp(i.subtotal)}</b>
               </li>
             ))}

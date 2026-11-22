@@ -4,6 +4,10 @@ import { FORMAT_ID_BUKTI, MAKS_BUKTI_PEMBAYARAN, PESAN_UKURAN_BUKTI } from '@/li
 import { bacaBukti, periksaBukti } from '@/lib/ocr-bukti';
 import { unduhFile } from '@/lib/backblaze';
 
+import { addOnValid, namaDenganAddOn } from '@/lib/add-on';
+
+import { formatJadwalAmbil, MULAI_PRE_ORDER, waktuPreOrder } from '@/lib/waktu';
+
 export const dynamic = 'force-dynamic';
 
 export async function POST(req) {
@@ -41,7 +45,7 @@ export async function POST(req) {
       if (teksBukti === null) return err('Bukti pembayaran belum dapat diperiksa. Coba lagi sebentar.', 503);
     }
 
-    const langsung = b.langsung?.id ? { id_produk: b.langsung.id, jumlah: Number(b.langsung.jumlah ?? 1) } : null;
+    const langsung = b.langsung?.id ? { id_produk: b.langsung.id, jumlah: Number(b.langsung.jumlah ?? 1), add_on: b.langsung.add_on } : null;
     if (langsung && (typeof langsung.id_produk !== 'string' || !Number.isSafeInteger(langsung.jumlah) || langsung.jumlah < 1)) {
       return err('Produk atau jumlah tidak valid.');
     }
@@ -53,6 +57,10 @@ export async function POST(req) {
         if (pernah.id_pembeli !== u.$id) return { error: 'ID checkout sudah digunakan.', status: 409 };
         if (pernah.response) return { ...pernah.response, idempotent: true };
       }
+      const now = new Date();
+      const adaJadwal = b.tanggal_ambil !== undefined && b.tanggal_ambil !== '';
+      const waktuAmbil = adaJadwal ? waktuPreOrder(b.tanggal_ambil, now) : null;
+      if (adaJadwal && (antar || !waktuAmbil)) return { error: 'Pre-order hanya tersedia untuk ambil di lapak pada ' + formatJadwalAmbil(MULAI_PRE_ORDER) + '. Checkout harus selesai sebelum jadwal tutup.' };
       const cart = langsung ? [] : await rows(null, 'item_keranjang', [Query.equal('id_keranjang', u.$id)]);
       const items = langsung ? [langsung] : cart;
       if (!items.length) return { error: 'Keranjang kosong.' };
@@ -60,11 +68,15 @@ export async function POST(req) {
       const produk = await rows(null, 'produk', [Query.equal('$id', items.map((i) => i.id_produk)), Query.equal('diarsipkan', false), Query.limit(500)]);
       const katalog = new Map(produk.map((p) => [p.$id, p]));
       const perMitra = new Map();
+      const jumlahPerProduk = new Map();
       for (const item of items) {
         const p = katalog.get(item.id_produk);
         if (!p) return { error: 'Ada produk yang sudah dihapus mitra. Perbarui keranjangmu.' };
         if (!Number.isSafeInteger(item.jumlah) || item.jumlah < 1) return { error: 'Jumlah item tidak valid.' };
-        if (p.stok < item.jumlah) return { error: 'Stok ' + p.nama + ' tidak cukup.' };
+        if (!addOnValid(p, item.add_on)) return { error: 'Pilihan add-on ' + p.nama + ' berubah. Pilih ulang dari halaman produk.', status: 409 };
+        const jumlah = (jumlahPerProduk.get(p.$id) || 0) + item.jumlah;
+        if (p.stok < jumlah) return { error: 'Stok ' + p.nama + ' tidak cukup.' };
+        jumlahPerProduk.set(p.$id, jumlah);
         const grup = perMitra.get(p.id_mitra) || [];
         grup.push({ item, produk: p });
         perMitra.set(p.id_mitra, grup);
@@ -79,7 +91,6 @@ export async function POST(req) {
         const subtotal = grup.reduce((sum, { item, produk }) => sum + item.jumlah * Math.round(produk.harga * 100), 0);
         totalPerMitra.set(id, subtotal + (antar ? mt.ongkir * 100 : 0));
       }
-      const now = new Date();
       const totalSen = [...totalPerMitra.values()].reduce((sum, nilai) => sum + nilai, 0);
       if ((antar || b.total_diharapkan !== undefined) && totalSen !== b.total_diharapkan) {
         return { error: 'Harga atau ongkir berubah. Muat ulang checkout sebelum membayar.', status: 409 };
@@ -108,7 +119,7 @@ export async function POST(req) {
         status_ocr: statusOcr, referensi: verifikasi.referensi,
         status_pembayaran: 'MENUNGGU',
       });
-      for (const item of items) await dec(null, 'produk', item.id_produk, 'stok', item.jumlah);
+      for (const [id, jumlah] of jumlahPerProduk) await dec(null, 'produk', id, 'stok', jumlah);
 
       for (const [mid, grup] of perMitra) {
         const mt = mitra.get(mid);
@@ -119,11 +130,12 @@ export async function POST(req) {
           jenis_pemesanan: antar ? 'ONLINE' : 'OFFLINE', total_harga: total,
           status_pesanan: 'MENUNGGU_KONFIRMASI', catatan_pembeli: catatan,
           ...(antar ? { alamat_pengiriman: alamat, ongkir: mt.ongkir } : {}),
+          ...(waktuAmbil ? { waktu_pengambilan: waktuAmbil } : {}),
         });
         for (const { item, produk } of grup) {
           await put(null, 'detail_pesanan', ID.unique(), {
             id_pesanan: pid, id_produk: produk.$id, jumlah: item.jumlah,
-            harga_satuan: produk.harga, subtotal: item.jumlah * produk.harga,
+            harga_satuan: produk.harga, subtotal: item.jumlah * produk.harga, add_on: item.add_on || '', catatan_item: item.catatan_item || '',
           });
         }
         await put(null, 'pembayaran', ID.unique(), {
@@ -131,13 +143,15 @@ export async function POST(req) {
           status_pembayaran: 'MENUNGGU',
           ...(upload ? { id_bukti: upload.id, id_bukti_checkout: upload.sha256, status_ocr: statusOcr, catatan_ocr: verifikasi.temuan, hasil_ocr: verifikasi.data } : {}),
         });
-        const ringkas = grup.map(({ item, produk }) => produk.nama + ' x' + item.jumlah).join(', ');
+        const ringkas = grup.map(({ item, produk }) => namaDenganAddOn(produk.nama, item.add_on) + ' x' + item.jumlah).join(', ');
         const label = upload ? 'QRIS' : 'Bayar di Lapak';
         const judul = 'Ada pesanan baru (' + label + ')';
-        const pesan = ringkas + '. Total Rp ' + total.toLocaleString('id-ID') + (antar ? '. Pesanan antar. Pembayaran menunggu verifikasi.' : upload ? '. Pesanan ambil di lapak. Pembayaran menunggu verifikasi.' : '. Pembeli akan bayar di lapak dalam 1 jam.');
+        const jadwal = waktuAmbil ? ' Pre-order untuk ambil di lapak pada ' + formatJadwalAmbil(waktuAmbil) + '.' : '';
+        const infoBayar = upload ? 'Pembayaran menunggu verifikasi.' : waktuAmbil ? 'Pembeli akan bayar di lapak saat mengambil pesanan.' : 'Pembeli akan bayar di lapak dalam 1 jam.';
+        const pesan = ringkas + '. Total Rp ' + total.toLocaleString('id-ID') + '.' + jadwal + (antar ? ' Pesanan antar.' : '') + ' ' + infoBayar;
         await notif(null, u.$id, 'Pesanan dibuat (' + label + ')', 'Pesanan ke ' + mt.nama_usaha + (upload
           ? ' berhasil dibuat dan menunggu verifikasi admin.'
-          : ' berhasil dibuat. Silakan bayar langsung di lapak dalam 1 jam.'));
+          : waktuAmbil ? ' berhasil dibuat. Silakan bayar di lapak saat mengambil pesanan.' : ' berhasil dibuat. Silakan bayar langsung di lapak dalam 1 jam.') + jadwal);
         await notif(null, mid, judul, pesan, !upload);
       }
       for (const item of cart) await del(null, 'item_keranjang', item.$id);

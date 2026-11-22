@@ -1,13 +1,16 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { api, rp, img, tgl } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
-import Rekap from '@/components/Rekap';
+import StatusMuat from '@/components/StatusMuat';
 import Modal from '@/components/Modal';
 import Ikon from '@/components/Ikon';
 import { Hitung } from '@/components/Motion';
 import { JUMLAH_TENANT } from '@/lib/tenant';
+
+const Rekap = dynamic(() => import('@/components/Rekap'), { loading: () => <StatusMuat teks="Memuat rekap penjualan…" /> });
 
 const TABS = [
   ['mitra', 'Verifikasi mitra', 'store'],
@@ -23,6 +26,9 @@ export default function Admin() {
   const { akun, peran, memuat, toast } = useSaya();
   const [tab, setTab] = useState('mitra');
   const [d, setD] = useState({ u: [], m: [], pr: [], ad: [], pb: [], rf: [], qris: [] });
+  const [cariMitra, setCariMitra] = useState('');
+  const [batasMitra, setBatasMitra] = useState(25);
+  const [galatMuat, setGalatMuat] = useState('');
   const [muatLanjutan, setMuatLanjutan] = useState(false);
   const [pencairan, setPencairan] = useState([]);
   const [menambah, setMenambah] = useState(false);
@@ -34,29 +40,32 @@ export default function Admin() {
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   const muat = useCallback(async (offset = 0, append = false) => {
+    if (!append) setGalatMuat('');
     try {
       const data = await api('/api/admin', { aksi: 'muat', offset });
       setD((sebelumnya) => append
         ? Object.fromEntries(['u', 'm', 'pr', 'ad', 'pb', 'rf', 'qris'].map((key) => [key, [...(sebelumnya[key] || []), ...(data[key] || [])]]).concat([['hasMore', data.hasMore], ['offset', data.offset], ['peran', { ...sebelumnya.peran, ...data.peran }]]))
         : data);
     } catch (e) {
+      if (!append) setGalatMuat(e.message);
       toast(e.message, true);
     }
   }, [toast]);
-  useEffect(() => { if (peran === 'admin') muat().catch((e) => toast(e.message, true)); }, [peran, muat, toast]);
+  useEffect(() => { if (peran === 'admin') void muat(); }, [peran, muat]);
 
   const muatPencairan = useCallback(async () => {
     const data = await api('/api/admin', { aksi: 'daftar_pencairan' });
     setPencairan(data.pencairan);
   }, []);
 
+  const pencairanTerbuka = tab === 'pencairan';
   useEffect(() => {
     if (peran !== 'admin') return;
-    const segarkan = () => muatPencairan().catch(() => {});
+    const segarkan = () => { if (!document.hidden) muatPencairan().catch(() => {}); };
     segarkan();
-    const timer = setInterval(segarkan, 15000);
+    const timer = setInterval(segarkan, pencairanTerbuka ? 15000 : 30000);
     return () => clearInterval(timer);
-  }, [peran, muatPencairan]);
+  }, [peran, pencairanTerbuka, muatPencairan]);
 
   const act = async (aksi, id, extra = {}, ok = 'Tersimpan.') => {
     try {
@@ -169,7 +178,8 @@ export default function Admin() {
   }, [modalGambar]);
 
   const nama = Object.fromEntries(d.m.map((x) => [x.$id, x.nama_usaha]));
-  const pg = (id) => d.u.find((x) => x.$id === id);
+  const penggunaPerId = new Map(d.u.map((x) => [x.$id, x]));
+  const pg = (id) => penggunaPerId.get(id);
   const tambah = async (e) => {
     e.preventDefault();
     if (menambah) return;
@@ -186,8 +196,11 @@ export default function Admin() {
     }
   };
 
-  if (memuat) return <main className="wrap" />;
+  if (memuat) return <main className="wrap"><StatusMuat teks="Memuat panel admin…" /></main>;
   if (peran !== 'admin') return <main className="wrap"><p className="kosong">Halaman ini khusus admin. <Link className="link" href="/masuk">Masuk</Link></p></main>;
+  const kataMitra = cariMitra.trim().toLowerCase();
+  const mitraCocok = d.m.filter((m) => m.nama_usaha.toLowerCase().includes(kataMitra) || String(m.nomor_tenant ?? '') === kataMitra);
+  const tenantTerisi = new Map(d.m.filter((m) => m.nomor_tenant).map((m) => [m.nomor_tenant, m.$id]));
   const nMitra = d.m.filter((x) => pg(x.$id)?.status_akun !== 'AKTIF').length;
   const nQris = (d.qris || []).length;
   const nRefund = d.rf.length;
@@ -231,6 +244,8 @@ export default function Admin() {
         </button>
       ))}</div>
 
+      {galatMuat && <p className="msg err" role="status">{galatMuat} <button className="link" type="button" onClick={() => muat()}>Coba lagi</button></p>}
+
       {tab === 'pencairan' && (
         <section className="card pad stack">
           <div className="row wallet-heading">
@@ -245,7 +260,7 @@ export default function Admin() {
                 <b>{x.nama_usaha} · {rp(x.nominal)}</b>
                 <small className="muted">{tgl(x.created_at)} · #{x.id.slice(-8)}</small>
                 <button className="wallet-qr" type="button" onClick={() => setModalGambar({ src: img(x.id_qris), judul: 'QRIS pencairan ' + x.nama_usaha, qris: true })} aria-label={'Perbesar QRIS ' + x.nama_usaha}>
-                  <img src={img(x.id_qris)} alt={'QRIS pencairan ' + x.nama_usaha} />
+                  <img loading="lazy" decoding="async" src={img(x.id_qris)} alt={'QRIS pencairan ' + x.nama_usaha} />
                 </button>
                 <button className="btn sun sm" type="button" onClick={() => setModalInfo({
                   judul: 'Konfirmasi pencairan',
@@ -366,14 +381,20 @@ export default function Admin() {
         </div>
       )}
 
-      {tab === 'mitra' && <div className="scroll"><table><thead><tr><th>Usaha</th><th>Nomor tenant</th><th>Kontak</th><th>Status</th><th>Tindakan</th></tr></thead><tbody>
-        {d.m.map((x) => { const u = pg(x.$id); return (
+      {tab === 'mitra' && <section className="stack">
+        <div className="field saring-daftar">
+          <label htmlFor="cari-mitra">Cari mitra</label>
+          <input id="cari-mitra" type="search" placeholder="Nama usaha atau nomor tenant" value={cariMitra} onChange={(e) => { setCariMitra(e.target.value); setBatasMitra(25); }} />
+        </div>
+        {d.offset === undefined && !galatMuat && <StatusMuat teks="Memuat data mitra…" />}
+        {d.offset !== undefined && <div className="scroll"><table><thead><tr><th>Usaha</th><th>Nomor tenant</th><th>Kontak</th><th>Status</th><th>Tindakan</th></tr></thead><tbody>
+        {mitraCocok.slice(0, batasMitra).map((x) => { const u = pg(x.$id); return (
           <tr key={x.$id}><td><b>{x.nama_usaha}</b></td>
             <td><form className="row" onSubmit={(e) => aturTenant(e, x)} style={{ flexWrap: 'nowrap' }}>
               <select key={x.nomor_tenant ?? 'kosong'} name="nomor_tenant" aria-label={`Nomor tenant ${x.nama_usaha}`} defaultValue={x.nomor_tenant ?? ''} disabled={simpanTenant !== null}>
                 <option value="">Belum ditetapkan</option>
                 {Array.from({ length: JUMLAH_TENANT }, (_, i) => i + 1).map((nomor) => (
-                  <option key={nomor} value={nomor} disabled={d.m.some((m) => m.$id !== x.$id && m.nomor_tenant === nomor)}>{nomor}</option>
+                  <option key={nomor} value={nomor} disabled={tenantTerisi.has(nomor) && tenantTerisi.get(nomor) !== x.$id}>{nomor}</option>
                 ))}
               </select>
               <button className="btn sm" disabled={simpanTenant !== null}>Simpan</button>
@@ -385,7 +406,9 @@ export default function Admin() {
               <button className="btn sm out" onClick={() => tolak(x)}>Minta perbaikan</button>
               <button className="btn sm red" onClick={() => konfirmasiHapusMitra(x)}>Hapus</button>
             </div></td></tr>); })}
-        {!d.m.length && <tr><td colSpan="5" className="muted">Belum ada mitra mendaftar.</td></tr>}</tbody></table></div>}
+        {!mitraCocok.length && <tr><td colSpan="5" className="muted">{kataMitra ? 'Mitra tidak ditemukan di data yang dimuat.' : 'Belum ada mitra mendaftar.'}</td></tr>}</tbody></table></div>}
+        {mitraCocok.length > batasMitra && <button className="btn out sm" type="button" onClick={() => setBatasMitra((batas) => batas + 25)}>Tampilkan lebih banyak mitra</button>}
+      </section>}
 
       {tab === 'pengguna' && <div className="stack">
         <form className="card pad" onSubmit={tambah}><h3>Tambah pengguna</h3>
