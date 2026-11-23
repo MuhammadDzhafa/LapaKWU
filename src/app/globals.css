@@ -604,7 +604,27 @@ html[data-nav=hide] .top:has(.panel-notifikasi){transform:none}
 .denah-header h3,.denah-header p{margin:0}
 .denah-peta{max-width:760px;margin-inline:auto;border:1px solid #d6dce2;border-radius:12px;background:#fff;color:#172442}
 .denah-svg{display:block;width:100%;height:auto}
-.denah-sorotan{fill:#ffb40045;stroke:#a74414;stroke-width:2.5;vector-effect:non-scaling-stroke}
+.denah-svg text{fill:#172442;text-anchor:middle;font-weight:800;font-size:28px}
+.denah-svg .denah-judul{font-size:45px;letter-spacing:.025em}
+.denah-svg .denah-label{font-size:30px}
+.denah-svg .denah-label-putih{fill:#fff}
+.denah-svg .denah-arah{font-size:58px}
+.denah-svg .denah-masuk{fill:#167148}
+.denah-svg .denah-keluar{fill:#ac2837}
+.denah-zona{fill:#e3edff;stroke:#a9bfdc;stroke-width:2}
+.denah-jalan{fill:#f0f4fa;stroke:#8195b2;stroke-width:2;stroke-dasharray:8 5}
+.denah-batas,.denah-garis{fill:none;stroke:#23365c;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+.denah-garis{stroke-width:3.5}
+.denah-sayap{fill:#23365c}
+.denah-bingkai-meja,.denah-lapakwu{fill:#fff;stroke:#9cadc4;stroke-width:2.5}
+.denah-tenant rect{fill:#fff;stroke:#dce4ef;stroke-width:1.5}
+.denah-tenant text{font-size:33px}
+.denah-tenant-aktif rect{fill:#ffcf56;stroke:#8a4c08;stroke-width:5;animation:denah-sorot 1.4s ease-in-out infinite}
+.denah-petunjuk{margin:0 0 12px;font-weight:700}
+@keyframes denah-sorot{
+  50%{fill:#ffe599;filter:drop-shadow(0 0 9px #dc8d21)}
+}
+@media(prefers-reduced-motion:reduce){.denah-tenant-aktif rect{animation:none}}
 
 
 /* =====================================================================
