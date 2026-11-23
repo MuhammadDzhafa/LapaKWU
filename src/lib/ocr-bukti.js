@@ -41,17 +41,34 @@ export function rupiahDalamSen(raw) {
 export function periksaBukti(lines, total) {
   if (!lines?.length) return { status: 'DITOLAK', temuan: [`Bukti tidak terbaca. Unggah gambar yang menampilkan merchant ${MERCHANT_QRIS} dan nominal pembayaran.`] };
   const teks = lines.join('\n');
-  const jumlahTransfer = /^(?:nominal|jumlah|total)(?:\s+(?:transfer|pembayaran|transaksi))?\b/i;
-  const berlabel = lines.flatMap((line, i) => {
-    if (!jumlahTransfer.test(line) || /\b(?:biaya|saldo)\b/i.test(line)) return [];
-    return [/(?:IDR|RP)|\d/i.test(line) ? line : (lines[i + 1] || '')];
+  const jumlahTransfer = /^(?:nominal|jumlah|total|kamu membayar)\b/i;
+  const bukanPembayaran = /\b(?:biaya|saldo|penghematan|hemat|diskon|cashback)\b/i;
+  const angka = (line, berikutnya) => {
+    if (bukanPembayaran.test(line)) return [];
+    const angkaTerpisah = berikutnya?.match(/^\s*(\d+(?:[ \t]*[.,][ \t]*\d+)*)\s*$/);
+    const teksNominal = angkaTerpisah && /\b(?:IDR|RP)\.?\s*$/i.test(line)
+      ? `${line} ${angkaTerpisah[1]}`
+      : line;
+    return [...teksNominal.matchAll(/\b(?:IDR|RP)\.?\s*(\d+(?:[ \t]*[.,][ \t]*\d+)*)/gi)]
+      .map((m) => rupiahDalamSen(m[1])).filter(Number.isSafeInteger);
+  };
+  const indeksBukanPembayaran = new Set();
+  lines.forEach((line, i) => {
+    if (!bukanPembayaran.test(line)) return;
+    indeksBukanPembayaran.add(i);
+    if (!/\b(?:IDR|RP)\.?\s*\d/i.test(line) && /^\s*(?:IDR|RP)\.?\s*(?:\d|$)/i.test(lines[i + 1] || '')) {
+      indeksBukanPembayaran.add(i + 1);
+    }
   });
-  const angka = (text) => [...text.matchAll(/\b(?:IDR|RP)\.?\s*(\d[\d.,]*)/gi)]
-    .map((m) => rupiahDalamSen(m[1])).filter(Number.isSafeInteger);
-  const nominalBerlabel = angka(berlabel.join('\n'));
-  const nominal = [...new Set(nominalBerlabel.length
-    ? nominalBerlabel
-    : angka(lines.filter((line) => !/\b(?:biaya|saldo)\b/i.test(line)).join('\n')))];
+  const berlabel = lines.flatMap((line, i) => {
+    if (!jumlahTransfer.test(line) || indeksBukanPembayaran.has(i)) return [];
+    if (/\b(?:IDR|RP)(?=\W|\d|$)/i.test(line)) return angka(line, lines[i + 1]);
+    if (indeksBukanPembayaran.has(i + 1)) return [];
+    return angka(lines[i + 1] || '', lines[i + 2]);
+  });
+  const nominal = [...new Set(berlabel.length ? berlabel : lines.flatMap((line, i) => (
+    indeksBukanPembayaran.has(i) ? [] : angka(line, lines[i + 1])
+  )))];
   const nominalCocok = nominal.length === 1 && nominal[0] === Math.round(total * 100);
   const labelPenerima = /^(?:merchant name|nama (?:penerima|merchant|toko)|merchant|toko|penerima|tujuan|kepada|dibayar ke|transfer ke)(?:\s*:\s*|\s+|$)/i;
   const penerimaTerbaca = lines.flatMap((line, i) => {
