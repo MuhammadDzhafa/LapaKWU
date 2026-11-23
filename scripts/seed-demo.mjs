@@ -2,6 +2,7 @@ import { readFile, mkdir, copyFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import bcrypt from 'bcryptjs';
+import { JUMLAH_TENANT } from '../src/lib/tenant.js';
 import { getDatabase, denganTransaksi, ubahData, cariSatu, queryDatabase } from '../src/lib/db.js';
 
 // Data tambahan saja: tidak menghapus atau menimpa data yang sudah dicoba.
@@ -43,7 +44,7 @@ try {
     await simpan('keranjang', 'demo-pembeli', { id_pembeli: 'demo-pembeli', total_harga: 30000 });
     for (const [id, nama_usaha] of [['demo-mitra', 'Dapur Nusantara Demo'], ['demo-mitra2', 'Kreasi Mahasiswa Demo'], ['demo-pending', 'Lapak Calon Mitra Demo']]) {
       if (await cariSatu('mitra', { _id: id })) continue;
-      const nomor = id === 'demo-pending' ? null : (await queryDatabase('SELECT n FROM generate_series(1,90) n WHERE NOT EXISTS (SELECT 1 FROM mitra WHERE nomor_tenant=n) ORDER BY n LIMIT 1')).rows[0]?.n;
+      const nomor = id === 'demo-pending' ? null : (await queryDatabase('SELECT n FROM generate_series(1,$1) n WHERE NOT EXISTS (SELECT 1 FROM mitra WHERE nomor_tenant=n) ORDER BY n LIMIT 1', [JUMLAH_TENANT])).rows[0]?.n;
       await simpan('mitra', id, { nama_usaha, alamat_usaha: 'Area bazar kampus (demo)', nomor_tenant: nomor ?? null, id_qris: 'demo-qris.jpg', ...(id !== 'demo-pending' ? { id_admin_verifikator: 'demo-admin' } : {}) });
     }
     const produk = [

@@ -371,7 +371,7 @@ export default function Beranda() {
                     {x.id_gambar ? <img src={img(x.id_gambar)} alt="" loading="lazy" decoding="async" /> : <span>{x.nama[0]}</span>}
                     {kategoriPerProduk.get(x.$id)?.length > 0 && <span className="kat">{kategori || kategoriPerProduk.get(x.$id)[0]}</span>}
                     {x.stok < 1 && <em className="habis">Habis</em>}
-                    {x.stok > 0 && x.stok <= 5 && <em className="sisa">Sisa {x.stok}</em>}
+                    {x.stok > 0 && (x.stok_varian || x.stok <= 5) && <em className="sisa">Sisa {x.stok} pcs</em>}
                   </Link>
                   <div className="pb">
                     <Link href={`/produk/${x.$id}`} className="nm">{x.nama}</Link>
@@ -437,7 +437,7 @@ export default function Beranda() {
         </div>
         <section className="denah-beranda" id="denah" aria-labelledby="judul-denah">
           <h2 id="judul-denah">Denah tenant</h2>
-          <div className="denah-scroll" tabIndex={0} aria-label="Denah lengkap, geser ke samping pada layar kecil">
+          <div className="denah-peta">
             <PetaTenant />
           </div>
         </section>

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
+import { JUMLAH_TENANT } from '../src/lib/tenant.js';
 import { denganTransaksi, getDatabase, queryDatabase } from '../src/lib/db.js';
 
 const url = new URL(process.env.POSTGRES_URL || process.env.DATABASE_URL);
@@ -59,13 +60,13 @@ try {
         WHERE NOT EXISTS (SELECT 1 FROM mitra m WHERE m.id = l.id)
       ), tenant_kosong AS (
         SELECT nomor, row_number() OVER (ORDER BY nomor) AS urutan
-        FROM generate_series(1, 90) AS tenant(nomor)
+        FROM generate_series(1, $2::integer) AS tenant(nomor)
         WHERE NOT EXISTS (SELECT 1 FROM mitra m WHERE m.nomor_tenant = tenant.nomor)
       )
       INSERT INTO mitra (id, nama_usaha, nomor_tenant)
       SELECT id, nama, nomor FROM lapak_baru LEFT JOIN tenant_kosong USING (urutan)
       ON CONFLICT (id) DO NOTHING
-    `, [lapakJson]);
+    `, [lapakJson, JUMLAH_TENANT]);
     await queryDatabase(`
       INSERT INTO produk (id, id_mitra, nama, kategori, harga, stok)
       SELECT id, id_mitra, nama, kategori, harga, stok

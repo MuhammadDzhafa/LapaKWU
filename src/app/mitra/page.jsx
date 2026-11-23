@@ -8,7 +8,7 @@ import { periodeJakarta } from '@/lib/waktu';
 import StatusMuat from '@/components/StatusMuat';
 import Modal from '@/components/Modal';
 import { kategoriProduk } from '@/lib/kategori';
-import { hargaAddOn } from '@/lib/add-on';
+import { hargaAddOn, perubahanStok, stokPilihan } from '@/lib/add-on';
 import PilihKategoriProduk from '@/components/PilihKategoriProduk';
 import InputVarian from '@/components/InputVarian';
 import Ikon from '@/components/Ikon';
@@ -18,8 +18,10 @@ const Pesanan = dynamic(() => import('@/components/Pesanan'), { loading: () => <
 const DompetMitra = dynamic(() => import('@/components/DompetMitra'), { loading: () => <StatusMuat teks="Memuat dompet…" /> });
 const Rekap = dynamic(() => import('@/components/Rekap'), { loading: () => <StatusMuat teks="Memuat rekap penjualan…" /> });
 
-const varianKosong = () => [{ nama: '', harga: 0 }];
-const siapkanVarian = (daftar) => daftar.map(({ nama, harga }) => ({ nama, harga: Number(harga) }));
+const varianKosong = () => [{ nama: '', harga: 0, stok: 0 }];
+const siapkanVarian = (daftar) => daftar.map(({ nama, harga, stok }) => ({
+  nama, harga: Number(harga), ...(stok == null || stok === '' ? {} : { stok: Number(stok) }),
+}));
 
 export default function Lapak() {
   const { akun, peran, pengguna, mitra, memuat, muat: muatSaya, toast } = useSaya();
@@ -83,6 +85,8 @@ export default function Lapak() {
 
   const kataProduk = cariProduk.trim().toLowerCase();
   const produkCocok = (ps ?? []).filter((p) => [p.nama, ...kategoriProduk(p), ...(p.pilihan_add_on ?? [])].some((nilai) => nilai?.toLowerCase().includes(kataProduk)));
+  const punyaVarian = f.pilihan_add_on.some(({ nama }) => nama.trim());
+  const totalVarian = f.pilihan_add_on.reduce((total, { nama, stok }) => total + (nama.trim() ? Number(stok || 0) : 0), 0);
   const pengantaran = layanan ?? { antar_aktif: mitra?.antar_aktif === true, ongkir: mitra?.ongkir ?? 0 };
   const simpanPengantaran = async (e) => {
     e.preventDefault();
@@ -114,16 +118,16 @@ export default function Lapak() {
     try {
       let id_gambar;
       if (file) id_gambar = (await storage.createFile({ bucketId: BUCKET, fileId: ID.unique(), file })).$id;
-      await api('/api/produk', { aksi: 'tambah', nama: f.nama, harga: +f.harga, kategori_list: f.kategori_list, deskripsi: f.deskripsi, stok: +f.stok, pilihan_add_on: siapkanVarian(f.pilihan_add_on), ...(id_gambar ? { id_gambar } : {}) });
+      await api('/api/produk', { aksi: 'tambah', nama: f.nama, harga: +f.harga, kategori_list: f.kategori_list, deskripsi: f.deskripsi, stok: punyaVarian ? totalVarian : +f.stok, pilihan_add_on: siapkanVarian(f.pilihan_add_on.map((v) => ({ ...v, stok: v.stok || 0 }))), ...(id_gambar ? { id_gambar } : {}) });
       setF({ nama: '', harga: '', kategori_list: [''], deskripsi: '', stok: '', pilihan_add_on: varianKosong() }); setFile(null); setPreview(null); e.target.reset(); toast('Produk berhasil ditambahkan.'); await muat();
     } catch (er) { setMsg(er.message); }
   };
   const segarkanStat = () => list('rekap_penjualan', [Query.equal('id_mitra', akun.$id)]).then((rk) => setSt((s) => s && ({ ...s, jual: rk.find((x) => x.periode === bln())?.total_penjualan || 0 }))).catch(() => {});
   // Tap +/−: angka stok berubah langsung di layar, server mencatat stok dan rekap. Gagal -> data dimuat ulang.
-  const ketuk = async (p, aksi) => {
-    if (aksi === 'jual' && p.stok < 1) return setMsg(`Stok ${p.nama} sudah habis.`);
-    setMsg(''); setPs((l) => l.map((x) => (x.$id === p.$id ? { ...x, stok: x.stok + (aksi === 'jual' ? -1 : 1) } : x)));
-    try { await api('/api/stok', { aksi, id: p.$id, jumlah: 1 }); if (aksi === 'jual') segarkanStat(); }
+  const ketuk = async (p, aksi, varian = '') => {
+    if (aksi === 'jual' && stokPilihan(p, varian) < 1) return setMsg(`Stok ${varian || p.nama} sudah habis.`);
+    setMsg(''); setPs((l) => l.map((x) => x.$id === p.$id ? { ...x, ...perubahanStok(x, varian, aksi === 'jual' ? -1 : 1) } : x));
+    try { await api('/api/stok', { aksi, id: p.$id, jumlah: 1, varian }); if (aksi === 'jual') segarkanStat(); }
     catch (e) { setMsg(e.message); muat(); }
   };
   const koreksi = async (nama, id, baru) => {
@@ -184,22 +188,29 @@ export default function Lapak() {
 
   const ubahAddOn = (p) => {
     setModalInfo({
-      judul: `Ubah add-on ${p.nama}`,
+      judul: `Ubah varian ${p.nama}`,
+      pesan: p.stok_varian
+        ? `Stok katalog: ${p.stok} pcs.${p.stok_belum_dialokasikan ? ` Alokasikan juga ${p.stok_belum_dialokasikan} pcs stok retur yang belum punya varian.` : ''}`
+        : `Isi stok setiap varian untuk membagi stok saat ini (${p.stok} pcs).`,
       tipe: 'input',
       inputType: 'varian',
-      inputLabel: 'Pilihan add-on (opsional)',
-      inputDefault: p.pilihan_add_on?.length ? p.pilihan_add_on.map((nama) => ({ nama, harga: hargaAddOn(p, nama) })) : varianKosong(),
+      inputLabel: 'Varian dan stok (opsional)',
+      inputDefault: p.pilihan_add_on?.length ? p.pilihan_add_on.map((nama) => ({
+        nama, harga: hargaAddOn(p, nama), stok: p.stok_varian ? stokPilihan(p, nama) : '',
+      })) : varianKosong(),
       inputOpsional: true,
-      tombolOk: 'Simpan add-on',
+      tombolOk: 'Simpan varian',
       onOk: async (nilai) => {
         setBusyModal(true);
         try {
-          await api('/api/produk', { aksi: 'ubah', id: p.$id, pilihan_add_on: siapkanVarian(nilai) });
+          await api('/api/produk', { aksi: 'ubah', id: p.$id, pilihan_add_on: siapkanVarian(nilai), stok_diharapkan: p.$updatedAt });
           await muat();
           setModalInfo(null);
-          toast('Add-on berhasil disimpan.');
+          toast('Varian berhasil disimpan.');
         } catch (e) {
           toast(e.message, true);
+          await muat();
+          setModalInfo(null);
         } finally {
           setBusyModal(false);
         }
@@ -391,10 +402,10 @@ export default function Lapak() {
         <form className="card pad" onSubmit={tambah}><h3>Tambah produk</h3>
           <div className="field"><label htmlFor="pn">Nama</label><input id="pn" required value={f.nama} onChange={set('nama')} /></div>
           <div className="two"><div className="field"><label htmlFor="ph">Harga (Rp)</label><input id="ph" type="number" min="0" required value={f.harga} onChange={set('harga')} /></div>
-            <div className="field"><label htmlFor="ps">Stok</label><input id="ps" type="number" min="0" required value={f.stok} onChange={set('stok')} /></div></div>
+            <div className="field"><label htmlFor="ps">Total stok (pcs)</label><input id="ps" type="number" min="0" required={!punyaVarian} readOnly={punyaVarian} value={punyaVarian ? totalVarian : f.stok} onChange={set('stok')} /></div></div>
           <PilihKategoriProduk kategori={kategori} nilai={f.kategori_list} onUbah={(kategori_list) => setF((prev) => ({ ...prev, kategori_list }))} />
           <div className="field"><label htmlFor="pd">Deskripsi</label><textarea id="pd" rows="3" value={f.deskripsi} onChange={set('deskripsi')} /></div>
-          <InputVarian judul="Pilihan add-on (opsional)" nilai={f.pilihan_add_on} onUbah={(pilihan_add_on) => setF((prev) => ({ ...prev, pilihan_add_on }))} />
+          <InputVarian judul="Varian dan stok (opsional)" nilai={f.pilihan_add_on} onUbah={(pilihan_add_on) => setF((prev) => ({ ...prev, pilihan_add_on }))} />
           <div className="field"><label htmlFor="pg">Foto (jpg, png, webp, maks 5 MB)</label><input id="pg" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} />
             {preview && <img src={preview} alt="Preview foto produk" style={{ marginTop: 8, width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8, border: '1px solid #F0DEB0' }} />}
           </div>
@@ -417,8 +428,27 @@ export default function Lapak() {
                     const harga = hargaAddOn(p, nama);
                     return harga > 0 ? `${nama} (+${rp(harga)})` : nama;
                   }).join(', ')}</small>}</div></div>
-              <div className="row"><span className="qty" role="group" aria-label={`Stok ${p.nama}`}><button className="qb" aria-label={`Kurangi stok ${p.nama} (terjual offline)`} disabled={p.stok < 1} onClick={() => ketuk(p, 'jual')}>−</button><b key={p.stok} className="qn" aria-live="polite">{p.stok}</b><button className="qb add" aria-label={`Tambah stok ${p.nama}`} onClick={() => ketuk(p, 'tambah')}>+</button></span>
-                <button className="link" onClick={() => harga(p)}>Ubah harga</button><button className="link" onClick={() => stok(p)}>Ubah stok</button><button className="link" onClick={() => ubahKategori(p)}>Ubah kategori</button><button className="link" onClick={() => ubahAddOn(p)}>Ubah add-on</button><button className="link" onClick={() => hapusP(p)}>Hapus</button></div>
+              <div className="stack">
+                {p.stok_varian && <b>Total stok {p.stok} pcs</b>}
+                {(p.stok_belum_dialokasikan > 0) && <small className="muted">{p.stok_belum_dialokasikan} pcs retur belum dialokasikan</small>}
+                {(p.stok_varian ? p.pilihan_add_on : ['']).map((nama) => (
+                  <div className="row" key={nama}>
+                    {nama && <span>{nama}</span>}
+                    <span className="qty" role="group" aria-label={`Stok ${nama || p.nama}`}>
+                      <button className="qb" aria-label={`Kurangi stok ${nama || p.nama} (terjual offline)`} disabled={stokPilihan(p, nama) < 1} onClick={() => ketuk(p, 'jual', nama)}>−</button>
+                      <b className="qn" aria-live="polite">{stokPilihan(p, nama)}</b>
+                      <button className="qb add" aria-label={`Tambah stok ${nama || p.nama}`} onClick={() => ketuk(p, 'tambah', nama)}>+</button>
+                    </span>
+                  </div>
+                ))}
+                <div className="row">
+                  <button className="link" onClick={() => harga(p)}>Ubah harga</button>
+                  {!p.stok_varian && <button className="link" onClick={() => stok(p)}>Ubah stok</button>}
+                  <button className="link" onClick={() => ubahKategori(p)}>Ubah kategori</button>
+                  <button className="link" onClick={() => ubahAddOn(p)}>Ubah varian</button>
+                  <button className="link" onClick={() => hapusP(p)}>Hapus</button>
+                </div>
+              </div>
             </div>))}
         </div></div>}
 

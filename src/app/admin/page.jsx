@@ -8,7 +8,7 @@ import StatusMuat from '@/components/StatusMuat';
 import Modal from '@/components/Modal';
 import Ikon from '@/components/Ikon';
 import { Hitung } from '@/components/Motion';
-import { JUMLAH_TENANT } from '@/lib/tenant';
+import { JUMLAH_TENANT, nomorTenantValid } from '@/lib/tenant';
 import { kategoriProduk } from '@/lib/kategori';
 
 const Rekap = dynamic(() => import('@/components/Rekap'), { loading: () => <StatusMuat teks="Memuat rekap penjualan…" /> });
@@ -442,6 +442,9 @@ export default function Admin() {
             <td><form className="atur-tenant" onSubmit={(e) => aturTenant(e, x)}>
               <select key={x.nomor_tenant ?? 'kosong'} name="nomor_tenant" aria-label={`Nomor tenant ${x.nama_usaha}`} defaultValue={x.nomor_tenant ?? ''} disabled={simpanTenant !== null}>
                 <option value="">Belum ditetapkan</option>
+                {x.nomor_tenant != null && !nomorTenantValid(x.nomor_tenant) && (
+                  <option value={x.nomor_tenant}>{x.nomor_tenant} (di luar denah baru)</option>
+                )}
                 {Array.from({ length: JUMLAH_TENANT }, (_, i) => i + 1).map((nomor) => (
                   <option key={nomor} value={nomor} disabled={tenantTerisi.has(nomor) && tenantTerisi.get(nomor) !== x.$id}>{nomor}</option>
                 ))}

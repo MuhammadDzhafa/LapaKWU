@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { list, ambil, api, storage, Query, rp } from '@/lib/aw';
 import { MAKS_BUKTI_PEMBAYARAN, PESAN_UKURAN_BUKTI } from '@/lib/bukti-pembayaran';
-import { addOnValid, hargaSatuanProduk, namaDenganAddOn } from '@/lib/add-on';
+import { addOnValid, hargaSatuanProduk, namaDenganAddOn, stokPilihan } from '@/lib/add-on';
 import { formatJadwalAmbil, MULAI_PRE_ORDER, TANGGAL_PRE_ORDER, waktuPreOrder } from '@/lib/waktu';
 import StatusMuat from '@/components/StatusMuat';
 import { useSaya } from '@/components/Shell';
@@ -33,9 +33,10 @@ export default function Checkout() {
     (async () => {
       if (q.get('beli')) {
         const p = await ambil('produk', q.get('beli'));
-        const jumlah = Math.max(1, Math.min(+q.get('jml') || 1, p.stok));
+        const jumlah = Number(q.get('jml') || 1);
         const add_on = q.get('add_on') ?? '';
         if (!addOnValid(p, add_on)) throw new Error('Pilihan add-on sudah berubah. Kembali ke halaman produk dan pilih ulang.');
+        if (!Number.isSafeInteger(jumlah) || jumlah < 1 || jumlah > stokPilihan(p, add_on)) throw new Error('Jumlah yang dipilih melebihi stok yang tersedia. Kembali ke halaman produk dan pilih ulang.');
         setLg({ id: p.$id, jumlah, add_on });
         const mt = await ambil('mitra', p.id_mitra).catch(() => null);
         if (mt) setMitras({ [p.id_mitra]: mt });

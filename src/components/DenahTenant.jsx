@@ -1,23 +1,29 @@
 'use client';
 
 import { useEffect, useId, useRef } from 'react';
+import { JUMLAH_TENANT } from '@/lib/tenant';
 
 const meja = [
-  ...[13, 10, 7, 4, 1].map((awal, i) => ({ awal, x: 65, y: 64 + 130 * i, vertikal: true })),
-  ...[16, 19, 22, 25, 28].map((awal, i) => ({ awal, x: 125 + 124 * i, y: 64 })),
-  ...[31, 34, 37, 40, 43].map((awal, i) => ({ awal, x: 755, y: 64 + 130 * i, vertikal: true })),
-  ...[46, 55, 64, 73, 82].flatMap((awal, i) =>
-    [0, 1, 2].map((kolom) => ({ awal: awal + kolom * 3, x: 195 + 175 * kolom, y: [176, 257, 338, 506, 587][i] }))),
+  ...[1, 4, 7, 10].map((awal, i) => ({ awal, x: 84 + 170 * i, y: 78, lebar: 50, tinggi: 42, zona: 'atas' })),
+  ...[['kiri', 13, 32], ['kanan', 28, 760]].flatMap(([zona, pertama, x]) =>
+    Array.from({ length: 5 }, (_, i) => ({ awal: pertama + i * 3, x, y: 106 + i * 122, lebar: 46, tinggi: 32, zona, vertikal: true }))),
+  ...[43, 49, 55, 61, 67, 73].flatMap((awal, i) =>
+    (awal === 73 ? [0] : [0, 1]).map((kolom) => ({
+      awal: awal + kolom * 3, x: 122 + 300 * kolom, y: [192, 250, 308, 505, 563, 621][i],
+      lebar: 94, tinggi: 42, zona: 'tengah',
+    }))),
 ];
 
-const kotak = meja.flatMap(({ awal, x, y, vertikal }) =>
-  [0, 1, 2].map((i) => ({ nomor: awal + i, x: x + (vertikal ? 0 : i * 34), y: y + (vertikal ? i * 34 : 0) })));
+const kotak = meja.flatMap(({ awal, x, y, lebar, tinggi, zona, vertikal }) =>
+  [0, 1, 2].map((i) => ({
+    nomor: awal + i, x: x + (vertikal ? 0 : i * lebar), y: y + (vertikal ? i * tinggi : 0), lebar, tinggi, zona,
+  })));
 
-function Stand({ kotak: { nomor, x, y }, dipilih }) {
+function Stand({ data: { nomor, x, y, lebar, tinggi, zona }, aktif }) {
   return (
-    <g className={dipilih ? 'denah-stand denah-stand-aktif' : 'denah-stand'} aria-hidden="true">
-      <rect x={x} y={y} width="34" height="34" rx="3" />
-      <text x={x + 17} y={y + 17} dominantBaseline="central" textAnchor="middle">{nomor}</text>
+    <g className={aktif ? 'denah-stand denah-stand-aktif' : 'denah-stand'} data-zona={zona}>
+      <rect x={x} y={y} width={lebar} height={tinggi} rx="6" />
+      <text x={x + lebar / 2} y={y + tinggi / 2} dominantBaseline="central" textAnchor="middle">{nomor}</text>
     </g>
   );
 }
@@ -25,50 +31,54 @@ function Stand({ kotak: { nomor, x, y }, dipilih }) {
 export function PetaTenant({ nomor }) {
   const deskripsi = useId();
   const aktif = kotak.find((stand) => stand.nomor === nomor);
+
   return (
-    <svg viewBox="0 0 856 806" role="img" aria-labelledby={deskripsi} className="denah-svg">
-      <title id={deskripsi}>{nomor ? `Denah bazar. Tenant ${nomor} disorot.` : "Denah bazar dengan 90 tenant dan pintu di sisi bawah."}</title>
-      <path d="M349 718H51V51H805V718H507" fill="none" stroke="currentColor" strokeWidth="3"/>
-      <rect className="denah-zona" x="168" y="151" width="514" height="244" rx="10"/>
-      <rect className="denah-zona" x="168" y="480" width="514" height="166" rx="10"/>
-      <rect className="denah-jalan" x="168" y="411" width="514" height="53" rx="9"/>
-      <text className="denah-label" x="425" y="444" textAnchor="middle">→　　 JALAN　　 ←</text>
-      <text className="denah-label" transform="translate(30 390) rotate(-90)" textAnchor="middle">GEDUNG B · SAYAP KIRI</text>
-      <text className="denah-label" transform="translate(827 390) rotate(90)" textAnchor="middle">GEDUNG A · SAYAP KANAN</text>
-      <path d="M349 718V688Q385 688 385 718M507 718V688Q471 688 471 718" fill="none" stroke="currentColor"/>
-      <text className="denah-label" x="394" y="751" textAnchor="middle">↑ MASUK</text>
-      <text className="denah-label" x="464" y="751" textAnchor="middle">↓ KELUAR</text>
-      <text className="denah-label" x="428" y="780" textAnchor="middle">PINTU MASUK / KELUAR</text>
-          {kotak.filter((stand) => stand.nomor !== nomor).map((stand) => <Stand key={stand.nomor} kotak={stand}/>)}
-          {aktif && <Stand kotak={aktif} dipilih/>}
+    <svg viewBox="0 0 838 836" role="img" aria-labelledby={deskripsi} className="denah-svg">
+      <title id={deskripsi}>{aktif ? `Denah bazar. Tenant ${nomor} disorot.` : `Denah bazar dengan ${JUMLAH_TENANT} tenant dan pintu di sisi bawah.`}</title>
+      <text className="denah-judul" x="419" y="29">Area Bazar / Kewirausahaan</text>
+      <text className="denah-label" x="419" y="52">12 m × 12 m · 75 kelompok · 25 meja (3 kelompok/meja)</text>
+      <path d="M330 782H26V66H812V782H508" fill="none" stroke="currentColor" strokeWidth="3" />
+      <rect className="denah-zona" x="105" y="144" width="628" height="35" rx="17" />
+      <text className="denah-label" x="419" y="167">ZONA TENGAH ATAS</text>
+      <rect className="denah-jalan" x="96" y="374" width="646" height="67" rx="12" />
+      <text className="denah-judul" x="419" y="415">→　　 JALAN　　 ←</text>
+      <rect className="denah-zona" x="105" y="457" width="628" height="35" rx="17" />
+      <text className="denah-label" x="419" y="480">ZONA TENGAH BAWAH</text>
+      <text className="denah-label" transform="translate(19 397) rotate(-90)">GEDUNG B · SAYAP KIRI</text>
+      <text className="denah-label" transform="translate(819 397) rotate(90)">GEDUNG A · SAYAP KANAN</text>
+      {[0, 1, 2, 3].flatMap((i) => [55, 783].map((x) => (
+        <text key={`${i}-${x}`} className="denah-jarak" x={x} y={218 + i * 122}>50 cm</text>
+      )))}
+      <path d="M330 782V728Q383 728 383 782M508 782V728Q455 728 455 782" fill="none" stroke="currentColor" strokeWidth="2" />
+      <text className="denah-label" x="387" y="750" fill="#16854c">↑</text>
+      <text className="denah-label" x="451" y="750" fill="#b62435">↓</text>
+      <text className="denah-jarak" x="387" y="771">MASUK</text>
+      <text className="denah-jarak" x="451" y="771">KELUAR</text>
+      <text className="denah-label" x="419" y="809">PINTU KELUAR / MASUK</text>
+      {kotak.filter((stand) => stand !== aktif).map((stand) => <Stand key={stand.nomor} data={stand} />)}
+      {aktif && <Stand data={aktif} aktif />}
     </svg>
   );
 }
 
 export default function DenahTenant({ nomor, nama, onClose }) {
   const dialog = useRef(null);
-  const area = useRef(null);
   const judul = useId();
-  const aktif = kotak.find((stand) => stand.nomor === nomor);
 
   useEffect(() => {
     if (!dialog.current.open) dialog.current.showModal();
-    if (aktif) {
-      const lebar = area.current.scrollWidth;
-      area.current.scrollLeft = (aktif.x + 17) * lebar / 856 - area.current.clientWidth / 2;
-    }
-  }, [aktif]);
+  }, []);
 
   return (
     <dialog ref={dialog} className="denah-modal" aria-labelledby={judul} onClose={onClose}>
       <header className="row denah-header">
         <div>
-      <h3 id={judul}>Denah area bazar</h3>
-      <p><b>Tenant {nomor}</b>{nama && <> · {nama}</>}</p>
+          <h3 id={judul}>Denah area bazar</h3>
+          <p><b>Tenant {nomor}</b>{nama && <> · {nama}</>}</p>
         </div>
         <form method="dialog"><button className="btn sm out">Tutup</button></form>
       </header>
-      <div ref={area} className="denah-scroll" tabIndex={0} aria-label="Denah dapat digeser ke samping">
+      <div className="denah-peta">
         <PetaTenant nomor={nomor} />
       </div>
     </dialog>

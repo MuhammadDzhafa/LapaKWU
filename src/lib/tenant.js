@@ -1,6 +1,6 @@
 import { BATAS_BAYAR_TENANT_MS, mulaiPengambilan, tenggatBayarTenant } from './pembayaran-tenant.js';
 
-export const JUMLAH_TENANT = 90;
+export const JUMLAH_TENANT = 75;
 
 export function nomorTenantValid(nomor) {
   return Number.isInteger(nomor) && nomor >= 1 && nomor <= JUMLAH_TENANT;

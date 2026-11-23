@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { list, ubah, hapus, hitungKeranjang, Query, rp } from '@/lib/aw';
-import { addOnValid, namaDenganAddOn } from '@/lib/add-on';
+import { addOnValid, namaDenganAddOn, stokPilihan } from '@/lib/add-on';
 import StatusMuat from '@/components/StatusMuat';
 import { useSaya } from '@/components/Shell';
 
@@ -41,7 +41,7 @@ export default function Keranjang() {
     try {
       if (j < 1) await hapus('item_keranjang', i.$id);
       else if (!i.p) return setMsg('Produk ini sudah dihapus mitra. Hapus dari keranjang.');
-      else if (j > i.p.stok) return setMsg(`Stok ${i.p.nama} tersisa ${i.p.stok}.`);
+      else if (d > 0 && j > stokPilihan(i.p, i.add_on)) return setMsg(`Stok ${namaDenganAddOn(i.p.nama, i.add_on)} tersisa ${stokPilihan(i.p, i.add_on)} pcs.`);
       else await ubah('item_keranjang', i.$id, { jumlah: j });
       await hitungKeranjang(akun.$id);
       setMsg('');

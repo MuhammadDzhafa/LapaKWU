@@ -3,6 +3,7 @@ import { denganTransaksi, kunciPesanan, queryDatabase, ubahData } from '@/lib/db
 import { svc, siapa, err, getRow, rows, upd, inc, notif, Query } from '@/lib/server';
 import { AKHIR_PRE_ORDER, HARI_PRE_ORDER, MULAI_PRE_ORDER, periodeJakarta } from '@/lib/waktu';
 import { hitungKomisi } from '@/lib/komisi';
+import { kembalikanStokPesanan } from '@/lib/stok-pesanan';
 export const dynamic = 'force-dynamic';
 
 // aksi -> [status asal, status baru, jenis yang diizinkan]
@@ -39,9 +40,7 @@ async function bersihkanKedaluwarsa(db) {
         const by = await getRow(db, 'pembayaran', calon.id);
         const ps = await getRow(db, 'pesanan', by.id_pesanan);
         if (by.status_pembayaran !== 'MENUNGGU' || !['MENUNGGU_KONFIRMASI', 'DIPROSES'].includes(ps.status_pesanan) || tenggatBayarTenant(ps) > sekarang) return;
-        for (const d of await rows(db, 'detail_pesanan', [Query.equal('id_pesanan', ps.$id)])) {
-          await inc(db, 'produk', d.id_produk, 'stok', d.jumlah);
-        }
+        await kembalikanStokPesanan(db, await rows(db, 'detail_pesanan', [Query.equal('id_pesanan', ps.$id)]));
         await upd(db, 'pembayaran', by.$id, { status_pembayaran: 'GAGAL' });
         await upd(db, 'pesanan', ps.$id, {
           status_pesanan: 'DIBATALKAN',
@@ -105,9 +104,7 @@ export async function POST(req) {
       if (by?.metode !== 'BAYAR_DI_TEMPAT') return err('Batas waktu ini hanya berlaku untuk bayar di lapak.');
       if (Date.now() < tenggatBayarTenant(p)) return err('Batas waktu pembayaran di lapak belum lewat.');
 
-      for (const d of await rows(db, 'detail_pesanan', [Query.equal('id_pesanan', id)])) {
-        await inc(db, 'produk', d.id_produk, 'stok', d.jumlah);
-      }
+      await kembalikanStokPesanan(db, await rows(db, 'detail_pesanan', [Query.equal('id_pesanan', id)]));
       if (by) await upd(db, 'pembayaran', by.$id, { status_pembayaran: 'GAGAL' });
       await upd(db, 'pesanan', id, {
         status_pesanan: 'DIBATALKAN',
@@ -149,7 +146,7 @@ export async function POST(req) {
     }
     if (batal) {
       data.alasan_pembatalan = String(alasan || (olehPembeli ? 'Dibatalkan pembeli' : 'Ditolak mitra')).slice(0, 500);
-      for (const d of await rows(db, 'detail_pesanan', [Query.equal('id_pesanan', id)])) await inc(db, 'produk', d.id_produk, 'stok', d.jumlah); // kembalikan stok
+      await kembalikanStokPesanan(db, await rows(db, 'detail_pesanan', [Query.equal('id_pesanan', id)]));
       if (by?.status_pembayaran === 'BERHASIL') await upd(db, 'pembayaran', by.$id, { status_pembayaran: 'REFUND_DIAJUKAN' });
       else if (by?.status_pembayaran === 'MENUNGGU') await upd(db, 'pembayaran', by.$id, { status_pembayaran: 'GAGAL' });
     }
