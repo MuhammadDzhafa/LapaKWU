@@ -5,7 +5,8 @@ import { hitungKomisi } from '@/lib/komisi';
 export const dynamic = 'force-dynamic';
 
 // Stok dan penjualan langsung di lapak (offline), dikelola mitra:
-//   tambah  : stok +jumlah (barang masuk, atau salah pencet "-")
+//   tambah  : stok +jumlah
+//   kurang  : stok -jumlah tanpa mencatat penjualan
 //   jual    : stok -jumlah, dicatat ke penjualan_offline, masuk rekap bulan berjalan
 //   koreksi : turunkan jumlah terjual offline bulan ini jadi `jumlah` (hanya boleh turun);
 //             catatan terbaru dihapus, stok dikembalikan, rekap berkurang otomatis
@@ -40,22 +41,23 @@ export async function POST(req) {
     const produkTerkunci = await getRow(db, 'produk', p.$id).catch(() => null);
     if (!produkTerkunci || produkTerkunci.diarsipkan || produkTerkunci.id_mitra !== u.$id) return err('Produk tidak ditemukan.', 404);
     p = produkTerkunci;
-    const jml = Math.floor(+b.jumlah);
+    const jml = Number(b.jumlah);
     const periode = periodeIni();
 
     if (b.aksi === 'tambah') {
       if (!Number.isSafeInteger(jml) || jml < 1) return err('Jumlah tidak valid.');
       await inc(db, 'produk', p.$id, 'stok', jml);
-      return Response.json({ ok: true });
+      return Response.json({ ok: true, stok: p.stok + jml });
     }
 
-    if (b.aksi === 'jual') {
+    if (b.aksi === 'kurang' || b.aksi === 'jual') {
       if (!Number.isSafeInteger(jml) || jml < 1) return err('Jumlah tidak valid.');
       if (p.stok < jml) return err('Stok ' + p.nama + ' tidak cukup.');
       await dec(db, 'produk', p.$id, 'stok', jml);
+      if (b.aksi === 'kurang') return Response.json({ ok: true, stok: p.stok - jml });
       await put(db, 'penjualan_offline', ID.unique(), { id_mitra: u.$id, id_produk: p.$id, nama_produk: p.nama, jumlah: jml, harga_satuan: p.harga, subtotal: jml * p.harga, waktu: new Date(), periode });
       await ubahRekap(db, await rekapId(db, u.$id, periode), jml * p.harga, jml);
-      return Response.json({ ok: true });
+      return Response.json({ ok: true, stok: p.stok - jml });
     }
 
     if (b.aksi === 'koreksi') {
@@ -63,7 +65,7 @@ export async function POST(req) {
       const log = await rows(db, 'penjualan_offline', [Query.equal('id_mitra', u.$id), Query.equal('id_produk', p.$id), Query.equal('periode', periode), Query.orderDesc('waktu'), Query.limit(500)]);
       if (log.length === 500) return err('Koreksi dibatasi pada 500 catatan terakhir. Hubungi admin untuk koreksi periode dengan lebih banyak catatan.');
       const sekarang = log.reduce((a, l) => a + l.jumlah, 0);
-      if (!(baru >= 0) || baru > sekarang) return err(`Isi angka 0 sampai ${sekarang}. Menambah penjualan lewat tombol −.`);
+      if (!(baru >= 0) || baru > sekarang) return err(`Isi angka 0 sampai ${sekarang}. Gunakan Catat penjualan offline untuk menambah penjualan.`);
       let sisa = sekarang - baru, uang = 0, kembali = 0;
       for (const l of log) { // hapus dari catatan terbaru; catatan terakhir dipotong kalau jumlahnya lebih besar dari sisa
         if (sisa <= 0) break;

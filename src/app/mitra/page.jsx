@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { list, api, storage, ID, Query, BUCKET, rp, img } from '@/lib/aw';
@@ -34,6 +34,8 @@ export default function Lapak() {
   const [st, setSt] = useState(null);
   const [off, setOff] = useState(null);
   const [edit, setEdit] = useState({});
+  const prosesStok = useRef(false);
+  const [sibukStok, setSibukStok] = useState(false);
   const [layanan, setLayanan] = useState(null);
   const [simpanLayanan, setSimpanLayanan] = useState(false);
 
@@ -119,13 +121,47 @@ export default function Lapak() {
     } catch (er) { setMsg(er.message); }
   };
   const segarkanStat = () => list('rekap_penjualan', [Query.equal('id_mitra', akun.$id)]).then((rk) => setSt((s) => s && ({ ...s, jual: rk.find((x) => x.periode === bln())?.total_penjualan || 0 }))).catch(() => {});
-  // Tap +/−: angka stok berubah langsung di layar, server mencatat stok dan rekap. Gagal -> data dimuat ulang.
-  const ketuk = async (p, aksi) => {
-    if (aksi === 'jual' && p.stok < 1) return setMsg(`Stok ${p.nama} sudah habis.`);
-    setMsg(''); setPs((l) => l.map((x) => (x.$id === p.$id ? { ...x, stok: x.stok + (aksi === 'jual' ? -1 : 1) } : x)));
-    try { await api('/api/stok', { aksi, id: p.$id, jumlah: 1 }); if (aksi === 'jual') segarkanStat(); }
-    catch (e) { setMsg(e.message); muat(); }
+  const ketuk = async (p, aksi, jumlah = 1) => {
+    if (prosesStok.current) return;
+    prosesStok.current = true;
+    setSibukStok(true);
+    setMsg('');
+    try {
+      const { stok } = await api('/api/stok', { aksi, id: p.$id, jumlah });
+      setPs((daftar) => daftar.map((x) => x.$id === p.$id ? { ...x, stok } : x));
+      if (aksi === 'jual') {
+        await segarkanStat();
+        toast(`Penjualan offline ${jumlah} pcs ${p.nama} berhasil dicatat.`);
+      }
+    } catch (e) {
+      setMsg(e.message);
+    } finally {
+      prosesStok.current = false;
+      setSibukStok(false);
+    }
   };
+  const catatPenjualan = (p) => setModalInfo({
+    judul: 'Catat penjualan offline',
+    pesan: `${p.nama} · ${rp(p.harga)} per pcs · Stok tersedia ${p.stok} pcs.`,
+    tipe: 'input',
+    inputType: 'number',
+    inputLabel: 'Jumlah terjual (pcs)',
+    inputDefault: 1,
+    inputMin: 1,
+    inputMax: p.stok,
+    tombolOk: 'Catat penjualan',
+    onOk: async (nilai) => {
+      const jumlah = Number(nilai);
+      if (prosesStok.current || !Number.isSafeInteger(jumlah) || jumlah < 1 || jumlah > p.stok) return;
+      setBusyModal(true);
+      try {
+        await ketuk(p, 'jual', jumlah);
+      } finally {
+        setModalInfo(null);
+        setBusyModal(false);
+      }
+    },
+  });
   const koreksi = async (nama, id, baru) => {
     try { const r = await api('/api/stok', { aksi: 'koreksi', id, baru }); setMsg(`${r.dikembalikan} pcs ${nama} dikembalikan ke stok, rekap ikut dikoreksi.`); setEdit({}); await Promise.all([muat(), muatOff(), segarkanStat()]); }
     catch (e) { setMsg(e.message); }
@@ -326,6 +362,8 @@ export default function Lapak() {
           inputType={modalInfo.inputType}
           inputLabel={modalInfo.inputLabel}
           inputDefault={modalInfo.inputDefault}
+          inputMin={modalInfo.inputMin}
+          inputMax={modalInfo.inputMax}
           kategori={kategori}
           inputOpsional={modalInfo.inputOpsional}
           inputPlaceholder={modalInfo.inputPlaceholder}
@@ -407,6 +445,7 @@ export default function Lapak() {
           {ps?.length > 0 && <div className="field saring-daftar">
             <label htmlFor="cari-produk-mitra">Cari produk lapak</label>
             <input id="cari-produk-mitra" type="search" placeholder="Nama, kategori, atau varian" value={cariProduk} onChange={(e) => setCariProduk(e.target.value)} />
+            <small className="muted">Tombol − dan + hanya mengoreksi stok. Gunakan Catat penjualan offline saat produk terjual di lapak.</small>
           </div>}
           {ps?.length > 0 && !produkCocok.length && <p className="kosong">Produk tidak ditemukan.</p>}
           {produkCocok.map((p) => (
@@ -417,7 +456,8 @@ export default function Lapak() {
                     const harga = hargaAddOn(p, nama);
                     return harga > 0 ? `${nama} (+${rp(harga)})` : nama;
                   }).join(', ')}</small>}</div></div>
-              <div className="row"><span className="qty" role="group" aria-label={`Stok ${p.nama}`}><button className="qb" aria-label={`Kurangi stok ${p.nama} (terjual offline)`} disabled={p.stok < 1} onClick={() => ketuk(p, 'jual')}>−</button><b key={p.stok} className="qn" aria-live="polite">{p.stok}</b><button className="qb add" aria-label={`Tambah stok ${p.nama}`} onClick={() => ketuk(p, 'tambah')}>+</button></span>
+              <div className="row"><span className="qty" role="group" aria-label={`Koreksi stok ${p.nama}`}><button type="button" className="qb" aria-label={`Kurangi stok ${p.nama} tanpa mencatat penjualan`} disabled={sibukStok || p.stok < 1} onClick={() => ketuk(p, 'kurang')}>−</button><b key={p.stok} className="qn" aria-live="polite">{p.stok}</b><button type="button" className="qb add" aria-label={`Tambah stok ${p.nama}`} disabled={sibukStok} onClick={() => ketuk(p, 'tambah')}>+</button></span>
+                <button type="button" className="btn sm out" disabled={sibukStok || p.stok < 1} onClick={() => catatPenjualan(p)}>Catat penjualan offline</button>
                 <button className="link" onClick={() => harga(p)}>Ubah harga</button><button className="link" onClick={() => stok(p)}>Ubah stok</button><button className="link" onClick={() => ubahKategori(p)}>Ubah kategori</button><button className="link" onClick={() => ubahAddOn(p)}>Ubah add-on</button><button className="link" onClick={() => hapusP(p)}>Hapus</button></div>
             </div>))}
         </div></div>}
@@ -427,7 +467,7 @@ export default function Lapak() {
         const per = {};
         for (const l of off) { const o = (per[l.id_produk] ??= { id: l.id_produk, nama: l.nama_produk, jml: 0, uang: 0 }); o.jml += l.jumlah; o.uang += l.subtotal; }
         const baris = Object.values(per);
-        if (!baris.length) return <p className="kosong">Belum ada penjualan offline bulan ini. Tekan − di tab Produk dan stok setiap ada pembeli di lapak.</p>;
+        if (!baris.length) return <p className="kosong">Belum ada penjualan offline bulan ini. Gunakan tombol Catat penjualan offline di tab Produk dan stok.</p>;
         return (<>
           <div className="scroll"><table>
             <thead><tr><th>Produk</th><th>Terjual offline (bulan ini)</th><th>Pendapatan</th><th></th></tr></thead>
@@ -438,7 +478,7 @@ export default function Lapak() {
                 <td>{+v !== r.jml && <button className="btn sm sun" onClick={() => koreksi(r.nama, r.id, +v)}>Simpan koreksi</button>}</td></tr>); })}</tbody>
             <tfoot><tr><th>Total</th><th>{baris.reduce((a, r) => a + r.jml, 0)}</th><th>{rp(baris.reduce((a, r) => a + r.uang, 0))}</th><th></th></tr></tfoot>
           </table></div>
-          <p className="muted" style={{ marginTop: 10 }}><small>Salah pencet −? Turunkan angka terjual lalu simpan. Stok bertambah kembali dan rekap penjualan ikut dikoreksi otomatis. Angka hanya bisa diturunkan; untuk menambah penjualan, tekan −.</small></p>
+          <p className="muted" style={{ marginTop: 10 }}><small>Jika penjualan salah dicatat, turunkan jumlah terjual lalu simpan koreksi. Stok dikembalikan dan rekap penjualan diperbarui.</small></p>
         </>);
       })()}
 

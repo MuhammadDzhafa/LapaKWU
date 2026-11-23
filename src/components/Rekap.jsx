@@ -157,7 +157,7 @@ export default function Rekap({ mitraId, nama = {} }) {
         <tfoot><tr><th colSpan={mitraId ? 1 : 2}>Total</th><th>{sum('jumlah_transaksi')}</th><th>{rp(sum('total_penjualan'))}</th><th>{rp(sum('total_komisi'))}</th><th>{rp(sum('total_offline'))}</th></tr></tfoot>
       </table></div>
     </div>
-    <p className="muted" style={{ marginTop: 10 }}><small>Penjualan offline (tombol − di Produk dan stok) ikut menambah total penjualan dan jumlah transaksi.</small></p>
+    <p className="muted" style={{ marginTop: 10 }}><small>Penjualan yang dicatat melalui Catat penjualan offline ikut menambah total penjualan dan jumlah transaksi.</small></p>
     {adaLanjutan && d.length > 0 && d.length % 500 === 0 && <div className="row" style={{ justifyContent: 'center' }}><button type="button" className="btn sm out" disabled={muatLanjutan} onClick={async () => { setMuatLanjutan(true); await muat(halaman + 500, true); setMuatLanjutan(false); }}>{muatLanjutan ? 'Memuat…' : 'Muat rekap berikutnya'}</button></div>}
   </section>);
 }

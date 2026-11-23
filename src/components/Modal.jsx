@@ -13,6 +13,7 @@ import InputVarian from '@/components/InputVarian';
  * - inputType: 'text' | 'number' | 'textarea'
  * - inputLabel: string
  * - inputDefault: string | number
+ * - inputMin, inputMax: batas untuk input angka
  * - inputPlaceholder: string
  * - tombolOk: string (default: 'Lanjutkan')
  * - tombolBatal: string (default: 'Batal')
@@ -28,6 +29,8 @@ export default function Modal({
   inputType = 'text',
   inputLabel = 'Keterangan',
   inputDefault = '',
+  inputMin,
+  inputMax,
   inputPlaceholder = '',
   inputOpsional = false,
   kategori,
@@ -40,6 +43,7 @@ export default function Modal({
 }) {
   const [val, setVal] = useState(inputDefault !== undefined ? inputDefault : '');
   const formId = useId();
+  const inputId = useId();
 
   useEffect(() => {
     setVal(inputDefault !== undefined ? inputDefault : '');
@@ -65,15 +69,15 @@ export default function Modal({
         {tipe === 'input' && (
           <form id={formId} onSubmit={handleSubmit} style={{ marginBottom: 16 }}>
             <div className="field">
-              {inputLabel && !['varian', 'kategori'].includes(inputType) && <label>{inputLabel}</label>}
+              {inputLabel && !['varian', 'kategori'].includes(inputType) && <label htmlFor={inputId}>{inputLabel}</label>}
               {inputType === 'kategori' ? (
                 <PilihKategoriProduk nilai={val} onUbah={setVal} nonaktif={busy} kategori={kategori} />
               ) : inputType === 'varian' ? (
                 <InputVarian judul={inputLabel} nilai={val} onUbah={setVal} nonaktif={busy} />
               ) : inputType === 'textarea' ? (
-                <textarea rows={3} required={!inputOpsional} placeholder={inputPlaceholder} value={val} onChange={(e) => setVal(e.target.value)} style={{ width: '100%', resize: 'vertical' }} autoFocus />
+                <textarea id={inputId} rows={3} required={!inputOpsional} placeholder={inputPlaceholder} value={val} onChange={(e) => setVal(e.target.value)} style={{ width: '100%', resize: 'vertical' }} autoFocus />
               ) : (
-                <input type={inputType} required={!inputOpsional} placeholder={inputPlaceholder} value={val} onChange={(e) => setVal(e.target.value)} style={{ width: '100%' }} autoFocus />
+                <input id={inputId} type={inputType} min={inputMin} max={inputMax} required={!inputOpsional} placeholder={inputPlaceholder} value={val} onChange={(e) => setVal(e.target.value)} style={{ width: '100%' }} autoFocus />
               )}
             </div>
           </form>
