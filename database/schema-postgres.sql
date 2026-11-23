@@ -34,9 +34,10 @@ CREATE TABLE IF NOT EXISTS mitra (
   id TEXT PRIMARY KEY REFERENCES pengguna(id) ON DELETE CASCADE,
   id_admin_verifikator TEXT REFERENCES pengguna(id) ON DELETE SET NULL,
   nama_usaha TEXT NOT NULL, alamat_usaha TEXT NOT NULL DEFAULT '', catatan_verifikasi TEXT, rekening TEXT, id_qris TEXT,
-  nomor_tenant INTEGER UNIQUE,
+  nomor_tenant INTEGER,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), extra JSONB NOT NULL DEFAULT '{}'
 );
+ALTER TABLE mitra DROP CONSTRAINT IF EXISTS mitra_nomor_tenant_key;
 CREATE TABLE IF NOT EXISTS admin (
   id TEXT PRIMARY KEY REFERENCES pengguna(id) ON DELETE CASCADE, level_akses TEXT NOT NULL DEFAULT 'SUPER',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), extra JSONB NOT NULL DEFAULT '{}'

@@ -89,12 +89,7 @@ export async function POST(req) {
       throw error;
     });
     if (!mitra) return err('Mitra tidak ditemukan.', 404);
-    try {
-      await upd(null, 'mitra', mitra.$id, { nomor_tenant });
-    } catch (error) {
-      if (error.code === '23505') return err('Nomor tenant sudah digunakan mitra lain.', 409);
-      throw error;
-    }
+    await upd(null, 'mitra', mitra.$id, { nomor_tenant });
     return Response.json({ ok: true });
   }
 

@@ -241,7 +241,6 @@ export default function Admin() {
   if (peran !== 'admin') return <main className="wrap"><p className="kosong">Halaman ini khusus admin. <Link className="link" href="/masuk">Masuk</Link></p></main>;
   const kataMitra = cariMitra.trim().toLowerCase();
   const mitraCocok = d.m.filter((m) => m.nama_usaha.toLowerCase().includes(kataMitra) || String(m.nomor_tenant ?? '') === kataMitra);
-  const tenantTerisi = new Map(d.m.filter((m) => m.nomor_tenant).map((m) => [m.nomor_tenant, m.$id]));
   const nMitra = d.m.filter((x) => pg(x.$id)?.status_akun !== 'AKTIF').length;
   const nQris = (d.qris || []).length;
   const nRefund = d.rf.length;
@@ -446,7 +445,7 @@ export default function Admin() {
                   <option value={x.nomor_tenant}>{x.nomor_tenant} (di luar denah baru)</option>
                 )}
                 {Array.from({ length: JUMLAH_TENANT }, (_, i) => i + 1).map((nomor) => (
-                  <option key={nomor} value={nomor} disabled={tenantTerisi.has(nomor) && tenantTerisi.get(nomor) !== x.$id}>{nomor}</option>
+                  <option key={nomor} value={nomor}>{nomor}</option>
                 ))}
               </select>
               <button className="btn sm" disabled={simpanTenant !== null}>Simpan</button>
