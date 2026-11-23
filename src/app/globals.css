@@ -604,21 +604,7 @@ html[data-nav=hide] .top:has(.panel-notifikasi){transform:none}
 .denah-header h3,.denah-header p{margin:0}
 .denah-peta{max-width:760px;margin-inline:auto;border:1px solid #d6dce2;border-radius:12px;background:#fff;color:#172442}
 .denah-svg{display:block;width:100%;height:auto}
-.denah-zona{fill:#d9e5fa;stroke:#acbddb}
-.denah-jalan{fill:#e6eaf3;stroke:#84919d;stroke-dasharray:5 4}
-.denah-svg text{text-anchor:middle;font-weight:800}
-.denah-judul{font-size:24px}
-.denah-label{font-size:17px}
-.denah-jarak{font-size:14px}
-.denah-stand[data-zona=atas] rect{fill:#d5f3e1;stroke:#358459}
-.denah-stand[data-zona=kiri] rect{fill:#d6edff;stroke:#2580be}
-.denah-stand[data-zona=kanan] rect{fill:#ecddfb;stroke:#8251ab}
-.denah-stand[data-zona=tengah] rect{fill:#ffe8a8;stroke:#b07924}
-.denah-stand text{fill:#172442;font-size:24px}
-.denah-stand-aktif{transform:translateY(-5px);filter:drop-shadow(0 4px 2px rgb(60 45 10 / .34));transition:transform .2s}
-.denah-stand-aktif[data-zona] rect{fill:var(--sun);stroke:#a74414;stroke-width:4}
-.denah-stand-aktif:hover{transform:translateY(-9px)}
-@media(prefers-reduced-motion:reduce){.denah-stand-aktif{transition:none}}
+.denah-sorotan{fill:#ffb40045;stroke:#a74414;stroke-width:2.5;vector-effect:non-scaling-stroke}
 
 
 /* =====================================================================
@@ -756,7 +742,7 @@ html[data-scrolled] .top .wrap{min-height:52px;background:rgba(255,253,248,.9);b
 .foot::after{content:"LapaKWU"/"";display:block;text-align:center;font:800 clamp(4.5rem,21vw,17rem)/.78 var(--f-disp);letter-spacing:-.07em;color:color-mix(in srgb,var(--cr) 9%,transparent);transform:translateY(20%);user-select:none;pointer-events:none;white-space:nowrap}
 
 /* ---------- modal & denah ---------- */
-.add-on-dialog{position:fixed;inset:0;width:min(calc(100% - 24px),460px);height:fit-content;max-height:90dvh;margin:auto}
+.add-on-dialog{position:fixed;inset:50% auto auto 50%;translate:-50% -50%;width:min(calc(100% - 24px),460px);max-height:calc(100dvh - 24px);margin:0}
 .add-on-pilihan{display:grid;gap:8px;min-width:0;border:0;padding:0;margin:0}
 .add-on-pilihan legend{padding:0;margin-bottom:8px;font-weight:700}
 .add-on-pilihan label{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;cursor:pointer}
@@ -791,8 +777,6 @@ html[data-scrolled] .top .wrap{min-height:52px;background:rgba(255,253,248,.9);b
 .denah-modal{border-radius:28px;box-shadow:0 40px 80px -30px rgba(34,49,63,.7)}
 .denah-modal[open]{animation:modalpop .45s var(--ease)}
 .denah-modal::backdrop{background:rgba(34,49,63,.65)}
-.denah-stand-aktif rect{animation:denah 1.6s ease-in-out infinite}
-@keyframes denah{50%{stroke-width:4;filter:drop-shadow(0 0 7px var(--or))}}
 
 /* sidebar HP: warna abu-abu bawaan diganti turunan palet */
 
@@ -818,7 +802,7 @@ html[data-scrolled] .top .wrap{min-height:52px;background:rgba(255,253,248,.9);b
   .auth>.card.pad{--pad:16px}
 }
 @media (prefers-reduced-motion:reduce){
-  .aurora i,.stage::before,.band::before,.band::after,.buah,.kilau,.jumbai,.auth::before,.auth::after,.sisa::before,.denah-stand-aktif rect{animation:none}
+  .aurora i,.stage::before,.band::before,.band::after,.buah,.kilau,.jumbai,.auth::before,.auth::after,.sisa::before{animation:none}
   .progress{display:none}
   .hero2 .wrap{animation:none}
 }

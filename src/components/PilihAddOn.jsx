@@ -56,10 +56,10 @@ export default function PilihAddOn({ produk, jumlah = 1, onTutup, onBeli }) {
       </div>
       <form className="stack" onSubmit={tambah}>
         <fieldset className="add-on-pilihan" disabled={sibuk}>
-          <legend>Pilih varian (boleh lebih dari satu)</legend>
+          <legend>Pilih add-on (boleh lebih dari satu)</legend>
           {(produk.pilihan_add_on || []).map((nama) => (
             <label key={nama}>
-              <input type="checkbox" name="varian" value={nama} checked={terpilih.includes(nama)} onChange={(e) => {
+              <input type="checkbox" name="add-on" value={nama} checked={terpilih.includes(nama)} onChange={(e) => {
                 const { checked } = e.target;
                 setTerpilih((sebelumnya) => checked ? [...sebelumnya, nama] : sebelumnya.filter((item) => item !== nama));
               }} />
