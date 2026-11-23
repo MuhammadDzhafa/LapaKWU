@@ -71,15 +71,15 @@ export default function Detail() {
     }
     await ubahItemKeranjang(p, n);
   };
-  const beli = (addOn = '', kuantitas = n) => {
+  const beli = (addOn = '') => {
     if (!bisaPesan) return;
     if (!akun) {
       sessionStorage.removeItem('lapakwu_add_on_intent');
-      sessionStorage.setItem('lapakwu_checkout_intent', JSON.stringify({ productId: id, quantity: kuantitas, addOn }));
+      sessionStorage.setItem('lapakwu_checkout_intent', JSON.stringify({ productId: id, quantity: n, addOn }));
       r.push('/masuk');
       return;
     }
-    const checkout = new URLSearchParams({ beli: id, jml: String(kuantitas), add_on: addOn });
+    const checkout = new URLSearchParams({ beli: id, jml: String(n), add_on: addOn });
     r.push(`/checkout?${checkout}`);
   };
 
@@ -97,7 +97,7 @@ export default function Detail() {
         <p><span className="badge" data-s={p.stok > 0 ? 'AKTIF' : 'DIBATALKAN'}>{p.stok > 0 ? `Stok ${p.stok}` : 'Stok habis'}</span></p>
         {p.stok > 0 ? (<>
           {modeAddOn && <PilihAddOn produk={p} jumlah={n} onTutup={() => setModeAddOn(null)} onBeli={modeAddOn === 'langsung' ? beli : undefined} />}
-          {!p.stok_varian && <div className="row">
+          <div className="row">
             <label htmlFor="jml"><b>Jumlah</b></label>
             <button type="button" className="btn out sm" aria-label="Kurangi" disabled={n <= 1} onClick={() => updateQty(n - 1)}>−</button>
             <input
@@ -112,7 +112,7 @@ export default function Detail() {
             />
             <button type="button" className="btn out sm" aria-label="Tambah" disabled={n >= p.stok} onClick={() => updateQty(n + 1)}>+</button>
             <b style={{ marginLeft: 8 }}>{rp(p.harga * n)}</b>
-          </div>}
+          </div>
           {inCartQty > 0 && (
             <div style={{ background: 'var(--tint)', border: '1px solid var(--or)', padding: '10px 16px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
               <span>✓ <b>{inCartQty}</b> produk sudah ada di keranjangmu</span>

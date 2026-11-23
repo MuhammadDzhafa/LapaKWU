@@ -371,7 +371,7 @@ export default function Beranda() {
                     {x.id_gambar ? <img src={img(x.id_gambar)} alt="" loading="lazy" decoding="async" /> : <span>{x.nama[0]}</span>}
                     {kategoriPerProduk.get(x.$id)?.length > 0 && <span className="kat">{kategori || kategoriPerProduk.get(x.$id)[0]}</span>}
                     {x.stok < 1 && <em className="habis">Habis</em>}
-                    {x.stok > 0 && (x.stok_varian || x.stok <= 5) && <em className="sisa">Sisa {x.stok} pcs</em>}
+                    {x.stok > 0 && x.stok <= 5 && <em className="sisa">Sisa {x.stok}</em>}
                   </Link>
                   <div className="pb">
                     <Link href={`/produk/${x.$id}`} className="nm">{x.nama}</Link>

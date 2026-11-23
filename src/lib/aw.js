@@ -1,6 +1,6 @@
 // Lapisan API sisi browser; data hanya diakses melalui route Next.js.
 
-import { hargaSatuanProduk, itemCocok, stokPilihan } from './add-on';
+import { hargaSatuanProduk, itemCocok } from './add-on';
 
 export const BUCKET = 'gambar-produk';
 
@@ -149,9 +149,8 @@ export async function ubahJumlahKeranjang(uid, p, delta = 1, addOn = '', catatan
   const itList = await list('item_keranjang', [{ type: 'eq', col: 'id_keranjang', val: uid }]);
   const it = itList.find((i) => itemCocok(i, p.$id, addOn, catatan));
   const curJml = it?.jumlah || 0;
-  const tersedia = stokPilihan(p, addOn);
-  if (addOn && delta > 0 && curJml + delta > tersedia) throw new Error('Stok produk tidak cukup.');
-  const newJml = delta < 0 ? curJml + delta : Math.min(curJml + delta, tersedia);
+  if (addOn && delta > 0 && curJml + delta > p.stok) throw new Error('Stok produk tidak cukup.');
+  const newJml = Math.min(curJml + delta, p.stok);
 
   if (newJml <= 0) {
     if (it) await hapus('item_keranjang', it.$id);

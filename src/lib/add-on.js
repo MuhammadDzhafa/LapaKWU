@@ -1,6 +1,4 @@
 export const MAKS_HARGA_ADD_ON = 999999999;
-export const MAKS_STOK = 2147483647;
-export const stokValid = (stok) => Number.isInteger(stok) && stok >= 0 && stok <= MAKS_STOK;
 const hargaValid = (nilai) => Number.isSafeInteger(nilai) && nilai >= 0 && nilai <= MAKS_HARGA_ADD_ON;
 // Nama tunggal tetap memakai format lama. Awalan ini membedakan daftar dari nama biasa.
 const PENANDA_MULTI = '\u001f';
@@ -31,15 +29,13 @@ export function bacaPilihanAddOn(teks) {
   for (const item of masukan) {
     const namaMentah = typeof item === 'string' ? item : item?.nama;
     const harga = typeof item === 'string' ? 0 : item?.harga;
-    const stok = typeof item === 'string' ? undefined : item?.stok;
     if (typeof namaMentah !== 'string' || namaMentah.length > 60 || namaMentah.includes('\0') || namaMentah.includes(PENANDA_MULTI) || !hargaValid(harga)) return null;
-    if (stok !== undefined && !stokValid(stok)) return null;
     const nama = namaMentah.trim();
-    if (!nama && harga === 0 && !stok) continue;
+    if (!nama && harga === 0) continue;
     const kunci = nama.toLowerCase();
     if (!nama || dipakai.has(kunci)) return null;
     dipakai.add(kunci);
-    pilihan.push({ nama, harga, ...(stok === undefined ? {} : { stok }) });
+    pilihan.push({ nama, harga });
   }
   return pilihan;
 }
@@ -59,26 +55,9 @@ export function addOnValid(produk, pilihan = '') {
   const daftar = daftarAddOn(pilihan);
   if (!daftar) return false;
   return produk.pilihan_add_on?.length
-    ? (produk.stok_varian ? daftar.length === 1 : daftar.length > 0)
+    ? daftar.length > 0
       && daftar.every((nama) => produk.pilihan_add_on.includes(nama))
     : daftar.length === 0;
-}
-
-export function stokPilihan(produk, pilihan) {
-  if (!produk.stok_varian) return produk.stok;
-  return Object.hasOwn(produk.stok_varian, pilihan) ? produk.stok_varian[pilihan] : 0;
-}
-
-// Stok yang dikembalikan tanpa varian aktif menunggu alokasi mitra.
-export function perubahanStok(produk, pilihan, delta) {
-  if (!produk.stok_varian) return { stok: produk.stok + delta };
-  if (!Object.hasOwn(produk.stok_varian, pilihan)) {
-    return { stok_belum_dialokasikan: (produk.stok_belum_dialokasikan ?? 0) + delta };
-  }
-  return {
-    stok: produk.stok + delta,
-    stok_varian: { ...produk.stok_varian, [pilihan]: stokPilihan(produk, pilihan) + delta },
-  };
 }
 
 export const MAKS_CATATAN_ITEM = 200;

@@ -1,8 +1,7 @@
 import { denganTransaksi, kunciProduk, ubahData } from '@/lib/db';
-import { svc, siapa, err, getRow, rows, put, upd, del, inc, ID, Query } from '@/lib/server';
+import { svc, siapa, err, getRow, rows, put, upd, del, dec, inc, ID, Query } from '@/lib/server';
 import { periodeJakarta } from '@/lib/waktu';
 import { hitungKomisi } from '@/lib/komisi';
-import { hargaSatuanProduk, perubahanStok, stokPilihan, stokValid } from '@/lib/add-on';
 export const dynamic = 'force-dynamic';
 
 // Stok dan penjualan langsung di lapak (offline), dikelola mitra:
@@ -43,23 +42,19 @@ export async function POST(req) {
     p = produkTerkunci;
     const jml = Math.floor(+b.jumlah);
     const periode = periodeIni();
-    const pilihan = p.stok_varian ? b.varian : '';
-    if (p.stok_varian && ['tambah', 'jual'].includes(b.aksi)
-      && (typeof pilihan !== 'string' || !Object.hasOwn(p.stok_varian, pilihan))) return err('Pilih varian yang tersedia.');
 
     if (b.aksi === 'tambah') {
-      if (!stokValid(jml) || jml < 1 || !stokValid(p.stok + jml)) return err('Jumlah tidak valid.');
-      await upd(db, 'produk', p.$id, perubahanStok(p, pilihan, jml));
+      if (!Number.isSafeInteger(jml) || jml < 1) return err('Jumlah tidak valid.');
+      await inc(db, 'produk', p.$id, 'stok', jml);
       return Response.json({ ok: true });
     }
 
     if (b.aksi === 'jual') {
       if (!Number.isSafeInteger(jml) || jml < 1) return err('Jumlah tidak valid.');
-      if (stokPilihan(p, pilihan) < jml) return err('Stok ' + p.nama + ' tidak cukup.');
-      const harga = hargaSatuanProduk(p, pilihan);
-      await upd(db, 'produk', p.$id, perubahanStok(p, pilihan, -jml));
-      await put(db, 'penjualan_offline', ID.unique(), { id_mitra: u.$id, id_produk: p.$id, nama_produk: p.nama, add_on: pilihan, jumlah: jml, harga_satuan: harga, subtotal: jml * harga, waktu: new Date(), periode });
-      await ubahRekap(db, await rekapId(db, u.$id, periode), jml * harga, jml);
+      if (p.stok < jml) return err('Stok ' + p.nama + ' tidak cukup.');
+      await dec(db, 'produk', p.$id, 'stok', jml);
+      await put(db, 'penjualan_offline', ID.unique(), { id_mitra: u.$id, id_produk: p.$id, nama_produk: p.nama, jumlah: jml, harga_satuan: p.harga, subtotal: jml * p.harga, waktu: new Date(), periode });
+      await ubahRekap(db, await rekapId(db, u.$id, periode), jml * p.harga, jml);
       return Response.json({ ok: true });
     }
 
@@ -70,15 +65,13 @@ export async function POST(req) {
       const sekarang = log.reduce((a, l) => a + l.jumlah, 0);
       if (!(baru >= 0) || baru > sekarang) return err(`Isi angka 0 sampai ${sekarang}. Menambah penjualan lewat tombol −.`);
       let sisa = sekarang - baru, uang = 0, kembali = 0;
-      const stokBaru = {};
       for (const l of log) { // hapus dari catatan terbaru; catatan terakhir dipotong kalau jumlahnya lebih besar dari sisa
         if (sisa <= 0) break;
-        Object.assign(stokBaru, perubahanStok({ ...p, ...stokBaru }, l.add_on, Math.min(l.jumlah, sisa)));
         if (l.jumlah <= sisa) { await del(db, 'penjualan_offline', l.$id); sisa -= l.jumlah; uang += l.subtotal; kembali += l.jumlah; }
         else { await upd(db, 'penjualan_offline', l.$id, { jumlah: l.jumlah - sisa, subtotal: (l.jumlah - sisa) * l.harga_satuan }); uang += sisa * l.harga_satuan; kembali += sisa; sisa = 0; }
       }
       if (kembali) {
-        await upd(db, 'produk', p.$id, stokBaru);
+        await inc(db, 'produk', p.$id, 'stok', kembali);
         await ubahRekap(db, await rekapId(db, u.$id, periode), -uang, -kembali);
       }
       return Response.json({ ok: true, dikembalikan: kembali });

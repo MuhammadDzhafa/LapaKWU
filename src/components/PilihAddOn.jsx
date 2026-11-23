@@ -2,7 +2,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSaya } from '@/components/Shell';
-import { addOnValid, hargaAddOn, hargaSatuanProduk, MAKS_CATATAN_ITEM, simpanPilihanAddOn, stokPilihan } from '@/lib/add-on';
+import { addOnValid, hargaAddOn, hargaSatuanProduk, MAKS_CATATAN_ITEM, simpanPilihanAddOn } from '@/lib/add-on';
 import { rp } from '@/lib/aw';
 
 export default function PilihAddOn({ produk, jumlah = 1, onTutup, onBeli }) {
@@ -10,11 +10,9 @@ export default function PilihAddOn({ produk, jumlah = 1, onTutup, onBeli }) {
   const mengirim = useRef(false);
   const judul = useId();
   const catatanId = useId();
-  const jumlahId = useId();
   const router = useRouter();
   const { akun, memuat, ubahItemKeranjang } = useSaya();
   const [terpilih, setTerpilih] = useState([]);
-  const [jumlahVarian, setJumlahVarian] = useState(1);
   const [catatan, setCatatan] = useState('');
   const [sibuk, setSibuk] = useState(false);
   const [pesan, setPesan] = useState('');
@@ -26,17 +24,14 @@ export default function PilihAddOn({ produk, jumlah = 1, onTutup, onBeli }) {
   }, []);
 
   const pilihan = simpanPilihanAddOn(terpilih);
-  const pakaiStokVarian = Boolean(produk.stok_varian);
-  const kuantitas = pakaiStokVarian ? Number(jumlahVarian) : jumlah;
-  const tersedia = stokPilihan(produk, pilihan);
-  const valid = addOnValid(produk, pilihan) && Number.isInteger(kuantitas) && kuantitas >= 1 && kuantitas <= tersedia;
+  const valid = addOnValid(produk, pilihan) && jumlah <= produk.stok;
   const tambah = async (e) => {
     e.preventDefault();
     if (!valid || memuat || mengirim.current) return;
-    if (onBeli) return onBeli(pilihan, kuantitas);
+    if (onBeli) return onBeli(pilihan);
     if (!akun) {
       sessionStorage.removeItem('lapakwu_checkout_intent');
-      sessionStorage.setItem('lapakwu_add_on_intent', JSON.stringify({ id: produk.$id, jumlah: kuantitas, pilihan, catatan: catatan.trim() }));
+      sessionStorage.setItem('lapakwu_add_on_intent', JSON.stringify({ id: produk.$id, jumlah, pilihan, catatan: catatan.trim() }));
       router.push('/masuk');
       return;
     }
@@ -44,7 +39,7 @@ export default function PilihAddOn({ produk, jumlah = 1, onTutup, onBeli }) {
     setSibuk(true);
     setPesan('');
     try {
-      const hasil = await ubahItemKeranjang(produk, kuantitas, pilihan, catatan.trim());
+      const hasil = await ubahItemKeranjang(produk, jumlah, pilihan, catatan.trim());
       if (hasil > 0) onTutup();
       else setPesan('Produk belum masuk ke keranjang. Periksa ketersediaan stok dan coba lagi.');
     } finally {
@@ -61,29 +56,18 @@ export default function PilihAddOn({ produk, jumlah = 1, onTutup, onBeli }) {
       </div>
       <form className="stack" onSubmit={tambah}>
         <fieldset className="add-on-pilihan" disabled={sibuk}>
-          <legend>{pakaiStokVarian ? 'Pilih varian' : 'Pilih varian (boleh lebih dari satu)'}</legend>
+          <legend>Pilih varian (boleh lebih dari satu)</legend>
           {(produk.pilihan_add_on || []).map((nama) => (
             <label key={nama}>
-              <input type={pakaiStokVarian ? 'radio' : 'checkbox'} name="varian" value={nama}
-                disabled={pakaiStokVarian && stokPilihan(produk, nama) === 0} checked={terpilih.includes(nama)} onChange={(e) => {
-                if (pakaiStokVarian) {
-                  setTerpilih([nama]);
-                  setJumlahVarian(1);
-                  return;
-                }
+              <input type="checkbox" name="varian" value={nama} checked={terpilih.includes(nama)} onChange={(e) => {
                 const { checked } = e.target;
                 setTerpilih((sebelumnya) => checked ? [...sebelumnya, nama] : sebelumnya.filter((item) => item !== nama));
               }} />
-              <span>{nama}{pakaiStokVarian && <small className="muted" style={{ display: 'block' }}>Sisa {stokPilihan(produk, nama)} pcs</small>}</span>
+              <span>{nama}</span>
               {hargaAddOn(produk, nama) > 0 && <b className="add-on-tambahan">+{rp(hargaAddOn(produk, nama))}</b>}
             </label>
           ))}
         </fieldset>
-        {pakaiStokVarian && pilihan && <div className="field">
-          <label htmlFor={jumlahId}>Jumlah</label>
-          <input id={jumlahId} type="number" min={1} max={tersedia} step={1} required
-            value={jumlahVarian} disabled={sibuk} onChange={(e) => setJumlahVarian(e.target.value)} />
-        </div>}
         {!onBeli && <div className="field">
           <label htmlFor={catatanId}>Catatan (opsional)</label>
           <textarea id={catatanId} rows={2} maxLength={MAKS_CATATAN_ITEM} placeholder="Misalnya, jangan terlalu manis" value={catatan} disabled={sibuk} onChange={(e) => setCatatan(e.target.value)} />
@@ -91,7 +75,7 @@ export default function PilihAddOn({ produk, jumlah = 1, onTutup, onBeli }) {
         {pesan && <p className="msg err" role="alert">{pesan}</p>}
         <button className="btn sun" disabled={!valid || sibuk || memuat}>
           <span>{sibuk ? 'Menambahkan…' : onBeli ? 'Beli sekarang' : 'Tambah pembelian'}</span>
-          <b>{rp(kuantitas * hargaSatuanProduk(produk, pilihan))}</b>
+          <b>{rp(jumlah * hargaSatuanProduk(produk, pilihan))}</b>
         </button>
       </form>
     </dialog>

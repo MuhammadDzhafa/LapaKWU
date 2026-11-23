@@ -1,10 +1,10 @@
-import { siapa, err, getRow, rows, put, upd, del, notif, ID, Query } from '@/lib/server';
+import { siapa, err, getRow, rows, put, upd, del, dec, notif, ID, Query } from '@/lib/server';
 import { cariSatu, denganTransaksi, kunciProduk, queryDatabase } from '@/lib/db';
 import { FORMAT_ID_BUKTI, MAKS_BUKTI_PEMBAYARAN, PESAN_UKURAN_BUKTI } from '@/lib/bukti-pembayaran';
 import { bacaBukti, periksaBukti } from '@/lib/ocr-bukti';
 import { unduhFile } from '@/lib/backblaze';
 
-import { addOnValid, hargaSatuanProduk, namaDenganAddOn, perubahanStok, stokPilihan } from '@/lib/add-on';
+import { addOnValid, hargaSatuanProduk, namaDenganAddOn } from '@/lib/add-on';
 
 import { formatJadwalAmbil, MULAI_PRE_ORDER, waktuPreOrder } from '@/lib/waktu';
 
@@ -68,17 +68,15 @@ export async function POST(req) {
       const produk = await rows(null, 'produk', [Query.equal('$id', items.map((i) => i.id_produk)), Query.equal('diarsipkan', false), Query.limit(500)]);
       const katalog = new Map(produk.map((p) => [p.$id, p]));
       const perMitra = new Map();
-      const stokBaru = new Map();
+      const jumlahPerProduk = new Map();
       for (const item of items) {
         const p = katalog.get(item.id_produk);
         if (!p) return { error: 'Ada produk yang sudah dihapus mitra. Perbarui keranjangmu.' };
         if (!Number.isSafeInteger(item.jumlah) || item.jumlah < 1) return { error: 'Jumlah item tidak valid.' };
         if (!addOnValid(p, item.add_on)) return { error: 'Pilihan add-on ' + p.nama + ' berubah. Pilih ulang dari halaman produk.', status: 409 };
-        const tersedia = { ...p, ...stokBaru.get(p.$id) };
-        if (stokPilihan(tersedia, item.add_on) < item.jumlah) {
-          return { error: 'Stok ' + namaDenganAddOn(p.nama, item.add_on) + ' tidak cukup.', status: 409 };
-        }
-        stokBaru.set(p.$id, perubahanStok(tersedia, item.add_on, -item.jumlah));
+        const jumlah = (jumlahPerProduk.get(p.$id) || 0) + item.jumlah;
+        if (p.stok < jumlah) return { error: 'Stok ' + p.nama + ' tidak cukup.' };
+        jumlahPerProduk.set(p.$id, jumlah);
         const grup = perMitra.get(p.id_mitra) || [];
         const hargaSen = Math.round(hargaSatuanProduk(p, item.add_on) * 100);
         grup.push({ item, produk: p, hargaSen });
@@ -122,7 +120,7 @@ export async function POST(req) {
         status_ocr: statusOcr, referensi: verifikasi.referensi,
         status_pembayaran: 'MENUNGGU',
       });
-      for (const [id, stok] of stokBaru) await upd(null, 'produk', id, stok);
+      for (const [id, jumlah] of jumlahPerProduk) await dec(null, 'produk', id, 'stok', jumlah);
 
       for (const [mid, grup] of perMitra) {
         const mt = mitra.get(mid);

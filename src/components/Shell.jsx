@@ -8,7 +8,7 @@ import Footer from '@/components/Footer';
 import Motion from '@/components/Motion';
 import Ikon from '@/components/Ikon';
 import Notifikasi from '@/components/Notifikasi';
-import { hargaSatuanProduk, itemCocok, stokPilihan } from '@/lib/add-on';
+import { hargaSatuanProduk, itemCocok } from '@/lib/add-on';
 import { bacaKeranjangLokal, simpanKeranjangLokal } from '@/lib/keranjang-lokal';
 
 const Ctx = createContext({});
@@ -93,7 +93,7 @@ export default function Shell({ children }) {
     const cocok = (i) => itemCocok(i, p.$id, addOn, catatan);
     const cur = keranjang.find(cocok);
     const curJml = cur?.jumlah || 0;
-    const targetJml = Math.max(0, delta < 0 ? curJml + delta : Math.min(curJml + delta, stokPilihan(p, addOn)));
+    const targetJml = Math.max(0, Math.min(curJml + delta, p.stok));
     const subtotal = targetJml * hargaSatuanProduk(p, addOn);
 
     // Update optimistik di state lokal

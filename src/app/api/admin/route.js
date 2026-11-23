@@ -1,10 +1,9 @@
 import { cariBanyak, cariSatu, denganTransaksi, kunciPesanan, queryDatabase, ubahData } from '@/lib/db';
-import { siapa, err, getRow, rows, put, upd, del, notif, Query } from '@/lib/server';
+import { siapa, err, getRow, rows, put, upd, del, inc, notif, Query } from '@/lib/server';
 import { buatAkun, cariAkunByEmail, hapusAkun } from '@/lib/auth';
 import { nanoid } from 'nanoid';
 import { JUMLAH_TENANT, nomorTenantValid } from '@/lib/tenant';
 import { arsipProduk } from '@/lib/arsip-produk';
-import { kembalikanStokPesanan } from '@/lib/stok-pesanan';
 export const dynamic = 'force-dynamic';
 
 async function setPeran(id, peran, info = {}) {
@@ -128,7 +127,7 @@ export async function POST(req) {
       await upd(null, 'pembayaran', id, { status_pembayaran: 'GAGAL' });
       await upd(null, 'pesanan', ps.$id, { status_pesanan: 'DIBATALKAN', alasan_pembatalan: catatan || 'Pembayaran ditolak admin (bukti/saldo tidak masuk).' });
       const details = await rows(null, 'detail_pesanan', [Query.equal('id_pesanan', ps.$id)]);
-      await kembalikanStokPesanan(null, details);
+      for (const d of details) await inc(null, 'produk', d.id_produk, 'stok', d.jumlah);
       await notif(null, ps.id_pembeli, 'Pembayaran QRIS Ditolak', `Pembayaran pesanan #${ps.$id.slice(-6)} ditolak admin: ${catatan || 'Bukti transfer tidak valid'}. Stok telah dikembalikan.`, true);
       return Response.json({ ok: true });
     }
