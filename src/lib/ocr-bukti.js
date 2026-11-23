@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { extname, join } from 'node:path';
 import sharp from 'sharp';
 import { denganPekerjaOcr } from './pekerja-ocr.js';
+import { MERCHANT_QRIS } from './bukti-pembayaran.js';
 
 export async function bacaBukti(buffer, originalName) {
   return denganPekerjaOcr(async (baca) => {
@@ -27,8 +28,7 @@ export async function bacaBukti(buffer, originalName) {
 }
 
 const normal = (text) => text.normalize('NFKC').toUpperCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
-const bulan = 'JAN FEB MAR APR MEI JUN JUL AGU SEP OKT NOV DES'.split(' ');
-const bulanInggris = 'JAN FEB MAR APR MAY JUN JUL AUG SEP OCT NOV DEC'.split(' ');
+const merchantQris = normal(MERCHANT_QRIS);
 
 export function rupiahDalamSen(raw) {
   const value = raw.replace(/\s/g, '').replace(/[.,]$/, '');
@@ -38,22 +38,8 @@ export function rupiahDalamSen(raw) {
   return null;
 }
 
-function tanggalBukti(lines) {
-  const cocok = lines.match(/\b(\d{4})[-/](\d{1,2})[-/](\d{1,2})\b/)
-    || lines.match(/\b(\d{1,2})[ /.-]+(\d{1,2}|[a-z]{3,9})[ /.-]+(\d{4})\b/i);
-  if (!cocok) return null;
-  let [, hari, month, tahun] = cocok;
-  if (hari.length === 4) [hari, tahun] = [tahun, hari];
-  if (!/^\d+$/.test(month)) {
-    const prefix = month.slice(0, 3).toUpperCase();
-    month = Math.max(bulan.indexOf(prefix), bulanInggris.indexOf(prefix)) + 1;
-  }
-  const date = new Date(Date.UTC(+tahun, +month - 1, +hari));
-  return date.getUTCMonth() === +month - 1 && date.getUTCDate() === +hari ? date.toISOString().slice(0, 10) : null;
-}
-
-export function periksaBukti(lines, total, now = new Date()) {
-  if (!lines?.length) return { status: 'DITOLAK', temuan: ['Bukti tidak terbaca. Unggah gambar yang menampilkan nominal, nama merchant, dan tanggal transaksi. Jam transaksi tidak harus terbaca.'] };
+export function periksaBukti(lines, total) {
+  if (!lines?.length) return { status: 'DITOLAK', temuan: [`Bukti tidak terbaca. Unggah gambar yang menampilkan merchant ${MERCHANT_QRIS} dan nominal pembayaran.`] };
   const teks = lines.join('\n');
   const jumlahTransfer = /^(?:nominal|jumlah|total)(?:\s+(?:transfer|pembayaran|transaksi))?\b/i;
   const berlabel = lines.flatMap((line, i) => {
@@ -74,29 +60,18 @@ export function periksaBukti(lines, total, now = new Date()) {
     const inline = line.slice(label[0].length).trim();
     return [inline || lines[i + 1] || ''];
   });
-  // Nama merchant harus terbaca sebagai bukti pembayaran, tetapi tidak
-  // dibandingkan dengan satu nama tetap karena QRIS dapat menampilkan nama
-  // merchant dari penyedia pembayaran (misalnya GoPay atau DANA).
-  const penerimaCocok = penerimaTerbaca.some((line) => normal(line).length >= 2);
-  const tanggal = tanggalBukti(teks);
-  const tanggalJakarta = (date) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Jakarta' }).format(date);
-  const hariIni = tanggalJakarta(now);
-  const jam = teks.match(/(?<![\w.:])([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?(?![\d.:])/)
-    || lines.filter((line) => tanggalBukti(line) || /\b(?:jam|waktu|pukul|WIB|WITA|WIT)\b/i.test(line))
-      .join('\n').match(/(?<![\w.:])([01]?\d|2[0-3])\.([0-5]\d)(?:\.([0-5]\d))?(?![\d.:])/);
-  const waktu = jam ? [jam[1].padStart(2, '0'), jam[2], jam[3]].filter(Boolean).join(':') : null;
+  const kandidatPenerima = penerimaTerbaca.length ? penerimaTerbaca : lines;
+  const penerimaCocok = kandidatPenerima.some((line) => normal(line) === merchantQris);
   const temuan = [];
   if (!nominal.length) temuan.push('Nominal pembayaran tidak ditemukan.');
   else if (nominal.length > 1) temuan.push('Nominal pembayaran tidak dapat dipastikan karena ada beberapa jumlah berbeda.');
   else if (!nominalCocok) temuan.push('Nominal pembayaran tidak sama dengan total pesanan.');
-  if (!penerimaCocok) temuan.push('Nama merchant tidak terbaca atau tidak cocok dengan penerima QRIS.');
-  if (!tanggal) temuan.push('Tanggal transaksi tidak ditemukan atau tidak valid.');
-  else if (tanggal !== hariIni) temuan.push('Tanggal transaksi harus sama dengan tanggal pemesanan (WIB).');
+  if (!penerimaCocok) temuan.push(`Nama merchant harus terbaca sebagai ${MERCHANT_QRIS}.`);
   const referensi = teks.match(/(?:no\.?[ \t]*)?(?:referensi|reference|ref\.?|id transaksi)[ \t]*[:#]?[ \t]*(?:\r?\n)?[ \t]*([A-Z0-9-]{8,64})\b/i)?.[1]?.toUpperCase();
   return {
     status: temuan.length ? 'DITOLAK' : 'COCOK',
     temuan,
-    data: { nominal: nominalCocok ? total : (nominal.length === 1 ? nominal[0] / 100 : null), penerima_cocok: penerimaCocok, tanggal, waktu },
+    data: { nominal: nominal.length === 1 ? nominal[0] / 100 : null, penerima_cocok: penerimaCocok },
     ...(referensi ? { referensi } : {}),
   };
 }

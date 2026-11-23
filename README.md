@@ -33,7 +33,7 @@ Untuk membuat admin pertama, isi `INITIAL_ADMIN_PASSWORD` dengan password sement
 
 ## File dan pemeriksaan pembayaran
 
-Isi `Backblaze_keyID`, `Backblaze_app_key`, dan `Backblaze_bucketName` untuk mengaktifkan foto produk, QRIS mitra, dan unggahan bukti pembayaran. Siapkan Python 3.11 atau 3.12, pasang dependensi dari `scripts/requirements-ocr.txt`, dan isi `OCR_PYTHON` dengan path interpreter virtual environment serta `OCR_NAMA_PENERIMA` sesuai nama merchant di bukti QRIS. Admin menerima hasil OCR sebagai bantuan dan memeriksa dana masuk sebelum menyetujui pembayaran. Bukti dapat dibuka oleh pembeli yang mengunggahnya dan admin.
+Isi `Backblaze_keyID`, `Backblaze_app_key`, dan `Backblaze_bucketName` untuk mengaktifkan foto produk, QRIS mitra, dan unggahan bukti pembayaran. Siapkan Python 3.11 atau 3.12, pasang dependensi dari `scripts/requirements-ocr.txt`,, dan isi `OCR_PYTHON` dengan path interpreter virtual environment. OCR mencocokkan merchant LapaKWU, Service dan nominal dengan total checkout. Admin menerima hasil OCR sebagai bantuan dan memeriksa dana masuk sebelum menyetujui pembayaran. Bukti dapat dibuka oleh pembeli yang mengunggahnya dan admin.
 
 `EMAIL_USER` dan `EMAIL_PASS` mengaktifkan email; `FONNTE_TOKEN` mengaktifkan WhatsApp; `PAYHOOK_SECRET` mengaktifkan endpoint konfirmasi dana masuk bila layanan webhook yang dipercaya tersedia. Fitur ini opsional.
 

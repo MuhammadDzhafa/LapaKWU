@@ -97,8 +97,8 @@ export async function POST(req) {
         return { error: 'Harga atau ongkir berubah. Muat ulang checkout sebelum membayar.', status: 409 };
       }
       const totalCheckout = totalSen / 100;
-      const verifikasi = upload ? periksaBukti(teksBukti, totalCheckout, now) : null;
-      if (verifikasi?.status === 'DITOLAK') return { error: 'Bukti pembayaran tidak valid. Unggah bukti lain dan coba lagi.', status: 422 };
+      const verifikasi = upload ? periksaBukti(teksBukti, totalCheckout) : null;
+      if (verifikasi?.status === 'DITOLAK') return { error: verifikasi.temuan.join(' '), status: 422 };
       const statusOcr = verifikasi?.status;
       if (upload) {
         if (await cariSatu('bukti_checkout', { _id: upload.sha256 })) {

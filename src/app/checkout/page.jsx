@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { list, ambil, api, storage, Query, rp } from '@/lib/aw';
-import { MAKS_BUKTI_PEMBAYARAN, PESAN_UKURAN_BUKTI } from '@/lib/bukti-pembayaran';
+import { MAKS_BUKTI_PEMBAYARAN, MERCHANT_QRIS, PESAN_UKURAN_BUKTI } from '@/lib/bukti-pembayaran';
 import { addOnValid, hargaSatuanProduk, namaDenganAddOn } from '@/lib/add-on';
 import { formatJadwalAmbil, MULAI_PRE_ORDER, TANGGAL_PRE_ORDER, waktuPreOrder } from '@/lib/waktu';
 import StatusMuat from '@/components/StatusMuat';
@@ -209,7 +209,7 @@ export default function Checkout() {
 
             <div style={{ background: '#fff', border: '1.5px solid var(--bl)', borderRadius: 10, padding: 16, textAlign: 'center' }}>
               <div style={{ display: 'inline-block', background: 'var(--bl-d)', color: '#fff', fontSize: '0.78rem', fontWeight: 800, padding: '2px 10px', borderRadius: 99, marginBottom: 8 }}>
-                LapaKWU, Service
+                {MERCHANT_QRIS}
               </div>
               <div style={{ margin: '4px 0 12px 0', fontSize: '1.05rem' }}>
                 Total Pembayaran: <b style={{ color: 'var(--bl-d)', fontSize: '1.25rem' }}>{rp(total)}</b>
@@ -243,7 +243,7 @@ export default function Checkout() {
               )}
 
               <p className="muted" style={{ fontSize: '0.82rem', margin: '12px 0 0', lineHeight: 1.5 }}>
-                Unggah bukti yang menampilkan nominal, nama merchant, dan tanggal yang sama dengan hari pemesanan. Jam transaksi bebas dan tidak harus terbaca. Pembayaran menunggu konfirmasi admin.
+                Unggah bukti yang menampilkan merchant {MERCHANT_QRIS} dan nominal yang sama dengan total pesanan. Pembayaran menunggu konfirmasi admin.
               </p>
             </div>
 

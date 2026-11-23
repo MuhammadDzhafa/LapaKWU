@@ -394,7 +394,7 @@ export default function Admin() {
                         )}
                         {x.status_ocr && <small className="muted" style={{ display: 'block' }}>
                           {x.status_ocr === 'COCOK' ? 'OCR cocok' : 'Perlu tinjauan manual'}
-                          {x.hasil_ocr?.tanggal && ' · ' + tgl(x.hasil_ocr.tanggal)}
+                          {x.hasil_ocr?.nominal != null && ' · Nominal bukti ' + rp(x.hasil_ocr.nominal)}
                         </small>}
                         {x.dana_terdeteksi && <small className="muted">Dana masuk terdeteksi oleh PayHook.</small>}
                       </td>
