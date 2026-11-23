@@ -1,13 +1,15 @@
 import { rows, siapa, err, Query } from '@/lib/server';
-import { TABEL_PUBLIK, TABEL_PRIVAT, batasAkses, sanitasiPublik } from '@/lib/akses-data';
+import { TABEL_PUBLIK, TABEL_PRIVAT, batasAkses, kueriPublikValid, sanitasiPublik } from '@/lib/akses-data';
 import { cariBanyak, databaseTidakTersedia } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req) {
   try {
-    const { tabel, queries = [] } = await req.json();
-    if (![...TABEL_PUBLIK, ...TABEL_PRIVAT].includes(tabel) || !Array.isArray(queries)) return err('Tabel atau kueri tidak valid.');
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return err('Data kueri tidak valid.');
+    const { tabel, queries = [] } = body;
+    if (![...TABEL_PUBLIK, ...TABEL_PRIVAT].includes(tabel) || !kueriPublikValid(tabel, queries)) return err('Tabel atau kueri tidak valid.');
 
     let akses = [];
     if (TABEL_PRIVAT.includes(tabel)) {

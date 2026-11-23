@@ -7,6 +7,33 @@ export const TABEL_PRIVAT = [
   'pesanan', 'detail_pesanan', 'pembayaran', 'rekap_penjualan', 'penjualan_offline',
 ];
 
+const kolomKueri = {
+  produk: ['id_mitra', 'kategori', 'nama', 'harga', 'stok', 'diarsipkan'],
+  mitra: ['nama_usaha', 'nomor_tenant'],
+  item_keranjang: ['id_keranjang', 'id_produk'],
+  keranjang: ['id_pembeli'],
+  notifikasi: ['id_pengguna', 'sudah_dibaca'],
+  pesanan: ['id_mitra', 'id_pembeli', 'tanggal_pesanan', 'status_pesanan'],
+  detail_pesanan: ['id_pesanan', 'id_produk'],
+  pembayaran: ['id_pesanan', 'metode', 'status_pembayaran'],
+  rekap_penjualan: ['id_mitra', 'periode'],
+  penjualan_offline: ['id_mitra', 'id_produk', 'periode'],
+};
+const kolomUmum = new Set(['$id', 'id', '$createdAt', '$updatedAt', 'created_at', 'updated_at']);
+const nilaiKueriValid = (v) => v === null || typeof v === 'boolean' || Number.isFinite(v)
+  || (typeof v === 'string' && v.length <= 512 && !v.includes('\0'));
+
+export function kueriPublikValid(tabel, queries) {
+  return Array.isArray(queries) && queries.length <= 16 && queries.every((q) => {
+    if (!q || typeof q !== 'object' || Array.isArray(q)) return false;
+    if (q.type === 'limit' || q.type === 'offset') return Number.isSafeInteger(q.n) && q.n >= 0;
+    if (!kolomUmum.has(q.col) && !kolomKueri[tabel]?.includes(q.col)) return false;
+    if (q.type === 'orderDesc' || q.type === 'orderAsc') return true;
+    if (q.type === 'eq' && Array.isArray(q.val)) return q.val.length <= 500 && q.val.every(nilaiKueriValid);
+    return ['eq', 'gt', 'lt'].includes(q.type) && nilaiKueriValid(q.val);
+  });
+}
+
 export async function batasAkses(tabel, uid, queries) {
   const kepemilikan = {
     pengguna: '$id', pembeli: '$id', admin: '$id', keranjang: 'id_pembeli',

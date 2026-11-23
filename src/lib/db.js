@@ -136,14 +136,17 @@ function kondisi(tabel, filter = {}, values = []) {
     }
     const col = ekspresiKolom(tabel, field);
     const ops = value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date) ? value : { $eq: value };
-    for (const [op, raw] of Object.entries(ops)) {
+    const kondisiKolom = Object.entries(ops);
+    if (!kondisiKolom.length) throw new Error('Filter kolom tidak valid.');
+    for (const [op, raw] of kondisiKolom) {
       if (op === '$in') {
         if (!Array.isArray(raw) || !raw.length) { parts.push('FALSE'); continue; }
         const marks = raw.map((v) => { values.push(nilaiDb(field, v)); return `$${values.length}`; });
         parts.push(`${col} IN (${marks.join(', ')})`);
         continue;
       }
-      const sqlOp = ({ $eq: '=', $gt: '>', $gte: '>=', $lt: '<', $lte: '<=' })[op];
+      const operator = { $eq: '=', $gt: '>', $gte: '>=', $lt: '<', $lte: '<=' };
+      const sqlOp = Object.hasOwn(operator, op) ? operator[op] : null;
       if (!sqlOp) throw new Error(`Operator filter tidak didukung: ${op}`);
       if (raw === null && op === '$eq') parts.push(`${col} IS NULL`);
       else { values.push(nilaiDb(field, raw)); parts.push(`${col} ${sqlOp} $${values.length}`); }

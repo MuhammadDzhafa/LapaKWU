@@ -11,6 +11,8 @@ export const dynamic = 'force-dynamic';
 // Akses tulis diperiksa di server berdasarkan akun mitra pemilik produk.
 const hargaValid = (n) => Number.isFinite(+n) && +n >= 0 && Number.isSafeInteger(Math.round(+n * 100));
 const stokValid = (n) => Number.isSafeInteger(+n) && +n >= 0;
+const teksValid = (nilai, maks) => typeof nilai === 'string' && nilai.length <= maks && !nilai.includes('\0');
+const gambarValid = (id) => typeof id === 'string' && /^[\w-]{1,80}\.(?:jpe?g|png|webp|gif)$/i.test(id);
 
 async function hapusGambarJikaTidakDipakai(id, uid, produkDikecualikan) {
   if (!id) return;
@@ -31,6 +33,10 @@ export async function POST(req) {
   if (!u) return err('Belum masuk.', 401);
 
   const b = await req.json();
+  if (!b || typeof b !== 'object' || Array.isArray(b)) return err('Data produk tidak valid.');
+  if ((b.nama !== undefined && (!teksValid(b.nama, 150) || !b.nama.trim()))
+    || (b.deskripsi != null && !teksValid(b.deskripsi, 4000))) return err('Nama atau deskripsi produk tidak valid.');
+  if (b.id_gambar != null && b.id_gambar !== '' && !gambarValid(b.id_gambar)) return err('ID gambar tidak valid.');
   const { db } = svc();
 
   // Pastikan akun aktif dan merupakan mitra

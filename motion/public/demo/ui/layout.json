@@ -1,0 +1,209 @@
+{
+  "deviceScaleFactor": 2,
+  "pages": {
+    "home": {
+      "width": 1440,
+      "height": 4011,
+      "cutouts": {
+        "home-hero": {
+          "x": 140,
+          "y": 138,
+          "width": 1160,
+          "height": 460
+        },
+        "catalog-grid": {
+          "x": 160,
+          "y": 1199.671875,
+          "width": 1120,
+          "height": 415.15625
+        },
+        "catalog-search": {
+          "x": 320,
+          "y": 658,
+          "width": 800,
+          "height": 134.09375
+        },
+        "tenant-map": {
+          "x": 160,
+          "y": 2028.109375,
+          "width": 1120,
+          "height": 1101.078125
+        },
+        "catalog-button": {
+          "x": 160,
+          "y": 441.625,
+          "width": 165.328125,
+          "height": 55
+        },
+        "catalog-product": {
+          "x": 160,
+          "y": 1199.671875,
+          "width": 263.5,
+          "height": 415.15625
+        }
+      }
+    },
+    "search": {
+      "width": 1440,
+      "height": 4011,
+      "cutouts": {
+        "search-panel": {
+          "x": 320,
+          "y": 663,
+          "width": 800,
+          "height": 134.09375
+        },
+        "search-result": {
+          "x": 160,
+          "y": 1199.671875,
+          "width": 263.5,
+          "height": 415.15625
+        }
+      }
+    },
+    "cart": {
+      "width": 1440,
+      "height": 1415,
+      "cutouts": {
+        "cart-panel": {
+          "x": 140,
+          "y": 138,
+          "width": 1160,
+          "height": 680
+        },
+        "cart-button": {
+          "x": 1105.71875,
+          "y": 458.765625,
+          "width": 174.28125,
+          "height": 45
+        }
+      }
+    },
+    "checkout": {
+      "width": 1440,
+      "height": 2059,
+      "cutouts": {
+        "checkout-panel": {
+          "x": 140,
+          "y": 138,
+          "width": 1160,
+          "height": 1323.8125
+        },
+        "checkout-payment": {
+          "x": 160,
+          "y": 527.890625,
+          "width": 544,
+          "height": 120.25
+        }
+      }
+    },
+    "cash": {
+      "width": 1440,
+      "height": 1560,
+      "cutouts": {
+        "cash-panel": {
+          "x": 140,
+          "y": 138,
+          "width": 1160,
+          "height": 832.734375
+        }
+      }
+    },
+    "orders": {
+      "width": 1440,
+      "height": 1498,
+      "cutouts": {
+        "orders-panel": {
+          "x": 140,
+          "y": 138,
+          "width": 1160,
+          "height": 762.734375
+        }
+      }
+    },
+    "tenant": {
+      "width": 1440,
+      "height": 1498,
+      "cutouts": {
+        "tenant-focus": {
+          "x": 340,
+          "y": 112.21875,
+          "width": 760,
+          "height": 775.546875
+        }
+      }
+    },
+    "partner": {
+      "width": 1440,
+      "height": 2154,
+      "cutouts": {
+        "partner-panel": {
+          "x": 100,
+          "y": 138,
+          "width": 1240,
+          "height": 1418.90625
+        },
+        "partner-stats": {
+          "x": 120,
+          "y": 287.90625,
+          "width": 1200,
+          "height": 156.65625
+        },
+        "partner-stock": {
+          "x": 638.65625,
+          "y": 805.125,
+          "width": 681.34375,
+          "height": 663.78125
+        }
+      }
+    },
+    "wallet": {
+      "width": 1440,
+      "height": 1682,
+      "cutouts": {
+        "wallet-panel": {
+          "x": 143,
+          "y": 644.46875,
+          "width": 1154,
+          "height": 100.65625
+        },
+        "wallet-card": {
+          "x": 120,
+          "y": 548.5625,
+          "width": 1200,
+          "height": 455.6875
+        },
+        "wallet-button": {
+          "x": 143,
+          "y": 864.3125,
+          "width": 182.4375,
+          "height": 45
+        }
+      }
+    },
+    "reports": {
+      "width": 1440,
+      "height": 2288,
+      "cutouts": {
+        "reports-chart": {
+          "x": 120,
+          "y": 855.96875,
+          "width": 1200,
+          "height": 272.5
+        },
+        "reports-line": {
+          "x": 120,
+          "y": 847.96875,
+          "width": 389.328125,
+          "height": 272.5
+        },
+        "reports-panel": {
+          "x": 100,
+          "y": 130,
+          "width": 1240,
+          "height": 1552.921875
+        }
+      }
+    }
+  }
+}

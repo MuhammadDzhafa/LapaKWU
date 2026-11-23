@@ -1,0 +1,29 @@
+{
+  "deviceScaleFactor": 2,
+  "pages": {
+    "mitra-orders": {
+      "width": 1440,
+      "height": 1806,
+      "cutouts": {
+        "mitra-orders-panel": {
+          "x": 120,
+          "y": 551.5625,
+          "width": 1200,
+          "height": 293.875
+        }
+      }
+    },
+    "mitra-qris": {
+      "width": 1440,
+      "height": 1848,
+      "cutouts": {
+        "mitra-qris-panel": {
+          "x": 120,
+          "y": 551.5625,
+          "width": 560,
+          "height": 634.578125
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "open": {
+    "file": "open.mp4",
+    "frames": 110,
+    "action": 13,
+    "captures": 44
+  },
+  "catalog": {
+    "file": "catalog.mp4",
+    "frames": 94,
+    "action": 23,
+    "captures": 74
+  },
+  "search": {
+    "file": "search.mp4",
+    "frames": 120,
+    "action": 23,
+    "captures": 89
+  },
+  "cart": {
+    "file": "cart.mp4",
+    "frames": 97,
+    "action": 23,
+    "captures": 59
+  },
+  "payment": {
+    "file": "payment.mp4",
+    "frames": 112,
+    "action": 23,
+    "captures": 47
+  },
+  "cash": {
+    "file": "cash.mp4",
+    "frames": 97,
+    "action": 23,
+    "captures": 23
+  },
+  "map": {
+    "file": "map.mp4",
+    "frames": 98,
+    "action": 23,
+    "captures": 119
+  },
+  "partner": {
+    "file": "partner.mp4",
+    "frames": 94,
+    "action": 23,
+    "captures": 63
+  },
+  "reports": {
+    "file": "reports.mp4",
+    "frames": 97,
+    "action": 23,
+    "captures": 128
+  },
+  "wallet": {
+    "file": "wallet.mp4",
+    "frames": 101,
+    "action": 23,
+    "captures": 87
+  }
+}

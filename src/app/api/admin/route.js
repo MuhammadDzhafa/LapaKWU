@@ -27,7 +27,9 @@ export async function POST(req) {
   const adRow = await getRow(null, 'admin', u.$id).catch(() => null);
   if (!adRow) return err('Khusus admin.', 403);
   const b = await req.json();
+  if (!b || typeof b !== 'object' || Array.isArray(b)) return err('Data admin tidak valid.');
   const { aksi, id, catatan } = b;
+  if (id !== undefined && (typeof id !== 'string' || !id || id.length > 200 || id.includes('\0'))) return err('ID tidak valid.');
   const PERAN = ['pembeli', 'mitra', 'admin'];
 
   if (aksi === 'daftar_pencairan') {

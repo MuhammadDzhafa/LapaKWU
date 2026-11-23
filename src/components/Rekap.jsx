@@ -64,7 +64,7 @@ function GrafikRekap({ bulanan, puncak, digital, offline }) {
 function unduhCsv(baris) {
   const csv = baris.map((row) => row.map((value) => {
     let text = String(value ?? '');
-    if (typeof value === 'string' && /^[\s]*[=+\-@]/.test(text)) text = "'" + text;
+    if (typeof value === 'string' && (/^[\s\u0000-\u001f]*[=+\-@＝＋－＠]/u.test(text) || /^[\t\r\n]/.test(text))) text = "'" + text;
     return '"' + text.replaceAll('"', '""') + '"';
   }).join(',')).join('\r\n');
   const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }));
@@ -78,9 +78,12 @@ function unduhCsv(baris) {
 function cetakPdf(laporan) {
   const frame = document.createElement('iframe');
   frame.title = 'Cetak rekap penjualan';
+  frame.setAttribute('sandbox', 'allow-same-origin allow-modals');
   frame.style.cssText = 'position:fixed;width:0;height:0;border:0';
   frame.onload = () => {
     const halaman = frame.contentWindow;
+    const dokumen = frame.contentDocument;
+    dokumen.body.append(dokumen.importNode(laporan, true));
     halaman.addEventListener('afterprint', () => frame.remove(), { once: true });
     halaman.focus();
     halaman.print();
@@ -96,7 +99,7 @@ function cetakPdf(laporan) {
     table{border-collapse:collapse;width:100%;table-layout:auto}
     th,td{padding:7px 5px;border-bottom:1px solid #c6cdd4;text-align:left;overflow-wrap:anywhere}
     thead{display:table-header-group} tfoot{display:table-row-group} tr{break-inside:avoid}
-    </style><body><h2>Rekap Penjualan LapaKWU</h2>${laporan.innerHTML}</body></html>`;
+    </style><body><h2>Rekap Penjualan LapaKWU</h2></body></html>`;
   document.body.append(frame);
 }
 

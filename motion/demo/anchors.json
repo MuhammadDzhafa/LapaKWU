@@ -1,0 +1,200 @@
+[
+  {
+    "id": "open",
+    "kind": "reveal",
+    "frame": 77,
+    "t": 2.571655328798186,
+    "beat": 4.494235047708302,
+    "drum": "snare",
+    "label": "open-reveal"
+  },
+  {
+    "id": "catalog",
+    "kind": "cut",
+    "frame": 160,
+    "t": 5.320408163265306,
+    "beat": 9.533588739031055,
+    "drum": "snare",
+    "label": "catalog-cut"
+  },
+  {
+    "id": "catalog",
+    "kind": "reveal",
+    "frame": 247,
+    "t": 8.2437641723356,
+    "beat": 14.893046566826214,
+    "drum": "snare",
+    "label": "catalog-reveal"
+  },
+  {
+    "id": "search",
+    "kind": "cut",
+    "frame": 331,
+    "t": 11.022448979591836,
+    "beat": 19.987275252972807,
+    "drum": "snare",
+    "label": "search-cut"
+  },
+  {
+    "id": "search",
+    "kind": "reveal",
+    "frame": 406,
+    "t": 13.536734693877552,
+    "beat": 24.596774818175472,
+    "drum": "snare",
+    "label": "search-reveal"
+  },
+  {
+    "id": "cart",
+    "kind": "cut",
+    "frame": 507,
+    "t": 16.90907029478458,
+    "beat": 30.77935756832825,
+    "drum": "snare",
+    "label": "cart-cut"
+  },
+  {
+    "id": "cart",
+    "kind": "reveal",
+    "frame": 580,
+    "t": 19.32857142857143,
+    "beat": 35.21508631658875,
+    "drum": "snare",
+    "label": "cart-reveal"
+  },
+  {
+    "id": "payment",
+    "kind": "cut",
+    "frame": 674,
+    "t": 22.48140589569161,
+    "beat": 40.995252438033354,
+    "drum": "snare",
+    "label": "payment-cut"
+  },
+  {
+    "id": "payment",
+    "kind": "reveal",
+    "frame": 760,
+    "t": 25.344897959183672,
+    "beat": 46.244960276180834,
+    "drum": "snare",
+    "label": "payment-reveal"
+  },
+  {
+    "id": "cash",
+    "kind": "cut",
+    "frame": 846,
+    "t": 28.208390022675736,
+    "beat": 51.49466811432831,
+    "drum": "kick",
+    "label": "cash-cut"
+  },
+  {
+    "id": "cash",
+    "kind": "reveal",
+    "frame": 887,
+    "t": 29.575283446712017,
+    "beat": 54.00062621128372,
+    "drum": "snare",
+    "label": "cash-reveal"
+  },
+  {
+    "id": "orders",
+    "kind": "cut",
+    "frame": 944,
+    "t": 31.48095238095238,
+    "beat": 57.494334215068285,
+    "drum": "snare",
+    "label": "orders-cut"
+  },
+  {
+    "id": "orders",
+    "kind": "reveal",
+    "frame": 985,
+    "t": 32.847845804988665,
+    "beat": 60.0002923120237,
+    "drum": "snare",
+    "label": "orders-reveal"
+  },
+  {
+    "id": "map",
+    "kind": "cut",
+    "frame": 1051,
+    "t": 35.02789115646259,
+    "beat": 63.99702110169347,
+    "drum": "snare",
+    "label": "map-cut"
+  },
+  {
+    "id": "map",
+    "kind": "reveal",
+    "frame": 1133,
+    "t": 37.75170068027211,
+    "beat": 68.99064563066301,
+    "drum": "snare",
+    "label": "map-reveal"
+  },
+  {
+    "id": "partner",
+    "kind": "cut",
+    "frame": 1182,
+    "t": 39.38798185941043,
+    "beat": 71.990478681033,
+    "drum": "snare",
+    "label": "partner-cut"
+  },
+  {
+    "id": "partner",
+    "kind": "reveal",
+    "frame": 1236,
+    "t": 41.19886621315193,
+    "beat": 75.3104158678754,
+    "drum": "snare",
+    "label": "partner-reveal"
+  },
+  {
+    "id": "reports",
+    "kind": "cut",
+    "frame": 1298,
+    "t": 43.25419501133787,
+    "beat": 79.07849884577917,
+    "drum": "snare",
+    "label": "reports-cut"
+  },
+  {
+    "id": "reports",
+    "kind": "reveal",
+    "frame": 1345,
+    "t": 44.840589569161,
+    "beat": 81.98687357144274,
+    "drum": "snare",
+    "label": "reports-reveal"
+  },
+  {
+    "id": "wallet",
+    "kind": "cut",
+    "frame": 1411,
+    "t": 47.02063492063492,
+    "beat": 85.98360236111252,
+    "drum": "snare",
+    "label": "wallet-cut"
+  },
+  {
+    "id": "wallet",
+    "kind": "reveal",
+    "frame": 1468,
+    "t": 48.93628117913832,
+    "beat": 89.49560202983835,
+    "drum": "snare",
+    "label": "wallet-reveal"
+  },
+  {
+    "id": "end",
+    "kind": "cut",
+    "frame": 1538,
+    "t": 51.27596371882086,
+    "beat": 93.78499745856861,
+    "drum": "snare",
+    "label": "end-cut"
+  }
+]
