@@ -3,6 +3,7 @@ import { cariSatu, denganTransaksi, kunciProduk, queryDatabase } from '@/lib/db'
 import { FORMAT_ID_BUKTI, MAKS_BUKTI_PEMBAYARAN, PESAN_UKURAN_BUKTI } from '@/lib/bukti-pembayaran';
 import { bacaBukti, periksaBukti } from '@/lib/ocr-bukti';
 import { unduhFile } from '@/lib/backblaze';
+import { cocokkanDanaQris, kunciReferensiQris } from '@/lib/dana-qris';
 
 import { addOnValid, hargaSatuanProduk, namaDenganAddOn } from '@/lib/add-on';
 
@@ -104,6 +105,8 @@ export async function POST(req) {
       const verifikasi = upload ? periksaBukti(teksBukti, totalCheckout) : null;
       if (verifikasi?.status === 'DITOLAK') return { error: verifikasi.temuan.join(' '), status: 422 };
       const statusOcr = verifikasi?.status;
+      const referensiQris = verifikasi?.referensi;
+      if (referensiQris) await kunciReferensiQris(referensiQris);
       if (upload) {
         if (await cariSatu('bukti_checkout', { _id: upload.sha256 })) {
           return { error: 'Bukti pembayaran ini sudah digunakan.', status: 409 };
@@ -161,6 +164,7 @@ export async function POST(req) {
         await notif(null, mid, judul, pesan, !isQris);
       }
       for (const item of cart) await del(null, 'item_keranjang', item.$id);
+      if (referensiQris) await cocokkanDanaQris(referensiQris);
       if (cart.length) await upd(null, 'keranjang', u.$id, { total_harga: 0 });
 
       const response = { jumlah: perMitra.size, itemTerpesan: cart.map((item) => item.$id), statusOcr };

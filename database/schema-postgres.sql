@@ -117,9 +117,10 @@ CREATE TABLE IF NOT EXISTS checkout_request (
   response JSONB, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS payhook_event (
-  id TEXT PRIMARY KEY, id_bukti_checkout TEXT NOT NULL,
+  id TEXT PRIMARY KEY, id_bukti_checkout TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), extra JSONB NOT NULL DEFAULT '{}'
 );
+ALTER TABLE payhook_event ALTER COLUMN id_bukti_checkout DROP NOT NULL;
 
 CREATE TABLE IF NOT EXISTS pencairan_dompet (
   id TEXT PRIMARY KEY, id_mitra TEXT NOT NULL, nama_usaha TEXT NOT NULL, id_qris TEXT NOT NULL,

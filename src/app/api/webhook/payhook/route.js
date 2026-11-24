@@ -1,7 +1,8 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { err, upd } from '@/lib/server';
-import { cariBanyak, cariSatu, denganTransaksi, tulis } from '@/lib/db';
+import { err } from '@/lib/server';
+import { cariSatu, denganTransaksi, tulis } from '@/lib/db';
 import { rupiahDalamSen } from '@/lib/ocr-bukti';
+import { cocokkanDanaQris, kunciReferensiQris } from '@/lib/dana-qris';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,7 +41,8 @@ export async function POST(req) {
   try {
     const body = Buffer.from(await req.arrayBuffer());
     if (!rahasiaCocok(req, body)) return err('Unauthorized', 401);
-    const payload = await bacaPayload(req, body) ?? {};
+    const payload = await bacaPayload(req, body).catch(() => null);
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return err('Payload PayHook tidak valid.', 400);
     const teks = teksPayload(payload);
     if (!teks || payload.is_test === true || payload.test === true || payload.ping === true || payload.action === 'test') {
       return Response.json({ ok: true, status: 'connected', pesan: 'Webhook LapaKWU berhasil terhubung dengan PayHook!' });
@@ -66,30 +68,15 @@ export async function POST(req) {
       return Response.json({ ok: true, terproses: false, nominal, pesan: 'Referensi transaksi tidak tersedia. Cocokkan dana masuk secara manual.' });
     }
     const referensi = ref.toUpperCase();
-    const hasil = await denganTransaksi(async () => {
-      if (await cariSatu('payhook_event', { _id: referensi })) return null;
-      const cocok = await cariBanyak('bukti_checkout', {
-        referensi, total: nominal, status_ocr: 'COCOK', status_pembayaran: 'MENUNGGU',
-        created_at: { $gte: new Date(Date.now() - 48 * 60 * 60 * 1000) },
-      }, { limit: 2 });
-      if (cocok.length !== 1) return null;
-      const bukti = cocok[0];
-      const daftar = await cariBanyak('pembayaran', { id_bukti_checkout: bukti.id, metode: 'QRIS' });
-      if (!daftar.length || daftar.some((bayar) => !['MENUNGGU', 'BERHASIL'].includes(bayar.status_pembayaran))) return null;
-
-      const orders = [];
-      for (const bayar of daftar) {
-        const order = await cariSatu('pesanan', { _id: bayar.id_pesanan });
-        if (!order || order.status_pesanan === 'DIBATALKAN') return null;
-        orders.push([order, bayar]);
-      }
-      const now = new Date();
-      await tulis('payhook_event', referensi, { id_bukti_checkout: bukti.id });
-      await upd(null, 'bukti_checkout', bukti.id, { waktu_dana_masuk: now });
-      return { ids: orders.map(([order]) => order.id) };
+    const ids = await denganTransaksi(async () => {
+      await kunciReferensiQris(referensi);
+      const event = await cariSatu('payhook_event', { _id: referensi });
+      if (event && event.nominal !== nominal) return [];
+      if (!event) await tulis('payhook_event', referensi, { nominal });
+      return cocokkanDanaQris(referensi);
     });
-    if (!hasil) return Response.json({ ok: true, terproses: false, nominal, pesan: 'Tidak ada bukti OCR yang cocok atau transaksi sudah diproses.' });
-    return Response.json({ ok: true, terproses: true, pesananId: hasil.ids[0], pesananIds: hasil.ids, nominal, pesan: 'Dana masuk tercatat. Menunggu verifikasi admin.' });
+    if (!ids.length) return Response.json({ ok: true, terproses: false, nominal, pesan: 'Dana masuk dicatat. Belum ada bukti OCR yang cocok atau transaksi sudah diproses.' });
+    return Response.json({ ok: true, terproses: true, pesananId: ids[0], pesananIds: ids, nominal, pesan: 'Dana masuk tercatat. Menunggu verifikasi admin.' });
   } catch (e) {
     if (e.code === 409) return Response.json({ ok: true, terproses: false, pesan: 'Transaksi sudah diproses.' });
     console.error('[payhook]', e?.message);
