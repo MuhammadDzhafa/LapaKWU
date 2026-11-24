@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { api, rp, img, tgl } from '@/lib/aw';
+import { api, rp, img, tgl, storage } from '@/lib/aw';
 import { useSaya } from '@/components/Shell';
 import StatusMuat from '@/components/StatusMuat';
 import Modal from '@/components/Modal';
@@ -30,6 +30,10 @@ export default function Admin() {
   const [d, setD] = useState({ u: [], m: [], pr: [], ad: [], pb: [], rf: [], qris: [] });
   const [cariMitra, setCariMitra] = useState('');
   const [cariProduk, setCariProduk] = useState('');
+  const [kodeQris, setKodeQris] = useState('');
+  const [hasilQris, setHasilQris] = useState(null);
+  const [memuatQris, setMemuatQris] = useState(false);
+  const [memprosesQris, setMemprosesQris] = useState(null);
   const [kategori, setKategori] = useState(null);
   const [galatKategori, setGalatKategori] = useState('');
   const [batasMitra, setBatasMitra] = useState(25);
@@ -92,6 +96,36 @@ export default function Admin() {
       void muat();
       return true;
     } catch (e) { toast(e.message, true); return false; }
+  };
+  const cariQris = async (id) => {
+    setMemuatQris(true);
+    try {
+      const { qris } = await api('/api/admin', { aksi: 'cari_qris', id });
+      setHasilQris(qris);
+    } catch (e) {
+      setHasilQris(null);
+      toast(e.message, true);
+    } finally {
+      setMemuatQris(false);
+    }
+  };
+  const prosesQris = async (x, aksi, file) => {
+    setMemprosesQris(x.$id);
+    try {
+      const extra = aksi === 'tolak_qris' ? { catatan: 'Bukti transfer tidak valid / dana tidak masuk ke QRIS LapaKWU.' } : {};
+      if (file?.size) {
+        const bukti = await storage.createFile({ file, jenis: 'bukti-pembayaran' });
+        extra.id_bukti_admin = bukti.$id;
+      }
+      const pesan = aksi === 'tolak_qris' ? 'Pembayaran ditolak.'
+        : extra.id_bukti_admin ? 'Pembayaran lunas. Bukti tersedia di Pesanan Masuk mitra.'
+          : 'Pembayaran lunas. Mitra dan pembeli telah dikabari.';
+      if (await act(aksi, x.$id, extra, pesan) && hasilQris !== null) await cariQris(x.id_pesanan);
+    } catch (e) {
+      toast(e.message, true);
+    } finally {
+      setMemprosesQris(null);
+    }
   };
   const aturTenant = async (e, mitra) => {
     e.preventDefault();
@@ -344,6 +378,13 @@ export default function Admin() {
             </div>
           </div>
 
+          <form className="row" onSubmit={(e) => { e.preventDefault(); void cariQris(kodeQris.trim()); }}>
+            <label htmlFor="kode-qris">Kode pesanan dari WhatsApp</label>
+            <input id="kode-qris" type="search" value={kodeQris} onChange={(e) => setKodeQris(e.target.value)} required maxLength={200} />
+            <button className="btn sm out" disabled={memuatQris || !!memprosesQris || !kodeQris.trim()}>Cari pesanan</button>
+            {hasilQris !== null && <button type="button" className="btn sm out" disabled={memuatQris || !!memprosesQris}
+              onClick={() => { setHasilQris(null); setKodeQris(''); }}>Lihat antrean QRIS</button>}
+          </form>
           <div className="scroll">
             <table>
               <thead>
@@ -357,19 +398,30 @@ export default function Admin() {
                 </tr>
               </thead>
               <tbody>
-                {(d.qris || []).map((x) => {
+                {(hasilQris ?? d.qris ?? []).map((x) => {
                   const pembeliUser = pg(x.pesanan?.id_pembeli);
-                  const namaMitra = nama[x.pesanan?.id_mitra] || 'Mitra Toko';
+                  const namaMitra = x.nama_mitra || nama[x.pesanan?.id_mitra] || 'Mitra Toko';
+                  const menunggu = x.status_pembayaran === 'MENUNGGU';
+                  const bisaTeruskan = x.pesanan && x.pesanan.status_pesanan !== 'DIBATALKAN'
+                    && (menunggu || (x.status_pembayaran === 'BERHASIL' && !x.id_bukti_admin));
                   return (
                     <tr key={x.$id}>
-                      <td><b>#{x.id_pesanan.slice(-6)}</b></td>
                       <td>
-                        <b>{pembeliUser?.nama || 'Pembeli'}</b>
+                        <b>{x.id_pesanan}</b>
+                        <div>{x.pesanan && tgl(x.pesanan.tanggal_pesanan)}</div>
+                        <ul>{x.items?.map((item, i) => <li key={i}>{item}</li>)}</ul>
+                        <small>{x.pesanan?.status_pesanan?.replaceAll('_', ' ').toLowerCase()}</small>
+                      </td>
+                      <td>
+                        <b>{x.nama_pembeli || pembeliUser?.nama || 'Pembeli'}</b>
                         <br />
                         <small className="muted">{pembeliUser?.email}</small>
                       </td>
                       <td>{namaMitra}</td>
-                      <td><b style={{ color: 'var(--bl-d)' }}>{rp(x.jumlah)}</b></td>
+                      <td>
+                        <b style={{ color: 'var(--bl-d)' }}>{rp(x.jumlah)}</b>
+                        {x.total_checkout_manual > x.jumlah && <div><small>Total checkout {rp(x.total_checkout_manual)}</small></div>}
+                      </td>
                       <td>
                         {x.id_bukti ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -396,30 +448,36 @@ export default function Admin() {
                           {x.hasil_ocr?.nominal != null && ' · Nominal bukti ' + rp(x.hasil_ocr.nominal)}
                         </small>}
                         {x.dana_terdeteksi && <small className="muted">Dana masuk terdeteksi oleh PayHook.</small>}
+                        {x.id_bukti_admin && <button type="button" className="link"
+                          onClick={() => setModalGambar({ src: img(x.id_bukti_admin), judul: 'Bukti yang diteruskan ke mitra' })}>Lihat bukti dari admin</button>}
                       </td>
                       <td>
-                        <div className="row" style={{ gap: 6 }}>
-                          <button
-                            className="btn sm sun"
-                            onClick={() => act('verifikasi_qris', x.$id, {}, 'Pembayaran QRIS berhasil diverifikasi Lunas! Mitra dan pembeli telah dikabari.')}
-                          >
-                            ✓ Konfirmasi Lunas
-                          </button>
-                          <button
-                            className="btn sm red"
-                            onClick={() => act('tolak_qris', x.$id, { catatan: 'Bukti transfer tidak valid / dana tidak masuk ke QRIS LapaKWU.' }, 'Pembayaran ditolak.')}
-                          >
-                            Tolak
-                          </button>
-                        </div>
+                        {bisaTeruskan ? (
+                          <form className="stack" onSubmit={(e) => {
+                            e.preventDefault();
+                            void prosesQris(x, menunggu ? 'verifikasi_qris' : 'teruskan_bukti_qris', new FormData(e.currentTarget).get('bukti'));
+                          }}>
+                            {!menunggu && <b>Lunas</b>}
+                            <label htmlFor={`bukti-admin-${x.$id}`}>Bukti WhatsApp untuk mitra{menunggu && !x.bukti_via_admin && ' (opsional)'}</label>
+                            <input id={`bukti-admin-${x.$id}`} type="file" name="bukti" accept="image/jpeg,image/png,image/webp"
+                              required={!menunggu || x.bukti_via_admin === true} disabled={!!memprosesQris || memuatQris} />
+                            <div className="row">
+                              <button className="btn sm sun" disabled={!!memprosesQris || memuatQris}>
+                                {memprosesQris === x.$id ? 'Memproses…' : menunggu ? 'Konfirmasi lunas' : 'Teruskan bukti'}
+                              </button>
+                              {menunggu && <button type="button" className="btn sm red" disabled={!!memprosesQris || memuatQris}
+                                onClick={() => void prosesQris(x, 'tolak_qris')}>Tolak</button>}
+                            </div>
+                          </form>
+                        ) : <span>{x.status_pembayaran === 'BERHASIL' ? 'Lunas' : x.status_pembayaran.replaceAll('_', ' ').toLowerCase()}</span>}
                       </td>
                     </tr>
                   );
                 })}
-                {!(d.qris || []).length && (
+                {!(hasilQris ?? d.qris ?? []).length && (
                   <tr>
                     <td colSpan="6" className="muted" style={{ textAlign: 'center', padding: 24 }}>
-                      Tidak ada pembayaran QRIS yang sedang menunggu verifikasi.
+                      {hasilQris !== null ? 'Pesanan QRIS dengan kode tersebut tidak ditemukan.' : 'Tidak ada pembayaran QRIS yang sedang menunggu verifikasi.'}
                     </td>
                   </tr>
                 )}

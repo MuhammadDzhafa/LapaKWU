@@ -4,7 +4,26 @@ import { buatAkun, cariAkunByEmail, hapusAkun } from '@/lib/auth';
 import { nanoid } from 'nanoid';
 import { JUMLAH_TENANT, nomorTenantValid } from '@/lib/tenant';
 import { arsipProduk } from '@/lib/arsip-produk';
+import { FORMAT_ID_BUKTI } from '@/lib/bukti-pembayaran';
+import { namaDenganAddOn } from '@/lib/add-on';
 export const dynamic = 'force-dynamic';
+
+async function rincianQris(ids) {
+  if (!ids.length) return new Map();
+  const { rows: data } = await queryDatabase(
+    `SELECT d.id_pesanan, d.jumlah, d.extra->>'add_on' AS add_on,
+            COALESCE(d.extra->>'nama_produk', p.nama) AS nama
+     FROM detail_pesanan d JOIN produk p ON p.id = d.id_produk
+     WHERE d.id_pesanan = ANY($1::text[]) ORDER BY d.created_at, d.id`, [ids]
+  );
+  const hasil = new Map();
+  for (const item of data) {
+    const items = hasil.get(item.id_pesanan) || [];
+    items.push(namaDenganAddOn(item.nama, item.add_on) + ' × ' + item.jumlah);
+    hasil.set(item.id_pesanan, items);
+  }
+  return hasil;
+}
 
 async function setPeran(id, peran, info = {}) {
   const ada = (tb) => getRow(null, tb, id).catch(() => null);
@@ -31,6 +50,24 @@ export async function POST(req) {
   const { aksi, id, catatan } = b;
   if (id !== undefined && (typeof id !== 'string' || !id || id.length > 200 || id.includes('\0'))) return err('ID tidak valid.');
   const PERAN = ['pembeli', 'mitra', 'admin'];
+
+  if (aksi === 'cari_qris') {
+    if (!id) return err('Masukkan kode pesanan lengkap.');
+    const pembayaran = await cariSatu('pembayaran', { id_pesanan: id, metode: 'QRIS' });
+    if (!pembayaran) return Response.json({ qris: [] });
+    const [pesanan, rincian, bukti] = await Promise.all([
+      getRow(null, 'pesanan', id), rincianQris([id]),
+      pembayaran.id_bukti_checkout ? cariSatu('bukti_checkout', { _id: pembayaran.id_bukti_checkout }) : null,
+    ]);
+    const [pembeli, mitra] = await Promise.all([
+      getRow(null, 'pengguna', pesanan.id_pembeli), getRow(null, 'mitra', pesanan.id_mitra),
+    ]);
+    return Response.json({ qris: [{
+      ...pembayaran, $id: pembayaran.id, pesanan, items: rincian.get(id) || [],
+      nama_pembeli: pembeli.nama, nama_mitra: mitra.nama_usaha,
+      dana_terdeteksi: Boolean(bukti?.waktu_dana_masuk),
+    }] });
+  }
 
   if (aksi === 'daftar_pencairan') {
     const pencairan = await cariBanyak('pencairan_dompet', { status: 'DIAJUKAN' }, { sort: { created_at: 1 }, limit: 50 });
@@ -62,15 +99,17 @@ export async function POST(req) {
     const rf = rfRows.filter((x) => x.status_pembayaran === 'REFUND_DIAJUKAN');
     const qrisPending = rfRows.filter((x) => x.metode === 'QRIS' && x.status_pembayaran === 'MENUNGGU');
     const idsBukti = [...new Set(qrisPending.map((by) => by.id_bukti_checkout).filter(Boolean))];
-    const [qrisOrders, buktiCheckout] = await Promise.all([
+    const [qrisOrders, buktiCheckout, rincian] = await Promise.all([
       qrisPending.length ? rows(null, 'pesanan', [Query.equal('id', qrisPending.map((q) => q.id_pesanan)), Query.limit(500)]) : [],
       idsBukti.length ? cariBanyak('bukti_checkout', { _id: { $in: idsBukti } }, { limit: 5000 }) : [],
+      rincianQris(qrisPending.map((by) => by.id_pesanan)),
     ]);
     const pesananPerId = new Map(qrisOrders.map((pesanan) => [pesanan.$id, pesanan]));
     const buktiPerId = new Map(buktiCheckout.map((bukti) => [bukti.id, bukti]));
     const qris = qrisPending.map((by) => ({
       ...by,
       pesanan: pesananPerId.get(by.id_pesanan) || null,
+      items: rincian.get(by.id_pesanan) || [],
       dana_terdeteksi: Boolean(buktiPerId.get(by.id_bukti_checkout)?.waktu_dana_masuk),
     }));
 
@@ -102,16 +141,32 @@ export async function POST(req) {
       if (!awal || !await kunciPesanan(awal.id_pesanan)) return null;
       return getRow(null, 'pembayaran', id);
     }
-    if (aksi === 'verifikasi_qris') {
+    if (aksi === 'verifikasi_qris' || aksi === 'teruskan_bukti_qris') {
       const by = await pembayaranTerkunci();
-      if (by?.metode !== 'QRIS' || by.status_pembayaran !== 'MENUNGGU') return err('Pembayaran QRIS tidak dalam status menunggu.');
+      const idBukti = b.id_bukti_admin;
+      const hanyaBukti = aksi === 'teruskan_bukti_qris';
+      if ((hanyaBukti || idBukti !== undefined) && (typeof idBukti !== 'string' || !FORMAT_ID_BUKTI.test(idBukti))) return err('Bukti pembayaran tidak valid.');
+      if (idBukti && by?.id_bukti_admin === idBukti && by.id_admin_bukti === u.$id) return Response.json({ ok: true });
+      if (by?.metode !== 'QRIS' || by.status_pembayaran !== (hanyaBukti ? 'BERHASIL' : 'MENUNGGU')) return err('Status pembayaran QRIS sudah berubah. Muat ulang daftar.', 409);
       const ps = await getRow(null, 'pesanan', by.id_pesanan).catch(() => null);
       if (!ps || ps.status_pesanan === 'DIBATALKAN') return err('Pesanan sudah dibatalkan atau tidak ditemukan.', 409);
+      if (by.bukti_via_admin && !idBukti) return err('Unggah bukti dari pembeli sebelum mengonfirmasi pembayaran.');
+      if (idBukti && !await cariSatu('unggahan_bukti', { _id: idBukti, id_pembeli: u.$id })) return err('Unggahan bukti admin tidak ditemukan.');
       const now = new Date().toISOString();
-      await upd(null, 'pembayaran', id, { status_pembayaran: 'BERHASIL', waktu_bayar: now });
+      const buktiAdmin = idBukti ? { id_bukti_admin: idBukti, id_admin_bukti: u.$id, waktu_bukti_admin: now } : {};
+      if (hanyaBukti) {
+        if (by.id_bukti_admin) return err('Bukti sudah diteruskan ke mitra.', 409);
+        await upd(null, 'pembayaran', id, buktiAdmin);
+        await notif(null, ps.id_mitra, 'Bukti QRIS dari admin', `Bukti pembayaran pesanan #${ps.$id.slice(-6)} tersedia di Pesanan Masuk.`);
+        return Response.json({ ok: true });
+      }
+      await upd(null, 'pembayaran', id, {
+        status_pembayaran: 'BERHASIL', waktu_bayar: now, id_admin_verifikator: u.$id,
+        ...buktiAdmin,
+      });
       if (ps.status_pesanan === 'MENUNGGU_KONFIRMASI') await upd(null, 'pesanan', ps.$id, { status_pesanan: 'DIPROSES' });
       const noPesanan = by.id_pesanan.slice(-6);
-      if (ps?.id_mitra) await notif(null, ps.id_mitra, 'Pembayaran QRIS Diverifikasi Admin!', `Pesanan #${noPesanan} sebesar Rp ${by.jumlah.toLocaleString('id-ID')} telah diverifikasi lunas oleh Admin. Silakan siapkan pesanan pembeli!`, true);
+      if (ps?.id_mitra) await notif(null, ps.id_mitra, 'Pembayaran QRIS Diverifikasi Admin!', `Pesanan #${noPesanan} sebesar Rp ${by.jumlah.toLocaleString('id-ID')} telah diverifikasi lunas oleh Admin. ${idBukti ? 'Bukti tersedia di Pesanan Masuk. ' : ''}Silakan siapkan pesanan pembeli!`, true);
       if (ps?.id_pembeli) await notif(null, ps.id_pembeli, 'Pembayaran QRIS Diterima & Invoice Terbit!', `Pembayaran pesanan #${noPesanan} telah diverifikasi. Invoice resmi sudah terbit di menu Riwayat Pesanan.`, true);
       return Response.json({ ok: true });
     }

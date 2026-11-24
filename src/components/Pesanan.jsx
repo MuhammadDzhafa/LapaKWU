@@ -3,6 +3,7 @@ import { namaDenganAddOn } from '@/lib/add-on';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { list, Query, rp, tgl, api, img } from '@/lib/aw';
 import { mulaiPengambilan, tenggatBayarTenant } from '@/lib/pembayaran-tenant';
+import { TAUTAN_WA } from '@/lib/kontak';
 import { bolehLihatDenah, nomorTenantValid } from '@/lib/tenant';
 import { formatJadwalAmbil } from '@/lib/waktu';
 import DenahTenant from '@/components/DenahTenant';
@@ -292,6 +293,22 @@ export default function Pesanan({ uid, sebagai }) {
             </p>}
 
             {/* PREVIEW BUKTI PEMBAYARAN (QRIS) */}
+            {sebagai === 'pembeli' && p.bayar?.metode === 'QRIS' && (
+              <p>
+                <a className="btn sm out" target="_blank" rel="noopener noreferrer"
+                  href={`${TAUTAN_WA}?text=${encodeURIComponent(
+                    `Halo Admin LapaKWU, saya ingin menanyakan pembayaran QRIS.\nKode pesanan: ${p.$id}\nLapak: ${p.lapak?.nama_usaha || 'Mitra LapaKWU'}\nNominal pesanan: ${rp(p.bayar.jumlah)}`
+                    + (isMenungguBayar ? '\nSaya akan lampirkan bukti pembayaran di chat ini.' : '')
+                  )}`}>{isMenungguBayar ? 'Chat admin untuk konfirmasi QRIS' : 'Chat admin soal pembayaran'}</a>
+              </p>
+            )}
+            {sebagai === 'mitra' && p.bayar?.id_bukti_admin && (
+              <p>
+                <button type="button" className="btn sm out" onClick={() => setModalGambar(img(p.bayar.id_bukti_admin))}>
+                  Lihat bukti QRIS dari admin
+                </button>
+              </p>
+            )}
             {sebagai === 'pembeli' && p.bayar?.id_bukti && (
               <div style={{ background: 'var(--tint)', padding: 10, borderRadius: 8, border: '1px dashed var(--line)', marginBottom: 12 }}>
                 <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>

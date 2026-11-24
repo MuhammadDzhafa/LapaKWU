@@ -18,6 +18,7 @@ export default function Checkout() {
   const [f, setF] = useState({ metode: 'QRIS', pengantaran: 'AMBIL', alamat: '', catatan: '' });
   const [preOrder, setPreOrder] = useState(false);
   const [fileBukti, setFileBukti] = useState(null);
+  const [buktiViaAdmin, setBuktiViaAdmin] = useState(false);
   const [previewBukti, setPreviewBukti] = useState(null);
   const [qrisError, setQrisError] = useState(false);
   const [msg, setMsg] = useState('');
@@ -90,13 +91,13 @@ export default function Checkout() {
     if (mengirim.current) return;
     if (jadwalAmbil && !waktuAmbil) return setMsg('Jadwal pre-order sudah ditutup.');
     mengirim.current = true;
-    setBusy(f.metode === 'QRIS' ? 'Mengunggah bukti…' : 'Membuat pesanan…');
+    setBusy(f.metode === 'QRIS' && !buktiViaAdmin ? 'Mengunggah bukti…' : 'Membuat pesanan…');
     setMsg('');
 
     let id_bukti = null;
     const isQris = f.metode === 'QRIS';
 
-    if (isQris) {
+    if (isQris && !buktiViaAdmin) {
       if (!fileBukti) {
         setMsg('Wajib mengunggah bukti pembayaran untuk metode QRIS.');
         mengirim.current = false;
@@ -114,12 +115,12 @@ export default function Checkout() {
       }
     }
 
-    setBusy(isQris ? 'Memeriksa bukti pembayaran…' : 'Membuat pesanan…');
+    setBusy(isQris && !buktiViaAdmin ? 'Memeriksa bukti pembayaran…' : 'Membuat pesanan…');
     try {
       checkoutId.current ||= sessionStorage.getItem('lapakwu_checkout_request') || crypto.randomUUID();
       sessionStorage.setItem('lapakwu_checkout_request', checkoutId.current);
       const { alamat, ...data } = f;
-      const hasil = await api('/api/checkout', { ...data, ...(antar ? { alamat } : jadwalAmbil ? { tanggal_ambil: TANGGAL_PRE_ORDER } : {}), id_bukti, langsung: lg, request_id: checkoutId.current, total_diharapkan: totalSen });
+      const hasil = await api('/api/checkout', { ...data, ...(antar ? { alamat } : jadwalAmbil ? { tanggal_ambil: TANGGAL_PRE_ORDER } : {}), id_bukti, bukti_via_admin: buktiViaAdmin, langsung: lg, request_id: checkoutId.current, total_diharapkan: totalSen });
       sessionStorage.removeItem('lapakwu_checkout_request');
       checkoutId.current = null;
       selesaiCheckout(akun.$id, hasil.itemTerpesan);
@@ -247,7 +248,11 @@ export default function Checkout() {
               </p>
             </div>
 
-            <div className="field" style={{ marginTop: 8 }}>
+            <label className="opsi-checkout">
+              <input type="checkbox" checked={buktiViaAdmin} onChange={(e) => setBuktiViaAdmin(e.target.checked)} />
+              <span>Kirim bukti ke admin lewat WhatsApp</span>
+            </label>
+            {buktiViaAdmin ? <p className="muted">Setelah membuat pesanan, buka Riwayat Pesanan dan pilih Chat admin. Lampirkan bukti QRIS di WhatsApp.</p> : <div className="field" style={{ marginTop: 8 }}>
               <label htmlFor="bukti" style={{ fontWeight: 600, color: 'var(--bl-d)' }}>
                 Upload Bukti Pembayaran / Transfer <span style={{ color: 'var(--coral)' }}>* (Wajib)</span>
               </label>
@@ -273,7 +278,7 @@ export default function Checkout() {
                   </div>
                 </div>
               )}
-            </div>
+            </div>}
           </div>
         )}
 
@@ -298,7 +303,7 @@ export default function Checkout() {
 
         {msg && <p className="msg err" role="alert">{msg}</p>}
         <button className="btn sun" disabled={busy || !it?.length || pengguna?.status_akun !== 'AKTIF' || (antar && !bisaAntar) || (jadwalAmbil && !waktuAmbil)}>
-          {busy || `Bayar dan pesan ${rp(total)}`}
+          {busy || (f.metode === 'QRIS' && buktiViaAdmin ? 'Buat pesanan untuk verifikasi admin' : `Bayar dan pesan ${rp(total)}`)}
         </button>
       </form>
 

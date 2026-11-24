@@ -23,7 +23,7 @@ export async function POST(req) {
     if (tabel === 'detail_pesanan' && hasil.length) {
       const produk = await cariBanyak('produk', { _id: { $in: [...new Set(hasil.map((item) => item.id_produk))] } }, { limit: hasil.length });
       const nama = new Map(produk.map((item) => [item.id, item.nama]));
-      return Response.json({ rows: hasil.map((item) => ({ ...item, nama_produk: nama.get(item.id_produk) })) });
+      return Response.json({ rows: hasil.map((item) => ({ ...item, nama_produk: item.nama_produk || nama.get(item.id_produk) })) });
     }
     return Response.json({ rows: TABEL_PUBLIK.includes(tabel) ? hasil.map((row) => sanitasiPublik(tabel, row)) : hasil });
   } catch (e) {

@@ -29,10 +29,14 @@ export async function POST(req) {
 
     let upload = null;
     let teksBukti = null;
-    if (b.metode === 'QRIS') {
+    const isQris = b.metode === 'QRIS';
+    const buktiViaAdmin = isQris && b.bukti_via_admin === true;
+    if (isQris) {
       const { rows: [tersimpan] } = await queryDatabase('SELECT id_pembeli, response FROM checkout_request WHERE id = $1', [b.request_id]);
       if (tersimpan?.id_pembeli === u.$id && tersimpan.response) return Response.json({ ok: true, ...tersimpan.response });
       if (tersimpan && tersimpan.id_pembeli !== u.$id) return err('ID checkout sudah digunakan.', 409);
+    }
+    if (isQris && !buktiViaAdmin) {
       if (typeof b.id_bukti !== 'string' || !FORMAT_ID_BUKTI.test(b.id_bukti)) {
         return err('Harap unggah bukti pembayaran dalam format JPG, PNG, atau WebP.');
       }
@@ -135,25 +139,26 @@ export async function POST(req) {
         });
         for (const { item, produk, hargaSen } of grup) {
           await put(null, 'detail_pesanan', ID.unique(), {
-            id_pesanan: pid, id_produk: produk.$id, jumlah: item.jumlah,
+            id_pesanan: pid, id_produk: produk.$id, nama_produk: produk.nama, jumlah: item.jumlah,
             harga_satuan: hargaSen / 100, subtotal: item.jumlah * hargaSen / 100, add_on: item.add_on || '', catatan_item: item.catatan_item || '',
           });
         }
         await put(null, 'pembayaran', ID.unique(), {
           id_pesanan: pid, metode: b.metode, jumlah: total,
           status_pembayaran: 'MENUNGGU',
+          ...(buktiViaAdmin ? { bukti_via_admin: true, total_checkout_manual: totalCheckout } : {}),
           ...(upload ? { id_bukti: upload.id, id_bukti_checkout: upload.sha256, status_ocr: statusOcr, catatan_ocr: verifikasi.temuan, hasil_ocr: verifikasi.data } : {}),
         });
         const ringkas = grup.map(({ item, produk }) => namaDenganAddOn(produk.nama, item.add_on) + ' x' + item.jumlah).join(', ');
-        const label = upload ? 'QRIS' : 'Bayar di Lapak';
+        const label = isQris ? 'QRIS' : 'Bayar di Lapak';
         const judul = 'Ada pesanan baru (' + label + ')';
         const jadwal = waktuAmbil ? ' Pre-order untuk ambil di lapak pada ' + formatJadwalAmbil(waktuAmbil) + '.' : '';
-        const infoBayar = upload ? 'Pembayaran menunggu verifikasi.' : waktuAmbil ? 'Pembeli akan bayar di lapak saat mengambil pesanan.' : 'Pembeli akan bayar di lapak dalam 1 jam.';
+        const infoBayar = isQris ? 'Pembayaran menunggu verifikasi.' : waktuAmbil ? 'Pembeli akan bayar di lapak saat mengambil pesanan.' : 'Pembeli akan bayar di lapak dalam 1 jam.';
         const pesan = ringkas + '. Total Rp ' + total.toLocaleString('id-ID') + '.' + jadwal + (antar ? ' Pesanan antar.' : '') + ' ' + infoBayar;
-        await notif(null, u.$id, 'Pesanan dibuat (' + label + ')', 'Pesanan ke ' + mt.nama_usaha + (upload
+        await notif(null, u.$id, 'Pesanan dibuat (' + label + ')', 'Pesanan ke ' + mt.nama_usaha + (isQris
           ? ' berhasil dibuat dan menunggu verifikasi admin.'
           : waktuAmbil ? ' berhasil dibuat. Silakan bayar di lapak saat mengambil pesanan.' : ' berhasil dibuat. Silakan bayar langsung di lapak dalam 1 jam.') + jadwal);
-        await notif(null, mid, judul, pesan, !upload);
+        await notif(null, mid, judul, pesan, !isQris);
       }
       for (const item of cart) await del(null, 'item_keranjang', item.$id);
       if (cart.length) await upd(null, 'keranjang', u.$id, { total_harga: 0 });
